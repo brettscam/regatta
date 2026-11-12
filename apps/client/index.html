@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="color-scheme" content="dark" />
+    <title>Slack Tide</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="view" aria-label="Sailing simulator view"></canvas>
+    <div id="readout" class="hud readout" title="Click to hide"></div>
+    <div id="clock" class="hud clock" title="Click to pause, drag sideways to change speed"></div>
+    <div id="alarm" class="hud alarm" role="status" aria-live="polite"></div>
+    <div id="tag" class="tag" aria-hidden="true"></div>
+    <div id="fps" class="hud fps" hidden></div>
+    <div id="veil" class="veil"><div class="title">Slack Tide<small>working title · milestone 1</small></div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
