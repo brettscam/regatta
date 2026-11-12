@@ -189,5 +189,18 @@ requestAnimationFrame((t) => {
   document.getElementById('veil')?.classList.add('gone');
 });
 
+// When this page is republished while someone is sailing, hand the boat across so they carry on where they were.
+interface HotReload { snapshot?: (fn: () => unknown) => void; ready?: (fn: (data: unknown) => void) => void; data?: unknown }
+const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
+const resume = (data: unknown): void => {
+  const saved = (data as { sim?: SimState } | undefined)?.sim;
+  if (!saved || typeof saved.tick !== 'number') return;
+  sim.restore(saved);
+  before = after = grab(sim.state);
+};
+hot?.snapshot?.(() => ({ sim: sim.snapshot() }));
+if (hot?.ready) hot.ready(resume);
+else resume(hot?.data);
+
 // For play testing from the browser console.
 Object.assign(window, { slackTide: { sim, drone, boatView, renderer, views: VIEWS, setPaused: (p: boolean) => { paused = p; } } });

@@ -6,6 +6,12 @@
   --amber: #ffc46b;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* One look, day or night: instruments on dark glass over the sea. */
+  color-scheme: dark;
+  --edge-top: calc(16px + env(safe-area-inset-top, 0px));
+  --edge-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  --edge-left: max(16px, env(safe-area-inset-left, 0px));
+  --edge-right: max(16px, env(safe-area-inset-right, 0px));
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0a141a; color: var(--ink); font-family: var(--font); }
@@ -20,7 +26,7 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 }
 
 /* The one readout: a mirror of the mast displays, so the numbers stay readable from drone height. */
-.readout { left: 16px; top: 16px; display: grid; grid-template-columns: repeat(3, auto); gap: 2px 18px; padding: 10px 14px; cursor: pointer; }
+.readout { left: var(--edge-left); top: var(--edge-top); display: grid; grid-template-columns: repeat(3, auto); gap: 2px 18px; padding: 10px 14px; cursor: pointer; }
 .readout .cell { display: flex; flex-direction: column; min-width: 58px; }
 .readout .k { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .readout .v { font-size: 22px; font-weight: 600; line-height: 1.15; white-space: nowrap; }
@@ -30,19 +36,19 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 .readout.hidden::after { content: "instruments"; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 
 /* The ship's clock: the one overlay control. Click to pause, drag to change the rate of time. */
-.clock { right: 16px; top: 16px; padding: 9px 14px 8px; text-align: right; cursor: ew-resize; min-width: 112px; }
+.clock { right: var(--edge-right); top: var(--edge-top); padding: 9px 14px 8px; text-align: right; cursor: ew-resize; min-width: 112px; }
 .clock .time { font-size: 22px; font-weight: 600; line-height: 1.15; }
 .clock .sub { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
 .clock.paused .time { color: var(--amber); }
 .clock.fast .sub { color: var(--amber); }
 
 .alarm {
-  left: 50%; bottom: 28px; transform: translateX(-50%) translateY(8px); padding: 8px 16px; font-size: 14px; letter-spacing: 0.02em;
+  left: 50%; bottom: calc(var(--edge-bottom) + 12px); transform: translateX(-50%) translateY(8px); padding: 8px 16px; font-size: 14px; letter-spacing: 0.02em;
   opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease; pointer-events: none; white-space: nowrap;
 }
 .alarm.on { opacity: 1; transform: translateX(-50%); }
 
-.fps { left: 16px; bottom: 16px; padding: 5px 9px; font: 11px var(--mono); color: var(--dim); }
+.fps { left: var(--edge-left); bottom: var(--edge-bottom); padding: 5px 9px; font: 11px var(--mono); color: var(--dim); }
 
 /* The tag at the pointer: the one number that matters for the part in hand. */
 .tag {
