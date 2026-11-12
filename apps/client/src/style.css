@@ -73,3 +73,65 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
   .readout .cell { min-width: 46px; }
   .clock .time { font-size: 17px; }
 }
+
+/* ---- instruments: the wind vane beside the numbers, tide underneath ------------------------- */
+.readout { grid-template-columns: auto auto; grid-template-areas: "dial cells" "tide tide"; gap: 6px 14px; align-items: center; }
+.readout .dial { grid-area: dial; width: 104px; }
+.readout .dial svg { display: block; width: 104px; height: 104px; }
+.readout .dial .legend { display: flex; justify-content: center; gap: 7px; font-size: 8.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.readout .dial .legend span::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; flex: none; }
+.readout .dial .legend span { display: inline-flex; align-items: center; }
+.readout .dial .legend .app::before { background: var(--amber); }
+.readout .dial .legend .true::before { border: 1.5px solid var(--ink); width: 4px; height: 4px; }
+.readout .dial .legend .tide::before { background: #6cc0ff; }
+.readout .cells { grid-area: cells; display: grid; grid-template-columns: repeat(3, auto); gap: 2px 16px; }
+.readout .tideline { grid-area: tide; font-size: 12px; color: var(--dim); border-top: 1px solid var(--edge); padding-top: 6px; white-space: nowrap; }
+.readout .tideline b { color: var(--ink); font-weight: 600; }
+.readout.hidden .dial, .readout.hidden .cells, .readout.hidden .tideline { display: none; }
+
+/* ---- chart: corner preview and the full passage-planning view -------------------------------- */
+.mini { right: var(--edge-right); bottom: var(--edge-bottom); width: 236px; height: 196px; padding: 0; overflow: hidden; cursor: pointer; display: block; }
+.mini[hidden], .chart[hidden] { display: none; }
+.chart {
+  position: fixed; inset: 0; z-index: 4; display: grid; place-items: center;
+  background: rgba(6, 12, 16, 0.62);
+  padding: calc(14px + env(safe-area-inset-top, 0px)) var(--edge-right) calc(14px + env(safe-area-inset-bottom, 0px)) var(--edge-left);
+}
+.chart-frame {
+  width: min(1560px, 100%); height: min(960px, 100%); display: grid;
+  grid-template-columns: minmax(0, 1fr) 452px; grid-template-rows: minmax(0, 1fr) 138px;
+  background: #0d1820; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.chart-map { grid-column: 1; grid-row: 1; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+.chart-strip { grid-column: 1; grid-row: 2; width: 100%; height: 100%; display: block; cursor: ew-resize; touch-action: none; border-top: 1px solid var(--edge); }
+.chart-side { grid-column: 2; grid-row: 1 / span 2; border-left: 1px solid var(--edge); padding: 14px 16px; overflow: auto; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.chart-side header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.chart-side h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+.chart-side h3 { margin: 0 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.chart-side .key { font-size: 10.5px; letter-spacing: 0.08em; color: var(--dim); }
+.chart-side section { border-top: 1px solid var(--edge); padding: 10px 0; display: grid; gap: 5px; }
+.chart-side .big { display: flex; justify-content: space-between; align-items: baseline; }
+.chart-side .big b { font-size: 19px; font-weight: 600; }
+.chart-side .pair { display: grid; grid-template-columns: 64px 1fr 56px 1fr; gap: 2px 8px; align-items: baseline; }
+.chart-side .pair span, .chart-side .big span { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.chart-side .pair b { font-weight: 600; }
+.chart-side .quiet { margin: 0; color: var(--dim); }
+.chart-side table { width: 100%; border-collapse: collapse; margin: 2px 0 10px; font-size: 11.5px; }
+.chart-side th { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); text-align: right; padding: 4px 3px; border-bottom: 1px solid var(--edge); }
+.chart-side td { text-align: right; padding: 5px 3px; border-bottom: 1px solid rgba(238, 243, 244, 0.07); white-space: nowrap; }
+.chart-side th.name, .chart-side td.name { text-align: left; }
+.chart-side td.name { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+.chart-side tr.next td { color: var(--amber); }
+.chart-side tr.done td { color: var(--dim); }
+.chart-side .late { color: #ff9a8a; }
+.chart-side .early, .chart-side .ok { color: #86dba8; }
+.chart-side .live { color: var(--ink); }
+.chart-side .hint, .chart-side .source { margin: 10px 0 0; font-size: 11px; line-height: 1.45; color: var(--dim); }
+@media (max-width: 980px) {
+  .chart-frame { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) 120px minmax(0, 1fr); }
+  .chart-side { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--edge); }
+  .mini { width: 168px; height: 148px; }
+  .readout .dial, .readout .dial svg { width: 78px; height: 78px; }
+  .readout .dial svg { height: 78px; }
+  .readout .tideline { font-size: 10.5px; white-space: normal; }
+}

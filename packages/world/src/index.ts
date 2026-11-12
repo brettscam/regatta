@@ -1,5 +1,7 @@
 import type { Environment, EnvSample } from '@slack-tide/sim';
 
+export * from './replay';
+
 const D2R = Math.PI / 180;
 const KT = 0.514444;
 
@@ -12,10 +14,7 @@ export interface SteadyWindOptions {
   currentKt?: number;
 }
 
-/**
- * The milestone 1 world: one steady wind everywhere, and an optional steady current.
- * Baked tiles of real wind, current, tide and depth replace this from milestone 3.
- */
+/** One steady wind everywhere and an optional steady current, with no land. For tests and tuning. */
 export function steadyWorld(opts: SteadyWindOptions): Environment {
   const set = (opts.currentTowardDeg ?? 0) * D2R;
   const drift = (opts.currentKt ?? 0) * KT;

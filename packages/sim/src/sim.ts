@@ -316,10 +316,36 @@ export class Sim {
     const env = this.env.sample(s.x, s.y, s.t);
     const sinH = Math.sin(s.heading);
     const cosH = Math.cos(s.heading);
-    const vx = s.speed * sinH + s.lateral * cosH + env.currentX;
-    const vy = s.speed * cosH - s.lateral * sinH + env.currentY;
-    s.x += vx * dt;
-    s.y += vy * dt;
+    let vx = s.speed * sinH + s.lateral * cosH + env.currentX;
+    let vy = s.speed * cosH - s.lateral * sinH + env.currentY;
+    // Depth under the keel is chart depth plus tide minus draft. Touching bottom stops the boat.
+    // She can still work her way off toward deeper water.
+    const draft = b.dimensions.draft;
+    o.underKeel = env.depth === undefined ? null : env.depth - draft;
+    o.aground = false;
+    let moveX = vx * dt;
+    let moveY = vy * dt;
+    if (env.depth !== undefined && env.depth < draft + 0.05) {
+      o.aground = true;
+    } else if (env.depth !== undefined) {
+      // Look a boat length ahead of the move so the keel stops at the shoal, not past it.
+      const ahead = this.env.sample(s.x + moveX, s.y + moveY, s.t).depth;
+      if (ahead !== undefined && ahead < draft) o.aground = true;
+    }
+    if (o.aground) {
+      const here = env.depth ?? 0;
+      const there = this.env.sample(s.x + moveX, s.y + moveY, s.t).depth ?? 0;
+      if (there <= here || there < draft * 0.6) {
+        moveX = 0;
+        moveY = 0;
+        s.speed *= Math.exp(-dt / 0.35);
+        s.lateral *= Math.exp(-dt / 0.35);
+      }
+    }
+    s.x += moveX;
+    s.y += moveY;
+    vx = moveX / dt;
+    vy = moveY / dt;
     o.sog = Math.hypot(vx, vy);
     o.cog = o.sog > 0.01 ? wrapTau(Math.atan2(vx, vy)) : s.heading;
 
@@ -487,7 +513,7 @@ export class Sim {
       tws: 0, twd: 0, twa: 0, aws: 0, awa: 0, sog: 0, cog: 0,
       main: emptySail(), jib: emptySail(),
       targetSpeed: 0, polarSpeed: 0, heelLoad: 0, heelPenalty: 1, weatherHelm: 0, rudderGrip: 1,
-      inIrons: false, roundingUp: false,
+      inIrons: false, roundingUp: false, underKeel: null, aground: false,
     };
   }
 }

@@ -10,6 +10,8 @@ export interface EnvSample {
   currentX: number;
   /** Current set, m/s north. */
   currentY: number;
+  /** Depth of water here and now, metres, tide included. Leave out for open water of no known depth. */
+  depth?: number;
 }
 
 export interface Environment {
@@ -172,4 +174,7 @@ export interface SimOutputs {
   rudderGrip: number;
   inIrons: boolean;
   roundingUp: boolean;
+  /** Water under the keel, metres. Null where the world gives no depth. */
+  underKeel: number | null;
+  aground: boolean;
 }

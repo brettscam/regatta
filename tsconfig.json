@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/sim" },
-    { "path": "packages/world" },
-    { "path": "apps/client" }
+    {
+      "path": "packages/sim"
+    },
+    {
+      "path": "packages/world"
+    },
+    {
+      "path": "packages/nav"
+    },
+    {
+      "path": "apps/client"
+    }
   ]
 }

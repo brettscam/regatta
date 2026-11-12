@@ -12,7 +12,7 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 
 ## Commands
 
-- `npm test` runs the sim tests. `npm run typecheck` checks all packages. `npm run dev` serves the client
+- `npm test` runs the sim, world and nav tests. `npm run typecheck` checks all packages. `npm run dev` serves the client
 - `npx vite-node scripts/tune.ts` prints reef crossovers, speeds against the polar and the tacking angle
 
 ## Conventions that are easy to get wrong
@@ -24,6 +24,10 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - Jib sheets are stored as slack in radians, 0 is hard in. Mainsheet is the widest boom angle it allows
 - Interactive parts are named nodes (`wheel`, `boom`, `winch_port`, `winch_stbd`, `furler`). Bindings live in the boat's JSON `controls` list
 
+- The world is `ReplayWorld` in `packages/world`, fed by `courses/sf-bay` (baked by `pipeline/`, see its README). Session time is seconds since the session start. `startOffset` places it in the season
+- Course coordinates are flat metres east and north of `course.origin`. Grids have row 0 at the southern edge
+- Chart and planning live in `apps/client/src/ui/chart.ts` and `passage.ts`. The maths is in `packages/nav` and is tested there
+
 ## Status
 
-Milestone 1 is built and waiting on its play test gate.
+Milestone 1 is built and waiting on its play test gate. At the owner's request, parts of milestone 3 were built early: the Bay replay (wind, stream, tide, depth, land), the chartplotter with passage planning and plan against actual, the forecast timeline, an on-screen wind and tide dial, and crew figures. The owner asked for these on-screen instruments directly, which overrides the PRD's lean toward keeping information on the boat. They hide with H.

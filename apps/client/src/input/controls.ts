@@ -15,6 +15,9 @@ interface Hover {
 export interface ControlHost {
   togglePause(): void;
   announce(text: string): void;
+  toggleChart(): void;
+  closeChart(): void;
+  toggleInstruments(): void;
 }
 
 /**
@@ -265,7 +268,9 @@ export class Controls {
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
       case 'Digit4': this.drone.flyTo(VIEWS.drone); break;
-      case 'KeyH': this.hud.toggleReadout(); break;
+      case 'KeyH': this.host.toggleInstruments(); break;
+      case 'KeyM': this.host.toggleChart(); break;
+      case 'Escape': this.host.closeChart(); break;
       case 'Backquote': this.hud.toggleFps(); break;
       default: if (e.code.startsWith('Arrow')) e.preventDefault();
     }

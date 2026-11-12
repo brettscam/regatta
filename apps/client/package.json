@@ -12,7 +12,8 @@
   "dependencies": {
     "@slack-tide/sim": "*",
     "@slack-tide/world": "*",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "@slack-tide/nav": "*"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",

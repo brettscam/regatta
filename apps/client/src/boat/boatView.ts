@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide/sim';
 import { buildSloop, type SloopModel } from './buildSloop';
 import { Jib, Mainsail, type SailShape } from './sails';
+import { Crew } from './crew';
 
 const R2D = 180 / Math.PI;
 const KT = 0.514444;
@@ -87,6 +88,7 @@ export class BoatView {
   private readonly jibTells: Array<{ v: number; port: Telltale; stbd: Telltale }> = [];
   private readonly leechTells: Array<{ v: number; t: Telltale }> = [];
 
+  private readonly crew: Crew;
   private readonly displayCanvas = document.createElement('canvas');
   private readonly displayTexture: THREE.CanvasTexture;
   private displayClock = 0;
@@ -102,6 +104,7 @@ export class BoatView {
     this.main = new Mainsail(this.model.geo);
     this.jib = new Jib(this.model.geo);
     this.root.add(this.main.mesh, this.jib.mesh);
+    this.crew = new Crew(this.model);
     this.model.nodes.main = this.main.mesh;
     this.model.nodes.jib = this.jib.mesh;
 
@@ -312,6 +315,8 @@ export class BoatView {
       this.glowLevel += (1 - this.glowLevel) * Math.min(1, dt * 12);
       this.applyGlow(this.glowNode, this.glowLevel * (1.1 + 0.25 * Math.sin(time * 5)));
     }
+
+    this.crew.update(state, out, pose, time, dt);
 
     this.displayClock -= dt;
     if (this.displayClock <= 0) {

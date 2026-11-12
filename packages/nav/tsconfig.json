@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "noEmit": false, "emitDeclarationOnly": true, "outDir": "dist", "rootDir": "../.." },
+  "include": ["src", "test", "../../boats/*.json"],
+  "references": [{ "path": "../sim" }]
+}

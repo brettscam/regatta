@@ -225,3 +225,49 @@ describe('current', () => {
     expect(sim.out.sog).toBeGreaterThan(sim.state.speed + 1.5 * KTms);
   });
 });
+
+describe('depth', () => {
+  // A beach to the east: 20 m deep at x = 0, shoaling to nothing at x = 200.
+  const beach = { sample: (x: number) => ({ windDir: 0, windSpeed: 12 * KT, currentX: 0, currentY: 0, depth: Math.max(0, 20 - x / 10) }) };
+
+  it('reports water under the keel', () => {
+    const sim = new Sim(boat, beach, { headingDeg: 90, speedKt: 5 });
+    sim.step();
+    expect(sim.out.underKeel).toBeCloseTo(20 - boat.dimensions.draft, 0);
+    expect(sim.out.aground).toBe(false);
+  });
+
+  it('touching bottom stops the boat before the beach', () => {
+    const sim = new Sim(boat, beach, { headingDeg: 90, speedKt: 5 });
+    sim.state.crewTrim = true;
+    sim.trimForWind();
+    sim.setHelm('heading');
+    sim.advance(180);
+    expect(sim.out.aground).toBe(true);
+    expect(sim.state.speed / KT).toBeLessThan(0.2);
+    // Draft is 2 m, so she stops where the water is about 2 m deep: x of about 180.
+    expect(sim.state.x).toBeGreaterThan(165);
+    expect(sim.state.x).toBeLessThan(182);
+  });
+
+  it('she can sail off again toward deeper water', () => {
+    const sim = new Sim(boat, beach, { headingDeg: 90, speedKt: 5 });
+    sim.state.crewTrim = true;
+    sim.trimForWind();
+    sim.setHelm('heading');
+    sim.advance(180);
+    sim.setHelm('heading', 270 * D2R);
+    // Aground she has no steerage, so point her by hand as a crew would with the engine or a kedge.
+    sim.state.heading = 270 * D2R;
+    sim.advance(120);
+    expect(sim.out.aground).toBe(false);
+    expect(sim.state.x).toBeLessThan(100);
+  });
+
+  it('open water of unknown depth never grounds', () => {
+    const sim = new Sim(boat, northWind(12), { headingDeg: 90, speedKt: 5 });
+    sim.advance(10);
+    expect(sim.out.underKeel).toBeNull();
+    expect(sim.out.aground).toBe(false);
+  });
+});

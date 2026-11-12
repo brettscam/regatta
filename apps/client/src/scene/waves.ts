@@ -14,6 +14,8 @@ export interface Wave {
   q: number;
   phase: number;
   length: number;
+  /** Amplitude in the reference 14 kt breeze, before scaling for the wind. */
+  base: number;
 }
 
 export const WAVE_COUNT = 8;
@@ -54,8 +56,21 @@ export function buildWaves(windFrom: number, twsKt: number): Wave[] {
       q: steepness / (k * a * WAVE_COUNT),
       phase,
       length,
+      base: amp,
     };
   });
+}
+
+/**
+ * Raise or flatten the sea for a new wind speed. Only heights change: lengths, directions and phases stay,
+ * so the water never jumps when the wind builds or eases.
+ */
+export function setSeaState(waves: Wave[], twsKt: number): void {
+  const heightScale = Math.min(2.6, Math.max(0.12, Math.pow(twsKt / 14, 1.35)));
+  for (const w of waves) {
+    w.amp = w.base * heightScale;
+    w.q = 0.78 / (w.k * w.amp * WAVE_COUNT);
+  }
 }
 
 /** Height of the long waves at a point. Good enough for floating the hull and keeping the camera dry. */

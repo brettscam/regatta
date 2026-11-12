@@ -2,7 +2,7 @@
 
 A realistic 3D sailing simulator that runs in the browser. You sail by handling the boat itself: point at a part and scroll, or drag it. The full plan is in [docs/PRD.md](docs/PRD.md).
 
-**Status: milestone 1 built, waiting on its play test.** One 38 ft sloop, open water, one steady wind, single player.
+**Status: milestone 1 built and waiting on its play test, with the chart, forecast and tide pulled forward from milestone 3 at the owner's request.** One 38 ft sloop on Central San Francisco Bay, replaying NOAA's wind, tidal stream and tide from 14 and 15 July 2024.
 
 ## Run it
 
@@ -44,22 +44,33 @@ Hover and scroll is the main control. Dragging the same part does the same thing
 - Double-click any part of the boat to fly to its working view
 - **H** hides the instrument readout. The backquote key shows a frame-rate meter
 - The wheel holds where you leave it. Until you first touch it, the boat holds her angle to the wind
+- **M** opens the chart. So does clicking the chart preview in the corner. **Esc** closes it
 
 The two jib sheets are separate, as on a real boat. Steer through the wind without touching them and the jib stays aback until you let the old sheet go and trim the new one.
 
 What the boat tells you: the masthead vane points at the apparent wind, jib telltales lift on the windward side when the sail is starved and droop to leeward when it is stalled, the mast display shows speed, heading and apparent wind, and loose cloth looks and sounds loose.
 
-Play-test options go in the address: `?wind=18&from=250&hdg=300&time=2024-07-15T01:00:00Z` sets wind speed in knots, wind direction, starting heading, and the date and time that place the sun.
+## Instruments, chart and passage plan
+
+- **Wind and tide dial** (top left): bow up. The solid pointer is where the apparent wind comes from, the hollow one the true wind, and the blue arrow is which way the tide is setting the boat. Underneath: true wind, height of tide and whether it is rising, and the stream at the boat. **H** hides all of it
+- **Chart preview** (bottom right): the boat, her track, the route, and wind and stream at the boat
+- **Chart** (**M**): click water to drop a waypoint, drag one to move it, double-click one to remove it. Each leg shows course, distance, forecast wind, fair or foul tide, speed over ground and planned arrival, worked out from the boat's polar and the forecast
+- **Plan against actual**: the track sailed is drawn over the planned route, a dashed ring shows where the plan says the boat should be now, and each mark records planned and actual arrival
+- **Forecast timeline** (under the chart): wind, tide height and the stream through the Golden Gate for the next day. Drag it to look ahead and the chart shows the forecast stream and wind for that time. Double-click it to come back to now
+- **Alarms**: shallow water, aground and each mark reached. An alarm drops time back to real speed
+
+Play-test options go in the address: `?start=20` begins 20 hours into the season instead of 2.5, and `?x=1300&y=250&hdg=293` sets the starting position in metres from the course origin and the heading.
 
 ## How it is built
 
 ```
 packages/sim     The sailing model. No rendering, no browser APIs, fixed 1/60 s step, deterministic
-packages/world   Wind and current at a place and time. Milestone 1: one steady wind
+packages/world   Wind, current, tide and depth at a place and time, replayed from a baked course package
+packages/nav     Passage planning: leg times from polar and forecast, plan against actual
 apps/client      Three.js rendering, drone camera, input, sound
 boats/           Boat data files. sloop38.json holds dimensions, polar, sails, heel law and control bindings
-courses/         Course data packages, from milestone 3
-pipeline/        Python scripts that bake world tiles, from milestone 3
+courses/         Course data packages. sf-bay is baked from NOAA SFBOFS and open elevation data
+pipeline/        Python scripts that bake them. See pipeline/README.md
 docs/PRD.md      The product plan
 ```
 
@@ -81,9 +92,20 @@ docs/PRD.md      The product plan
 - [ ] 60 frames a second on a recent laptop: needs checking on real hardware (backquote key shows the meter)
 - [ ] The gate: a sailor who has never seen the game beats upwind through three tacks using only the mouse, with no instructions
 
+## Beyond milestone 1, built early
+
+- [x] Real wind, tidal stream, tide height, depth and coastline for the Central Bay, replayed (milestone 3)
+- [x] Land and the Golden Gate Bridge in the 3D view, grounding in shallow water
+- [x] Chartplotter with waypoints, passage plan, plan against actual, and a forecast that can be wrong (milestone 3)
+- [x] Wind and tide dial on screen, two crew figures aboard
+- [ ] Milestone 3 gate still open: set and drift at the Gate checked against NOAA within half a knot
+
 ## Known gaps, on purpose
 
 - The sim runs on the main thread. It is already isolated behind plain state and commands, so moving it into a Web Worker is mechanical, and it comes with the autopilot work in milestone 3
 - Reef and furler are in the sim and its tests, but have no parts to point at yet. They arrive with milestone 2
-- No land, no tide, no current, no gusts. Those are milestone 3
+- The pilot holds a heading or a wind angle but does not yet follow the route
+- Waves do not break on the shore and the wind does not know about the hills. Wind shadows are milestone 3 work
+- Gusts and shifts are added on top of the hourly model wind, as the PRD allows. They are not from data
+- The crew are figures only. Skill, fatigue and watches are milestone 4
 - The sloop is a placeholder built in code, to be replaced by a proper model before milestone 3
