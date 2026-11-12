@@ -37,6 +37,11 @@ export class Passage {
 
   constructor(private readonly polar: PolarTable, private readonly weather: PlanWeather) {}
 
+  /** Where the leg now being sailed began. */
+  get legOrigin(): Point {
+    return this.legStart;
+  }
+
   get nextIndex(): number {
     const i = this.marks.findIndex((m) => m.reachedAt === null);
     return i < 0 ? this.marks.length : i;

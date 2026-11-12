@@ -36,6 +36,7 @@ Hover and scroll is the main control. Dragging the same part does the same thing
 | Wheel | Up or right steers to starboard, down or left to port | Drag the rim | A and D, or left and right arrows |
 | Boom | Up hauls the mainsheet in, down eases | Drag the boom in or out | W in, S out |
 | Jib winch, either side | Up trims that sheet, down eases it | Toward the centreline grinds, outward eases | Q trims the leeward sheet, E eases the loaded one |
+| Autopilot head (aft cabin bulkhead) | Turns the heading or wind angle it holds | Drag its dial. Click it to change what it holds | P engages or releases. Shift+P changes what it holds |
 | Water or sky | Zoom | Orbit. Right-drag or two fingers to pan | 1 helm, 2 mast, 3 foredeck, 4 drone |
 
 - **T** tacks or gybes, and the crew swaps the jib sheets
@@ -49,6 +50,23 @@ Hover and scroll is the main control. Dragging the same part does the same thing
 The two jib sheets are separate, as on a real boat. Steer through the wind without touching them and the jib stays aback until you let the old sheet go and trim the new one.
 
 What the boat tells you: the masthead vane points at the apparent wind, jib telltales lift on the windward side when the sail is starved and droop to leeward when it is stalled, the mast display shows speed, heading and apparent wind, and loose cloth looks and sounds loose.
+
+## Autopilot
+
+The pilot holds one of three things: a **heading**, a **wind angle**, or the **route**. While it steers, the crew trims the sails, so the boat sails herself. Touch the wheel and you have the helm back. Pick up a sheet and the crew leaves the trimming to you.
+
+- **Route** steers for the next mark on the chart, crabbing across the tide so her course over ground stays on the mark. When each mark is reached it carries on to the next
+- When the mark is to windward it sails close-hauled and tacks when the mark can be laid. It short-tacks away from shoal water rather than run up it
+- It gives up when overpowered: a few seconds of losing to the helm and it hands the wheel back with an alarm
+- It does not reef, avoid other vessels or look ahead for land on a reach. Keep a watch
+
+## Sailing in company
+
+Open the same link with someone else and each of you sees the other's boat, live. Everyone sails in one clock, so one wind and one tide: the page moves you up to whoever is furthest on, and pause and fast-forward are off while another boat is there. Nothing is stored. Close the page and your boat leaves the others' water.
+
+This uses the claude.ai artifact room, so it only works on the published page, for people the page has been shared with who are signed in. A local `npm run dev` build is single-handed.
+
+There is other traffic on the Bay too: ferries, a ship in the channel and a few sailboats. They show on the chart with their course and speed, and an alarm sounds when one will pass close.
 
 ## Instruments, chart and passage plan
 
@@ -100,11 +118,14 @@ docs/PRD.md      The product plan
 - [x] Wind and tide dial on screen, two crew figures aboard
 - [ ] Milestone 3 gate still open: set and drift at the Gate checked against NOAA within half a knot
 
+- [x] Autopilot: heading, wind angle and route, with the crew trimming (milestone 3)
+- [x] Shared water: other people's boats live in your world on one clock (multiplayer step 2, without accounts or a server)
+- [x] Bay traffic, city and landmarks, and a more detailed boat
+
 ## Known gaps, on purpose
 
 - The sim runs on the main thread. It is already isolated behind plain state and commands, so moving it into a Web Worker is mechanical, and it comes with the autopilot work in milestone 3
 - Reef and furler are in the sim and its tests, but have no parts to point at yet. They arrive with milestone 2
-- The pilot holds a heading or a wind angle but does not yet follow the route
 - Waves do not break on the shore and the wind does not know about the hills. Wind shadows are milestone 3 work
 - Gusts and shifts are added on top of the hourly model wind, as the PRD allows. They are not from data
 - The crew are figures only. Skill, fatigue and watches are milestone 4

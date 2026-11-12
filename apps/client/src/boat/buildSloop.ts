@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BoatSpec } from '@slack-tide/sim';
 
 /**
@@ -87,6 +88,70 @@ function bandTexture(bands: Array<[number, string]>, height = 512): THREE.Canvas
   return tex;
 }
 
+function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  draw(c.getContext('2d')!, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/** Repeatable noise, so the boat looks the same on every machine. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (Math.imul(a, 1664525) + 1013904223) >>> 0;
+    return a / 4294967296;
+  };
+}
+
+/** Laid teak: planks running fore and aft with dark caulking between them. One tile is 0.42 m square. */
+function teakTexture(): THREE.CanvasTexture {
+  const tex = canvasTexture(256, 256, (g, w, h) => {
+    const rnd = seeded(7);
+    const planks = 6;
+    const pw = w / planks;
+    for (let i = 0; i < planks; i++) {
+      const tone = 0.86 + rnd() * 0.24;
+      g.fillStyle = `rgb(${Math.round(150 * tone)}, ${Math.round(104 * tone)}, ${Math.round(62 * tone)})`;
+      g.fillRect(i * pw, 0, pw, h);
+      // Grain: long faint streaks along the plank.
+      for (let k = 0; k < 26; k++) {
+        g.fillStyle = `rgba(${rnd() < 0.5 ? '70, 44, 22' : '205, 160, 108'}, ${0.05 + rnd() * 0.09})`;
+        g.fillRect(i * pw + 3 + rnd() * (pw - 6), rnd() * h, 1 + rnd() * 1.5, 30 + rnd() * 120);
+      }
+      g.fillStyle = '#1d1712';
+      g.fillRect(i * pw - 1.5, 0, 3, h);
+      // A butt joint somewhere along each plank.
+      g.fillRect(i * pw, Math.floor(rnd() * h), pw, 2.5);
+    }
+  });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1 / 0.42, 1 / 0.42);
+  return tex;
+}
+
+/** Moulded non-skid: a fine regular stipple. One tile is 0.25 m square. */
+function nonSkidTexture(): THREE.CanvasTexture {
+  const tex = canvasTexture(128, 128, (g, w, h) => {
+    g.fillStyle = '#c9c7bc';
+    g.fillRect(0, 0, w, h);
+    const rnd = seeded(11);
+    for (let y = 0; y < h; y += 4) {
+      for (let x = (y / 4) % 2 ? 2 : 0; x < w; x += 4) {
+        g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,250' : '120,118,108'}, ${0.1 + rnd() * 0.12})`;
+        g.fillRect(x, y, 2, 2);
+      }
+    }
+  });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1 / 0.25, 1 / 0.25);
+  return tex;
+}
+
 export function buildSloop(spec: BoatSpec): SloopModel {
   const d = spec.dimensions;
   const root = new THREE.Group();
@@ -136,8 +201,10 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     roughness: 0.28, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.2,
   });
   const white = new THREE.MeshStandardMaterial({ color: 0xeeece4, roughness: 0.55 });
-  // Double-sided so every bulkhead and coaming face shows, whichever way the lofted skin happens to wind.
-  const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, side: THREE.DoubleSide });
+  // The deck is one skin with three finishes. Double-sided so every bulkhead and coaming face shows.
+  const nonSkidMat = new THREE.MeshStandardMaterial({ map: nonSkidTexture(), roughness: 0.92, side: THREE.DoubleSide });
+  const gelMat = new THREE.MeshPhysicalMaterial({ color: 0xf2f0e8, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25, side: THREE.DoubleSide });
+  const teakDeckMat = new THREE.MeshStandardMaterial({ map: teakTexture(), roughness: 0.78, side: THREE.DoubleSide });
   const teak = new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.8 });
   const steel = new THREE.MeshStandardMaterial({ color: 0xcfd4d6, roughness: 0.22, metalness: 1 });
   const alloy = new THREE.MeshStandardMaterial({ color: 0xd9dcdc, roughness: 0.42, metalness: 0.65 });
@@ -203,6 +270,50 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     hull.castShadow = true;
     hull.receiveShadow = true;
     solids.push(hull);
+
+    // Cove stripe: a thin gold line that follows the sheer.
+    const halfWidthAt = (t: number, y: number) => {
+      const sy = sheerY(t);
+      const ky = Math.min(keelY(t), sy - 0.02);
+      const n = lerp(1.25, 2.5, smooth(0, 0.4, t));
+      const c = Math.pow(1 - Math.min(1, Math.max(0, (y - ky) / (sy - ky))), n / 2);
+      return halfBeam(t) * Math.pow(Math.sqrt(Math.max(0, 1 - c * c)), 2 / n);
+    };
+    const gold = new THREE.MeshStandardMaterial({ color: 0xc9a558, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
+    for (const side of [-1, 1]) {
+      const p: number[] = [];
+      const ix: number[] = [];
+      const N = 70;
+      for (let i = 0; i <= N; i++) {
+        const t = 0.035 + (0.955 * i) / N;
+        for (const drop of [0.105, 0.14]) {
+          const y = sheerY(t) - drop;
+          p.push(side * (halfWidthAt(t, y) + 0.004), y, zAt(t));
+        }
+        if (i < N) ix.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+      }
+      const sg = new THREE.BufferGeometry();
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+      sg.setIndex(ix);
+      sg.computeVertexNormals();
+      root.add(new THREE.Mesh(sg, gold));
+    }
+
+    // Name and hailing port across the transom.
+    const nameTex = canvasTexture(1024, 256, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = '#d9b869';
+      c.font = '600 118px Georgia, "Times New Roman", serif';
+      c.fillText('SLACK TIDE', w / 2, 92);
+      c.font = '500 54px Georgia, "Times New Roman", serif';
+      c.fillText('S A U S A L I T O', w / 2, 204);
+    });
+    const name = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.425), new THREE.MeshStandardMaterial({ map: nameTex, transparent: true, alphaTest: 0.35, roughness: 0.45, metalness: 0.3 }));
+    name.position.set(0, (tSy + Math.max(tKy, 0.3)) / 2 + 0.06, zAt(1) + 0.006);
+    name.name = 'transom_name';
+    root.add(name);
   }
 
   // ---- deck, cabin and cockpit, lofted as one skin ------------------------------------------------
@@ -221,25 +332,39 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   const COAM_IN = 1.0;
   const COAM_OUT = 1.16;
 
+  /** Height of the coachroof at a station and a distance off the centreline: crowned, highest in the middle. */
+  const cabinCrownY = (t: number, x: number) => cabinTopY(t) + 0.085 * (1 - Math.min(1, Math.abs(x) / cabinHalfWidth(t)) ** 2);
+
   const profile = (t: number, regime: Regime): Array<[number, number]> => {
     const b = halfBeam(t);
     const h = sheerY(t);
     if (regime === 'cabin') {
+      // A crowned coachroof with a rounded shoulder, sides that lean in a little, and a fillet onto the side deck.
       const cw = cabinHalfWidth(t);
-      const top = cabinTopY(t);
+      const rise = Math.min(1, cabinRise(t) / 0.22);
+      const edge = cw - 0.1;
+      const shoulder = cabinCrownY(t, edge);
+      const foot = Math.min(h + 0.07, shoulder - 0.1 * rise);
       return [
-        [0, top + 0.05], [cw * 0.5, top + 0.04], [cw * 0.85, top + 0.015], [cw - 0.05, top - 0.02],
-        [cw, h + 0.04], [lerp(cw, b, 0.33), h + 0.035], [lerp(cw, b, 0.66), h + 0.02], [b, h],
+        [0, cabinCrownY(t, 0)], [cw * 0.24, cabinCrownY(t, cw * 0.24)], [cw * 0.48, cabinCrownY(t, cw * 0.48)],
+        [cw * 0.7, cabinCrownY(t, cw * 0.7)], [cw * 0.86, cabinCrownY(t, cw * 0.86)],
+        [edge, shoulder], [cw - 0.04, shoulder - 0.035 * rise], [cw - 0.008, shoulder - 0.1 * rise],
+        [cw + 0.025, foot], [cw + 0.06, h + 0.045], [lerp(cw + 0.06, b, 0.55), h + 0.03], [b, h],
       ];
     }
     if (regime === 'cockpit') {
+      // Sole, rounded seat fronts, seats, coamings with a capped top.
       const sole = h - SOLE_DROP;
       const seat = h - SEAT_DROP;
       const top = h + COAMING;
-      return [[0, sole], [WELL, sole], [WELL, seat], [COAM_IN, seat], [COAM_IN, top], [COAM_OUT, top], [COAM_OUT + 0.03, h + 0.02], [b, h]];
+      return [
+        [0, sole], [WELL - 0.035, sole], [WELL, sole + 0.035], [WELL, seat - 0.025], [WELL + 0.025, seat],
+        [COAM_IN - 0.035, seat], [COAM_IN, seat + 0.035], [COAM_IN + 0.02, top - 0.025], [COAM_IN + 0.045, top],
+        [COAM_OUT, top], [COAM_OUT + 0.045, h + 0.03], [b, h],
+      ];
     }
     const out: Array<[number, number]> = [];
-    for (let k = 0; k < 8; k++) out.push([(b * k) / 7, h + 0.07 * (1 - (k / 7) ** 2)]);
+    for (let k = 0; k < 12; k++) out.push([(b * k) / 11, h + 0.07 * (1 - (k / 11) ** 2)]);
     return out;
   };
 
@@ -250,27 +375,20 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     };
     const e = 0.0004;
     span(0.004, T_CABIN0 - e, 12, 'deck');
-    span(T_CABIN0 + e, T_CABIN1 - e, 22, 'cabin');
+    span(T_CABIN0 + e, T_CABIN1 - e, 24, 'cabin');
     span(T_CABIN1 + e, T_COCK0 - e, 2, 'deck');
     span(T_COCK0 + e, T_COCK1 - e, 8, 'cockpit');
     span(T_COCK1 + e, 1, 5, 'deck');
 
-    const NONSKID = new THREE.Color(0xc9c7bd);
-    const GEL = new THREE.Color(0xf1efe7);
-    const TEAK = new THREE.Color(0x8f6238);
-    const colourFor = (regime: Regime, k: number): THREE.Color => {
-      if (regime === 'cabin') return k <= 2 ? NONSKID : k === 3 ? GEL : NONSKID;
-      if (regime === 'cockpit') return k === 0 || k === 2 || k === 4 ? TEAK : k === 6 ? NONSKID : GEL;
-      return NONSKID;
+    // Finish of each strip of the skin, counted outward from the centreline: 0 non-skid, 1 gelcoat, 2 teak.
+    const finishFor = (regime: Regime, k: number): number => {
+      if (regime === 'cabin') return k <= 4 ? 0 : k <= 8 ? 1 : 0;
+      if (regime === 'cockpit') return k === 0 || k === 4 || k === 8 ? 2 : k === 10 ? 0 : 1;
+      return k === 10 ? 1 : 0;
     };
-
-    const pos: number[] = [];
-    const col: number[] = [];
-    const pushTri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, colour: THREE.Color) => {
-      for (const p of [a, b, c]) {
-        pos.push(p.x, p.y, p.z);
-        col.push(colour.r, colour.g, colour.b);
-      }
+    const pos: number[][] = [[], [], []];
+    const pushTri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, finish: number) => {
+      for (const p of [a, b, c]) pos[finish].push(p.x, p.y, p.z);
     };
     for (let i = 0; i < stations.length - 1; i++) {
       const s0 = stations[i];
@@ -280,22 +398,36 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       // Where the profile changes shape between two stations a hair apart, the skin between them is a bulkhead.
       const wall = s0.regime !== s1.regime;
       for (const side of [-1, 1]) {
-        for (let k = 0; k < 7; k++) {
+        for (let k = 0; k < 11; k++) {
           const a = new THREE.Vector3(side * p0[k][0], p0[k][1], zAt(s0.t));
           const b = new THREE.Vector3(side * p0[k + 1][0], p0[k + 1][1], zAt(s0.t));
           const c = new THREE.Vector3(side * p1[k][0], p1[k][1], zAt(s1.t));
           const e2 = new THREE.Vector3(side * p1[k + 1][0], p1[k + 1][1], zAt(s1.t));
-          const colour = wall ? GEL : colourFor(s0.regime, k);
-          if (side > 0) { pushTri(a, c, b, colour); pushTri(b, c, e2, colour); }
-          else { pushTri(a, b, c, colour); pushTri(b, e2, c, colour); }
+          const finish = wall ? 1 : finishFor(s0.regime, k);
+          // Wound so every face looks up or outboard.
+          if (side > 0) { pushTri(a, c, b, finish); pushTri(b, c, e2, finish); }
+          else { pushTri(a, b, c, finish); pushTri(b, e2, c, finish); }
         }
       }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    g.computeVertexNormals();
-    const deck = add('deck', new THREE.Mesh(g, deckMat));
+    const all = pos.flat();
+    // Textures are laid flat on the deck: one metre of deck is one unit of texture before each map's own repeat.
+    const uv = new Float32Array((all.length / 3) * 2);
+    for (let i = 0; i < all.length / 3; i++) {
+      uv[i * 2] = all[i * 3];
+      uv[i * 2 + 1] = all[i * 3 + 2];
+    }
+    let g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(all, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    // Smooth across gentle curves such as the coachroof crown, keep hard edges hard.
+    g = toCreasedNormals(g, 38 * (Math.PI / 180));
+    let start = 0;
+    pos.forEach((list, finish) => {
+      g.addGroup(start, list.length / 3, finish);
+      start += list.length / 3;
+    });
+    const deck = add('deck', new THREE.Mesh(g, [nonSkidMat, gelMat, teakDeckMat]));
     deck.castShadow = true;
     deck.receiveShadow = true;
     solids.push(deck);
@@ -395,6 +527,10 @@ export function buildSloop(spec: BoatSpec): SloopModel {
         const sp = rod(new THREE.Vector3(0, s.y, mastZ), tips[i], 0.022, alloy, mastGroup);
         sp.scale.z = 2.2;
         sp.castShadow = true;
+        // Boots on the spreader ends, to save the genoa from chafe.
+        const boot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), white);
+        boot.position.copy(tips[i]);
+        mastGroup.add(boot);
       });
       const capTop = new THREE.Vector3(side * 0.06, hounds.y - 0.15, mastZ);
       rod(chain(side), tips[0], 0.006, steel, mastGroup);
@@ -404,6 +540,19 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     }
     rod(stem, hounds, 0.007, steel, mastGroup);
     rod(new THREE.Vector3(0, mastTopY - 0.05, mastZ + 0.1), new THREE.Vector3(0, sheerY(1) + 0.05, zAt(0.995)), 0.006, steel, mastGroup);
+
+    // Masthead: VHF whip, wind transducer on its arm, tricolour light. Steaming light and a radar reflector lower down.
+    rod(new THREE.Vector3(0.07, mastTopY, mastZ + 0.1), new THREE.Vector3(0.09, mastTopY + 0.95, mastZ + 0.13), 0.005, black, mastGroup);
+    rod(new THREE.Vector3(0, mastTopY, mastZ - 0.05), new THREE.Vector3(0, mastTopY + 0.14, mastZ - 0.5), 0.008, alloy, mastGroup);
+    const cups = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 10), black);
+    cups.position.set(0, mastTopY + 0.17, mastZ - 0.5);
+    const tricolour = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0xe9eef0, roughness: 0.2, emissive: 0x30383c }));
+    tricolour.position.set(-0.06, mastTopY + 0.04, mastZ + 0.02);
+    const steaming = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.06), black);
+    steaming.position.set(0, mastBaseY + h * 0.46, mastZ - 0.14);
+    const reflector = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.42, 10), white);
+    reflector.position.set(0, mastBaseY + h * 0.53, mastZ - 0.17);
+    mastGroup.add(cups, tricolour, steaming, reflector);
 
     // Masthead wind vane. It turns to show where the apparent wind comes from.
     const windex = add('windex', new THREE.Group(), mastGroup);
@@ -441,6 +590,30 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     boom.add(cap);
     proxy('boom', new THREE.BoxGeometry(0.7, 0.85, d.boomLength + 0.3), boom, new THREE.Vector3(0, 0.05, d.boomLength / 2));
     solids.push(spar);
+
+    // Stack pack: the sail cover lies open along both sides of the boom while the main is set.
+    // Lazy jacks hold it up and lead to the mast. They ride with the boom, which pivots almost on the mast.
+    const cover = new THREE.MeshStandardMaterial({ color: 0x1b2d4a, roughness: 0.95, side: THREE.DoubleSide });
+    const jackTop = new THREE.Vector3(0, mastBaseY + (mastTopY - mastBaseY) * 0.34 - gooseneck.y - 0.1, -0.13);
+    for (const side of [-1, 1]) {
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.27, d.boomLength - 0.55), cover);
+      flap.position.set(side * 0.105, 0.17, d.boomLength / 2 + 0.05);
+      flap.rotation.z = -side * 0.22;
+      flap.castShadow = true;
+      boom.add(flap);
+      const batten = rod(new THREE.Vector3(side * 0.135, 0.305, 0.35), new THREE.Vector3(side * 0.135, 0.305, d.boomLength - 0.25), 0.012, cover, boom);
+      batten.castShadow = true;
+      const top = jackTop.clone().setX(side * 0.05);
+      const mid = new THREE.Vector3(side * 0.12, 1.55, d.boomLength * 0.42);
+      rod(top, mid, 0.003, white, boom);
+      for (const f of [0.26, 0.52, 0.8]) rod(mid, new THREE.Vector3(side * 0.135, 0.31, d.boomLength * f), 0.003, white, boom);
+    }
+    // Gooseneck fitting and the outhaul car at the clew.
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.12), steel);
+    neck.position.set(0, 0, -0.04);
+    const outhaul = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.14), black);
+    outhaul.position.set(0, 0.12, d.boomLength - 0.3);
+    boom.add(neck, outhaul);
   }
 
   // ---- cockpit: wheel, pedestal, winches ----------------------------------------------------------
@@ -458,9 +631,33 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     const screen = add('chartplotter', new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.15), new THREE.MeshBasicMaterial({ color: 0x0d2f3a })), pedestal);
     screen.position.set(0, soleY + 1.135, wheelPos.z - 0.1);
     screen.rotation.x = -0.35;
-    const compass = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), glass);
-    compass.position.set(0, soleY + 1.24, wheelPos.z - 0.2);
-    pedestal.add(post, pod, compass);
+    // Binnacle: the steering compass in its housing on top of the pedestal, under a dome.
+    const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.085, 0.07, 18), white);
+    housing.position.set(0, soleY + 1.255, wheelPos.z - 0.2);
+    const card = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.012, 18), new THREE.MeshStandardMaterial({ color: 0x101418, roughness: 0.4 }));
+    card.position.set(0, soleY + 1.295, wheelPos.z - 0.2);
+    const lubber = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.004, 0.14), new THREE.MeshBasicMaterial({ color: 0xe8e4d8 }));
+    lubber.position.set(0, soleY + 1.303, wheelPos.z - 0.2);
+    const compass = new THREE.Mesh(
+      new THREE.SphereGeometry(0.088, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshPhysicalMaterial({ color: 0x9fb4bd, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.45, depthWrite: false }),
+    );
+    compass.position.set(0, soleY + 1.29, wheelPos.z - 0.2);
+    // Guard rail over the binnacle: something to hold on to, and it keeps sheets off the compass.
+    const guard = tube([
+      new THREE.Vector3(-0.2, soleY, wheelPos.z - 0.32), new THREE.Vector3(-0.2, soleY + 1.0, wheelPos.z - 0.34),
+      new THREE.Vector3(-0.14, soleY + 1.4, wheelPos.z - 0.36), new THREE.Vector3(0.14, soleY + 1.4, wheelPos.z - 0.36),
+      new THREE.Vector3(0.2, soleY + 1.0, wheelPos.z - 0.34), new THREE.Vector3(0.2, soleY, wheelPos.z - 0.32),
+    ], 0.014, steel);
+    // Engine control on the starboard side of the pedestal.
+    const lever = add('engine_lever', new THREE.Group(), pedestal);
+    lever.position.set(0.1, soleY + 0.78, wheelPos.z - 0.14);
+    const leverBase = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12).rotateZ(Math.PI / 2), steel);
+    rod(new THREE.Vector3(0.02, 0, 0), new THREE.Vector3(0.03, 0.15, -0.03), 0.008, steel, lever);
+    const leverKnob = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), black);
+    leverKnob.position.set(0.03, 0.16, -0.03);
+    lever.add(leverBase, leverKnob);
+    pedestal.add(post, pod, housing, card, lubber, compass, guard);
     pedestal.traverse((o) => { o.castShadow = true; });
     root.add(pedestal);
 
@@ -539,33 +736,240 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   }
 
   // ---- cabin details ------------------------------------------------------------------------------
+  const bulkheadZ = zAt(T_CABIN1) + 0.014;
+  const bulkheadY = sheerY(T_CABIN1);
   {
     const details = new THREE.Group();
     details.name = 'cabin_details';
-    // Companionway: a dark opening in the back of the cabin, with a sliding hatch above.
-    const cz = zAt(T_CABIN1) + 0.012;
-    const ch = cabinTopY(T_CABIN1) - sheerY(T_CABIN1);
-    const way = new THREE.Mesh(new THREE.PlaneGeometry(0.62, ch * 0.9), glass);
-    way.position.set(0, sheerY(T_CABIN1) + ch * 0.52, cz);
-    const hatch = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.8), new THREE.MeshStandardMaterial({ color: 0x25313a, roughness: 0.25, metalness: 0.3 }));
-    hatch.position.set(0, cabinTopY(T_CABIN1 - 0.035) + 0.065, zAt(T_CABIN1 - 0.036));
+    const smoked = new THREE.MeshStandardMaterial({ color: 0x25313a, roughness: 0.2, metalness: 0.3 });
+    // Companionway: a dark opening in the back of the cabin with teak trim, and a sliding hatch above.
+    const ch = cabinCrownY(T_CABIN1, 0) - bulkheadY;
+    const way = new THREE.Mesh(new THREE.PlaneGeometry(0.6, ch * 0.9), glass);
+    way.position.set(0, bulkheadY + ch * 0.5, bulkheadZ);
+    for (const side of [-1, 1]) {
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.035, ch * 0.92, 0.03), teak);
+      trim.position.set(side * 0.318, bulkheadY + ch * 0.5, bulkheadZ + 0.01);
+      details.add(trim);
+    }
+    const hatch = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.035, 0.8), smoked);
+    hatch.position.set(0, cabinCrownY(T_CABIN1 - 0.035, 0) + 0.022, zAt(T_CABIN1 - 0.036));
     details.add(way, hatch);
-    // Portlights along the cabin sides.
+    // Portlights along the cabin sides: smoked glass in bright frames.
     for (const side of [-1, 1]) {
       for (const t of [0.42, 0.5, 0.58]) {
-        const port = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.13, 0.55), glass);
         const cw = cabinHalfWidth(t);
-        port.position.set(side * (cw - 0.022), lerp(sheerY(t) + 0.04, cabinTopY(t) - 0.02, 0.55), zAt(t));
-        port.rotation.z = side * 0.105;
+        const port = new THREE.Group();
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.15, 0.56), steel);
+        const pane = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.115, 0.52), glass);
+        port.add(frame, pane);
+        port.position.set(side * (cw + 0.006), lerp(sheerY(t) + 0.07, cabinCrownY(t, cw - 0.1) - 0.1, 0.5), zAt(t));
+        port.rotation.z = side * 0.1;
         port.rotation.y = -side * Math.atan2(cabinHalfWidth(t + 0.02) - cabinHalfWidth(t - 0.02), L * 0.04);
         details.add(port);
       }
     }
     // Foredeck hatch.
-    const fh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.55), new THREE.MeshStandardMaterial({ color: 0x25313a, roughness: 0.25, metalness: 0.3 }));
+    const fh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.55), smoked);
     fh.position.set(0, sheerY(0.2) + 0.09, zAt(0.2));
-    details.add(fh);
+    const fhFrame = new THREE.Mesh(new THREE.BoxGeometry(0.61, 0.03, 0.61), alloy);
+    fhFrame.position.set(0, sheerY(0.2) + 0.075, zAt(0.2));
+    details.add(fh, fhFrame);
+
+    // Teak handrails along the coachroof.
+    for (const side of [-1, 1]) {
+      const pts: THREE.Vector3[] = [];
+      for (let t = 0.4; t <= 0.601; t += 0.04) {
+        const x = side * (cabinHalfWidth(t) - 0.3);
+        const foot = new THREE.Vector3(x, cabinCrownY(t, x), zAt(t));
+        pts.push(foot.clone().setY(foot.y + 0.075));
+        rod(foot, pts[pts.length - 1], 0.014, teak, details);
+      }
+      details.add(tube(pts, 0.017, teak));
+    }
+
+    // Halyards and reefing lines lead aft over the coachroof, through clutches, to a winch each side of the hatch.
+    const tails = [0xb5332a, 0x2a56a0, 0xe8e4d8];
+    for (const side of [-1, 1]) {
+      const wx = side * 0.5;
+      const wt = T_CABIN1 - 0.022;
+      const winch = new THREE.Group();
+      winch.position.set(wx, cabinCrownY(wt, wx), zAt(wt));
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.062, 0.1, 16), steel);
+      drum.position.y = 0.06;
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.055, 0.025, 16), steel);
+      cap.position.y = 0.122;
+      winch.add(drum, cap);
+      const ct = T_CABIN1 - 0.052;
+      const clutch = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.055, 0.13), black);
+      clutch.position.set(wx, cabinCrownY(ct, wx) + 0.03, zAt(ct));
+      details.add(winch, clutch);
+      tails.forEach((colour, i) => {
+        const from = new THREE.Vector3(side * (0.09 + i * 0.03), mastBaseY + 0.06, mastZ + 0.2);
+        const to = new THREE.Vector3(wx + (i - 1) * 0.06, cabinCrownY(ct, wx) + 0.05, zAt(ct) - 0.06);
+        const mid = from.clone().lerp(to, 0.5);
+        mid.y = cabinCrownY((mid.z - zAt(0)) / L, mid.x) + 0.035;
+        const mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 });
+        rod(from, mid, 0.006, mat, details);
+        rod(mid, to, 0.006, mat, details);
+      });
+    }
+
+    // Dodger: a canvas spray hood on a bright hoop over the companionway, with a clear window to see forward.
+    const canvasCloth = new THREE.MeshStandardMaterial({ color: 0x1b2d4a, roughness: 0.95, side: THREE.DoubleSide });
+    const vinyl = new THREE.MeshPhysicalMaterial({ color: 0x8fa6b2, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+    const zAft = zAt(T_CABIN1) + 0.1;
+    const zFore = zAft - 1.2;
+    const DODGER_HALF = 0.98;
+    const dodgerPoint = (u: number, v: number, lift: number): [number, number, number] => {
+      const x = DODGER_HALF * u;
+      const z = lerp(zFore, zAft, v) - 0.24 * (1 - u * u) * Math.pow(1 - v, 1.5);
+      const t = Math.min(T_CABIN1 - 0.002, (z - zAt(0)) / L);
+      const rise = 0.56 * (1 - Math.pow(1 - v, 2.2)) * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(u), 4)));
+      return [x, cabinCrownY(t, x) + rise + lift, z];
+    };
+    const patch = (u0: number, u1: number, v0: number, v1: number, nu: number, nv: number, lift: number, mat: THREE.Material) => {
+      const p: number[] = [];
+      const ix: number[] = [];
+      for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) p.push(...dodgerPoint(lerp(u0, u1, i / nu), lerp(v0, v1, j / nv), lift));
+      for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+        const a = j * (nu + 1) + i;
+        ix.push(a, a + nu + 1, a + 1, a + 1, a + nu + 1, a + nu + 2);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+      g.setIndex(ix);
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat);
+      m.castShadow = mat === canvasCloth;
+      return m;
+    };
+    const dodger = new THREE.Group();
+    dodger.name = 'dodger';
+    nodes.dodger = dodger;
+    dodger.add(patch(-1, 1, 0, 1, 20, 9, 0, canvasCloth), patch(-0.66, 0.66, 0.16, 0.6, 10, 4, 0.012, vinyl));
+    const hoop: THREE.Vector3[] = [];
+    for (let i = 0; i <= 14; i++) hoop.push(new THREE.Vector3(...dodgerPoint(-1 + (2 * i) / 14, 1, 0.005)));
+    dodger.add(tube(hoop, 0.014, steel));
+    details.add(dodger);
+
+    // Instruments on the aft face of the cabin, to port of the companionway.
+    const dialTex = (label: string, value: string, unit: string) => canvasTexture(128, 128, (g, w, h) => {
+      g.fillStyle = '#071216';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#6fa8b6';
+      g.font = '600 17px ui-sans-serif, system-ui, sans-serif';
+      g.fillText(label, 10, 24);
+      g.textAlign = 'right';
+      g.fillText(unit, w - 10, h - 12);
+      g.fillStyle = '#eafcff';
+      g.font = '700 50px ui-sans-serif, system-ui, sans-serif';
+      g.fillText(value, w - 10, 86);
+    });
+    [['DEPTH', '24.0', 'm'], ['SPEED', '5.8', 'kt']].forEach(([label, value, unit], i) => {
+      const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.135, 0.03), black);
+      bezel.position.set(-0.5 - i * 0.16, bulkheadY + 0.33, bulkheadZ + 0.012);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.108, 0.108), new THREE.MeshBasicMaterial({ map: dialTex(label, value, unit), toneMapped: false }));
+      face.position.set(bezel.position.x, bezel.position.y, bulkheadZ + 0.0285);
+      details.add(bezel, face);
+    });
     root.add(details);
+  }
+
+  // Autopilot control head, to starboard of the companionway. Its screen is drawn by the boat view.
+  {
+    const pilot = add('autopilot', new THREE.Group());
+    pilot.position.set(0.8, bulkheadY + 0.33, bulkheadZ + 0.02);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.04), black);
+    body.userData.glow = true;
+    const screen = add('autopilot_screen', new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.11), new THREE.MeshBasicMaterial({ color: 0x0a1a1f })), pilot);
+    screen.position.set(-0.04, 0.012, 0.0212);
+    const knob = add('autopilot_knob', new THREE.Group(), pilot);
+    knob.position.set(0.082, 0.01, 0.02);
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.038, 0.03, 20).rotateX(Math.PI / 2), steel);
+    dial.position.z = 0.015;
+    dial.userData.glow = true;
+    const tick = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.022, 0.004), black);
+    tick.position.set(0, 0.02, 0.031);
+    knob.add(dial, tick);
+    pilot.add(body);
+    proxy('autopilot', new THREE.BoxGeometry(0.45, 0.42, 0.3), pilot, new THREE.Vector3(0, 0, 0.12));
+  }
+
+  // ---- ground tackle, safety gear and the ensign --------------------------------------------------
+  {
+    const gear = new THREE.Group();
+    gear.name = 'deck_gear';
+    const galv = new THREE.MeshStandardMaterial({ color: 0x9aa0a3, roughness: 0.55, metalness: 0.7 });
+    // Bow roller with a plough anchor stowed in it.
+    const bowY = sheerY(0) + 0.05;
+    const roller = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.46), steel);
+    roller.position.set(0, bowY, zAt(0) + 0.13);
+    const shank = rod(new THREE.Vector3(0, bowY + 0.05, zAt(0) + 0.5), new THREE.Vector3(0, bowY + 0.02, zAt(0) - 0.14), 0.02, galv, gear);
+    shank.castShadow = true;
+    const fluke = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.46, 4), galv);
+    fluke.scale.set(1, 1, 0.42);
+    fluke.position.set(0, bowY - 0.2, zAt(0) - 0.1);
+    fluke.rotation.x = 2.5;
+    fluke.castShadow = true;
+    gear.add(roller, fluke);
+    // Mooring cleats at the bow and on each quarter.
+    for (const side of [-1, 1]) {
+      for (const t of [0.07, 0.955]) {
+        const cleat = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.22), steel);
+        cleat.position.set(side * (halfBeam(t) - 0.17), sheerY(t) + 0.06, zAt(t));
+        gear.add(cleat);
+      }
+    }
+    // Horseshoe lifebuoy on the starboard quarter of the pushpit.
+    const buoy = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.058, 8, 18, Math.PI * 1.45), new THREE.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.7 }));
+    buoy.position.set(halfBeam(0.975) - 0.09, sheerY(1) + 0.4, zAt(0.972));
+    buoy.rotation.set(0, Math.PI / 2 - 0.25, Math.PI * 0.275 + Math.PI);
+    buoy.castShadow = true;
+    gear.add(buoy);
+    // Ensign staff on the port quarter. The flag itself is moved by the boat view so it streams in the apparent wind.
+    // It stands right out on the corner and stays short, so the flag never hangs across the view from the helm.
+    const staffFoot = new THREE.Vector3(-(halfBeam(1) - 0.1), sheerY(1) + 0.5, zAt(0.994));
+    const staffTop = staffFoot.clone().add(new THREE.Vector3(-0.08, 0.82, 0.24));
+    rod(staffFoot, staffTop, 0.012, teak, gear).castShadow = true;
+    const truck = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc9a558, roughness: 0.4, metalness: 0.6 }));
+    truck.position.copy(staffTop);
+    gear.add(truck);
+    const ensign = add('ensign', new THREE.Group(), gear);
+    ensign.position.copy(staffTop).add(new THREE.Vector3(0, -0.03, 0));
+    const FLY = 0.6;
+    const HOIST = 0.36;
+    const flagGeom = new THREE.PlaneGeometry(FLY, HOIST, 12, 5);
+    flagGeom.translate(FLY / 2, -HOIST / 2, 0);
+    const flagTex = canvasTexture(256, 152, (g, w, h) => {
+      // A yacht ensign: thirteen stripes, and a ring of stars round an anchor in the canton.
+      for (let i = 0; i < 13; i++) {
+        g.fillStyle = i % 2 ? '#f3f1ea' : '#b22a35';
+        g.fillRect(0, (i * h) / 13, w, h / 13 + 1);
+      }
+      g.fillStyle = '#1f305e';
+      g.fillRect(0, 0, w * 0.42, (h * 7) / 13);
+      g.fillStyle = '#f3f1ea';
+      const cx = w * 0.21;
+      const cy = (h * 3.5) / 13;
+      for (let i = 0; i < 13; i++) {
+        const a = (i / 13) * Math.PI * 2;
+        g.beginPath();
+        g.arc(cx + Math.cos(a) * 26, cy + Math.sin(a) * 26, 3.4, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.fillRect(cx - 1.5, cy - 14, 3, 26);
+      g.fillRect(cx - 8, cy - 9, 16, 3);
+      g.beginPath();
+      g.arc(cx, cy + 4, 10, 0.15, Math.PI - 0.15);
+      g.lineWidth = 3;
+      g.strokeStyle = '#f3f1ea';
+      g.stroke();
+    });
+    const flag = add('ensign_flag', new THREE.Mesh(flagGeom, new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.9, emissive: 0x2a2a2a })), ensign);
+    flag.castShadow = true;
+    flag.userData.fly = FLY;
+    flag.userData.hoist = HOIST;
+    root.add(gear);
   }
 
   const tTrav = 0.79;
@@ -596,7 +1000,11 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   {
     const beam = new THREE.Mesh(new THREE.BoxGeometry(COAM_IN * 2, 0.05, 0.09), black);
     beam.position.copy(geo.traveller).add(new THREE.Vector3(0, -0.03, 0));
-    root.add(beam);
+    const car = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.11), steel);
+    car.position.copy(geo.traveller).add(new THREE.Vector3(0, 0.02, 0));
+    const block = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12).rotateZ(Math.PI / 2), black);
+    block.position.copy(geo.traveller).add(new THREE.Vector3(0, 0.1, 0));
+    root.add(beam, car, block);
   }
 
   return { root, nodes, hitProxies, solids, geo };

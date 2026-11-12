@@ -1,7 +1,7 @@
 :root {
   --ink: #eef3f4;
   --dim: rgba(238, 243, 244, 0.62);
-  --glass: rgba(9, 18, 24, 0.5);
+  --glass: rgba(9, 18, 24, 0.66);
   --edge: rgba(238, 243, 244, 0.16);
   --amber: #ffc46b;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -20,8 +20,8 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 
 .hud {
   position: fixed; z-index: 2;
+  /* Plain dark glass, no blur: blurring what is behind a panel makes the browser redo that work every frame of the 3D view. */
   background: var(--glass); border: 1px solid var(--edge); border-radius: 10px;
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   font-variant-numeric: tabular-nums;
 }
 
@@ -75,7 +75,7 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 }
 
 /* ---- instruments: the wind vane beside the numbers, tide underneath ------------------------- */
-.readout { grid-template-columns: auto auto; grid-template-areas: "dial cells" "tide tide"; gap: 6px 14px; align-items: center; }
+.readout { grid-template-columns: auto auto; grid-template-areas: "dial cells" "tide tide" "pilot pilot"; gap: 6px 14px; align-items: center; }
 .readout .dial { grid-area: dial; width: 104px; }
 .readout .dial svg { display: block; width: 104px; height: 104px; }
 .readout .dial .legend { display: flex; justify-content: center; gap: 7px; font-size: 8.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
@@ -87,7 +87,10 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 .readout .cells { grid-area: cells; display: grid; grid-template-columns: repeat(3, auto); gap: 2px 16px; }
 .readout .tideline { grid-area: tide; font-size: 12px; color: var(--dim); border-top: 1px solid var(--edge); padding-top: 6px; white-space: nowrap; }
 .readout .tideline b { color: var(--ink); font-weight: 600; }
-.readout.hidden .dial, .readout.hidden .cells, .readout.hidden .tideline { display: none; }
+.readout .pilotline { grid-area: pilot; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.readout .pilotline b { color: var(--ink); font-weight: 600; }
+.readout .pilotline b.on { color: var(--amber); }
+.readout.hidden .dial, .readout.hidden .cells, .readout.hidden .tideline, .readout.hidden .pilotline { display: none; }
 
 /* ---- chart: corner preview and the full passage-planning view -------------------------------- */
 .mini { right: var(--edge-right); bottom: var(--edge-bottom); width: 236px; height: 196px; padding: 0; overflow: hidden; cursor: pointer; display: block; }
@@ -134,4 +137,11 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
   .readout .dial, .readout .dial svg { width: 78px; height: 78px; }
   .readout .dial svg { height: 78px; }
   .readout .tideline { font-size: 10.5px; white-space: normal; }
+}
+
+/* ---- shared water: a name over each visiting boat ---------------------------------------------- */
+.boat-label {
+  position: fixed; left: 0; top: 0; z-index: 1; pointer-events: none; white-space: nowrap;
+  padding: 3px 9px; border-radius: 999px; background: rgba(9, 18, 24, 0.7); border: 1px solid var(--edge);
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
 }

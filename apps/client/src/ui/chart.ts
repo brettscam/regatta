@@ -2,6 +2,7 @@ import { KT, R2D, type PolarTable } from '@slack-tide/sim';
 import { metresToNm } from '@slack-tide/nav';
 import type { CourseData, ReplayWorld } from '@slack-tide/world';
 import type { Passage } from './passage';
+import type { TrafficVessel } from '../scene/traffic';
 
 const D2R = Math.PI / 180;
 const NM = 1852;
@@ -17,6 +18,10 @@ const MAGENTA = '#b0237a';
 const STREAM = '#1d6fb8';
 const WIND = '#4a5560';
 const TRACK = '#14222c';
+const TARGET = '#0d6a5f';
+const TARGET_CLOSE = '#c0392b';
+/** A target that will pass inside this many metres within ten minutes is drawn as a danger. */
+const CLOSE_QUARTERS = 250;
 
 export interface ChartBoat {
   x: number;
@@ -33,6 +38,8 @@ export interface ChartHost {
   /** Sim time now, seconds since the session started. */
   now(): number;
   boat(): ChartBoat;
+  /** Other vessels on the water, shown like AIS targets. */
+  traffic?: () => TrafficVessel[];
 }
 
 interface View {
@@ -43,6 +50,17 @@ interface View {
 }
 
 const pad3 = (rad: number) => String(Math.round(((rad * R2D) % 360 + 360) % 360) % 360).padStart(3, '0');
+
+/** Closest point of approach if both hold course and speed, looking no more than ten minutes ahead. */
+function approach(boat: ChartBoat, v: TrafficVessel): { cpa: number; tcpa: number; range: number; bearing: number } {
+  const px = v.x - boat.x;
+  const py = v.y - boat.y;
+  const wx = Math.sin(v.heading) * v.sog - Math.sin(boat.cog) * boat.sog;
+  const wy = Math.cos(v.heading) * v.sog - Math.cos(boat.cog) * boat.sog;
+  const w2 = wx * wx + wy * wy;
+  const tcpa = w2 < 1e-6 ? 0 : Math.max(0, Math.min(600, -(px * wx + py * wy) / w2));
+  return { cpa: Math.hypot(px + wx * tcpa, py + wy * tcpa), tcpa, range: Math.hypot(px, py), bearing: Math.atan2(px, py) };
+}
 
 function minutes(seconds: number): string {
   const m = Math.round(Math.abs(seconds) / 60);
@@ -426,6 +444,68 @@ export class Chart {
     }
   }
 
+  /** Other vessels as AIS targets: heading, a three-minute course vector, and on the full chart a name and speed. */
+  private drawTraffic(ctx: CanvasRenderingContext2D, w: number, h: number, v: View, labels: boolean): void {
+    const vessels = this.host.traffic?.();
+    if (!vessels) return;
+    const boat = this.host.boat();
+    for (const t of vessels) {
+      const [x, y] = this.screen(w, h, v, t.x, t.y);
+      if (x < -60 || y < -60 || x > w + 60 || y > h + 60) continue;
+      const ap = approach(boat, t);
+      const close = ap.cpa < CLOSE_QUARTERS + t.length / 2 && ap.range < 3000;
+      const colour = close ? TARGET_CLOSE : TARGET;
+      if (t.sog > 0.3) {
+        const len = t.sog * 180 * v.scale;
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = labels ? 1.3 : 1;
+        ctx.setLineDash(labels ? [4, 3] : []);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.sin(t.heading) * len, y - Math.cos(t.heading) * len);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(t.heading);
+      ctx.strokeStyle = colour;
+      ctx.fillStyle = close ? 'rgba(192, 57, 43, 0.25)' : 'rgba(255, 255, 255, 0.82)';
+      ctx.lineWidth = labels ? 1.7 : 1.3;
+      ctx.lineJoin = 'round';
+      const L = t.length * v.scale;
+      const B = t.beam * v.scale;
+      ctx.beginPath();
+      if (labels && L > 16) {
+        // Big enough on screen to draw to scale: a ship's outline.
+        ctx.moveTo(0, -L / 2);
+        ctx.lineTo(B / 2, -L / 2 + B * 0.9);
+        ctx.lineTo(B / 2, L / 2);
+        ctx.lineTo(-B / 2, L / 2);
+        ctx.lineTo(-B / 2, -L / 2 + B * 0.9);
+      } else {
+        const s = labels ? 8 : 5;
+        ctx.moveTo(0, -s);
+        ctx.lineTo(s * 0.55, s * 0.7);
+        ctx.lineTo(-s * 0.55, s * 0.7);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      if (labels) {
+        ctx.fillStyle = colour;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = '600 10.5px ui-sans-serif, system-ui, sans-serif';
+        const off = Math.max(11, Math.min(L, 60) / 2 + 6);
+        ctx.fillText(t.name, x + off, y - 6);
+        ctx.font = '500 10px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillText(t.sog < 0.3 ? 'stopped' : `${(t.sog / KT).toFixed(1)} kt  ${pad3(t.heading)}°`, x + off, y + 6);
+      }
+    }
+  }
+
   private drawBoat(ctx: CanvasRenderingContext2D, w: number, h: number, v: View, size: number): void {
     const b = this.host.boat();
     const [x, y] = this.screen(w, h, v, b.x, b.y);
@@ -475,6 +555,7 @@ export class Chart {
     }
     this.drawBase(ctx, w, h, v);
     this.drawRoute(ctx, w, h, v, false);
+    this.drawTraffic(ctx, w, h, v, false);
     this.drawBoat(ctx, w, h, v, 8);
 
     // Wind and tide at the boat, north up.
@@ -635,6 +716,7 @@ export class Chart {
     }
 
     this.drawRoute(ctx, w, h, v, true);
+    this.drawTraffic(ctx, w, h, v, true);
     this.drawBoat(ctx, w, h, v, 11);
 
     // Scale bar.
@@ -869,6 +951,22 @@ export class Chart {
     const rate = world.tideRate(t, future ? 'forecast' : 'truth');
     const depth = world.chartDepth(boat.x, boat.y);
     const issued = new Date(this.course.forecast.issued);
+    // The nearest few vessels, as an AIS list: range, bearing and how close they will pass.
+    let traffic = '';
+    const vessels = this.host.traffic?.();
+    if (vessels && vessels.length) {
+      const near = vessels.map((v) => ({ v, a: approach(boat, v) })).sort((p, q) => p.a.range - q.a.range).slice(0, 3);
+      const trs = near.map(({ v, a }) => {
+        const danger = a.cpa < CLOSE_QUARTERS + v.length / 2 && a.range < 3000;
+        const cpa = a.cpa < 1000 ? `${Math.round(a.cpa / 10) * 10} m` : `${metresToNm(a.cpa).toFixed(1)} nm`;
+        // A target already past its closest point is opening: nothing to wait for.
+        const when = a.tcpa < 20 ? (danger ? 'now' : 'opening') : a.tcpa >= 599 ? '10+ min' : `${Math.max(1, Math.round(a.tcpa / 60))} min`;
+        return `<tr class="${danger ? 'next' : ''}"><td class="name">${v.name}</td><td>${metresToNm(a.range).toFixed(2)} nm</td><td>${pad3(a.bearing)}°</td>
+          <td>${(v.sog / KT).toFixed(0)} kt</td><td class="${danger ? 'late' : ''}">${cpa}</td><td>${when}</td></tr>`;
+      }).join('');
+      traffic = `<section class="traffic"><h3>Traffic</h3></section>
+        <table><thead><tr><th class="name">Vessel</th><th>Range</th><th>Bearing</th><th>Speed</th><th>Closest</th><th>In</th></tr></thead><tbody>${trs}</tbody></table>`;
+    }
     this.side.innerHTML = `
       <header><h2>Passage plan</h2><span class="key">M or Esc closes</span></header>
       <section class="live">${live}${total}</section>
@@ -883,6 +981,7 @@ export class Chart {
         <div class="pair"><span>Tide</span><b>${world.tide(t, future ? 'forecast' : 'truth').toFixed(2)} m, ${Math.abs(rate) < 0.04 ? 'standing' : rate > 0 ? 'rising' : 'falling'}</b>
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
+      ${traffic}
       <p class="hint">Click water to add a waypoint. Drag one to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
       <p class="source">Wind, stream and tide: NOAA SFBOFS, replayed from ${this.dayFmt.format(world.dateAt(0))} 2024. Forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }

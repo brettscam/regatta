@@ -92,7 +92,7 @@ function catmull(series: number[], pos: number): number {
 export class ReplayWorld implements Environment {
   readonly course: CourseData;
   /** Seconds from the start of the season to the start of the session. */
-  readonly startOffset: number;
+  startOffset: number;
   private readonly cur: Int8Array;
   private readonly dep: Uint8Array;
   private readonly out: EnvSample = { windDir: 0, windSpeed: 0, currentX: 0, currentY: 0, depth: 0 };
@@ -106,6 +106,19 @@ export class ReplayWorld implements Environment {
     const c = this.course.current;
     if (this.cur.length !== c.steps * c.nx * c.ny * 2) throw new Error('Current data does not match its grid');
     if (this.dep.length !== this.course.depth.nx * this.course.depth.ny) throw new Error('Depth data does not match its grid');
+  }
+
+  /** Seconds into the season at a session time. */
+  seasonTime(t: number): number {
+    return this.startOffset + t;
+  }
+
+  /**
+   * Move the whole session later in the season, without touching session time.
+   * This is how boats sharing the water agree on one clock: everyone moves up to the furthest-on boat.
+   */
+  shiftTime(seconds: number): void {
+    if (seconds > 0) this.startOffset += seconds;
   }
 
   /** Seconds of season available after the session start. */

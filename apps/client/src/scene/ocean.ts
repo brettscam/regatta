@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { WAVE_COUNT, WAVE_GEOM_COUNT, type Wave } from './waves';
 
 const TRAIL_POINTS = 24;
+/** Other vessels whose white water the sea can draw at once. */
+const SHIP_SLOTS = 8;
 
 /** Small seeded generator so the water detail is the same on every machine. */
 function mulberry32(seed: number): () => number {
@@ -162,6 +164,7 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   #define NW ${WAVE_COUNT}
   #define NT ${TRAIL_POINTS}
+  #define NS ${SHIP_SLOTS}
   uniform float uTime;
   uniform vec4 uWaveA[NW];
   uniform vec4 uWaveB[NW];
@@ -178,8 +181,24 @@ const fragmentShader = /* glsl */ `
   uniform float uBoatSpeed;
   uniform float uBoatHeel;
   uniform vec4 uTrail[NT]; // x, z, age 0..1, strength
+  uniform vec4 uShipA[NS]; // x, z, sin(heading), cos(heading)
+  uniform vec4 uShipB[NS]; // speed m/s, length, beam, 1 when the slot is in use
   varying vec3 vWorld;
   varying vec2 vBase;
+
+  // Signed distance to a triangle: negative inside.
+  float triDist(vec2 p, vec2 a, vec2 b, vec2 c) {
+    vec2 e0 = b - a, e1 = c - b, e2 = a - c;
+    vec2 v0 = p - a, v1 = p - b, v2 = p - c;
+    vec2 q0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+    vec2 q1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+    vec2 q2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+    float sgn = sign(e0.x * e2.y - e0.y * e2.x);
+    vec2 d = min(min(vec2(dot(q0, q0), sgn * (v0.x * e0.y - v0.y * e0.x)),
+                     vec2(dot(q1, q1), sgn * (v1.x * e1.y - v1.y * e1.x))),
+                     vec2(dot(q2, q2), sgn * (v2.x * e2.y - v2.y * e2.x)));
+    return -sqrt(d.x) * sign(d.y);
+  }
 
   float segDist(vec2 p, vec2 a, vec2 b) {
     vec2 pa = p - a;
@@ -242,11 +261,33 @@ const fragmentShader = /* glsl */ `
     vec3 body = uDeep * (0.55 + 0.45 * sunUp) + uScatter * sunUp * (0.18 + 0.5 * crest + 0.9 * crest * through);
     body *= mix(1.0, 0.78, gust * 0.6);
 
+    // The boat's shadow on the water: hull and sails thrown down-sun. It dims the light coming up out of the water
+    // and the sun's glitter, but not the reflected sky, which is how a shadow on water really looks.
+    float shade = 0.0;
+    vec2 relB = vBase - uBoat.xy;
+    if (uSunDir.y > 0.06 && dot(relB, relB) < 110.0 * 110.0) {
+      vec2 lb = vec2(relB.x * uBoat.w + relB.y * uBoat.z, -relB.x * uBoat.z + relB.y * uBoat.w); // x starboard, y astern
+      vec2 sunFlat = uSunDir.xz / uSunDir.y;
+      // Where a point one metre up throws its shadow, in the boat's frame.
+      vec2 thrown = -vec2(sunFlat.x * uBoat.w + sunFlat.y * uBoat.z, -sunFlat.x * uBoat.z + sunFlat.y * uBoat.w);
+      float lean = sin(uBoatHeel);
+      float up = cos(uBoatHeel);
+      vec2 head = vec2(lean * 15.6, -1.2) + thrown * (15.6 * up);
+      vec2 stem = vec2(lean * 1.4, -5.6) + thrown * (1.4 * up);
+      vec2 clew = vec2(lean * 2.7, 3.4) + thrown * (2.7 * up);
+      float soft = 0.5 + length(thrown) * 0.25;
+      float sails = 1.0 - smoothstep(-soft, soft, triDist(lb, stem, clew, head));
+      vec2 hq2 = (lb - thrown * 0.7) / vec2(1.9, 6.0);
+      float hullShade = 1.0 - smoothstep(0.75, 1.25, dot(hq2, hq2));
+      shade = max(sails * 0.75, hullShade * 0.9) * clamp(uSunDir.y * 6.0, 0.0, 1.0);
+    }
+    body *= 1.0 - 0.62 * shade;
+
     vec3 col = mix(body, sky, fresnel);
 
     // Sun glitter.
     float rl = max(dot(R, uSunDir), 0.0);
-    col += uSunColor * uSunPower * (pow(rl, 1400.0) * 1.0 + pow(rl, 180.0) * 0.045) * (0.25 + 0.75 * fresnel) * sunUp;
+    col += uSunColor * uSunPower * (pow(rl, 1400.0) * 1.0 + pow(rl, 180.0) * 0.045) * (0.25 + 0.75 * fresnel) * sunUp * (1.0 - shade);
 
     // Whitecaps where the crests pinch, more of them as the wind rises.
     float foamTex = texture2D(uDetail, vBase / 5.5 + vec2(0.0, uTime * 0.02)).a;
@@ -290,7 +331,40 @@ const fragmentShader = /* glsl */ `
       wake *= smoothstep(0.3, 0.75, noise + wake * 0.25) * 0.8;
       foam = max(foam, clamp(alongside + bowWave * smoothstep(0.3, 0.6, noise) + wake, 0.0, 1.0));
     }
-    vec3 foamCol = (uSunColor * (0.55 * sunUp + 0.08) + sky * 0.35) * 0.8;
+    // Other vessels: white water round the hull, a bow wave, and a wake spreading astern.
+    // A fast ferry leaves a long bright one, a yacht a short faint one.
+    {
+      float shipFoam = 0.0;
+      float sNoise = foamTex * 0.55 + foamFine * 0.45;
+      for (int i = 0; i < NS; i++) {
+        vec4 sb = uShipB[i];
+        if (sb.w < 0.5) continue;
+        vec4 sa = uShipA[i];
+        vec2 sr = vBase - sa.xy;
+        float reach = sb.y * 2.2 + sb.x * 34.0;
+        if (dot(sr, sr) > (reach + sb.y) * (reach + sb.y)) continue;
+        vec2 sl = vec2(sr.x * sa.w + sr.y * sa.z, -sr.x * sa.z + sr.y * sa.w); // x starboard, y astern
+        float halfL = sb.y * 0.5;
+        float halfB = sb.z * 0.5;
+        float sway = clamp(sb.x / 4.0, 0.0, 1.6);
+        vec2 q = vec2(sl.x / (halfB * 1.25 + 1.0), sl.y / (halfL * 1.07));
+        float collar = smoothstep(1.45, 1.05, dot(q, q)) * smoothstep(0.35, 0.7, sNoise + sway * 0.1) * min(sway, 1.0);
+        float bz = sl.y + halfL; // metres aft of the stem
+        float armW = 0.6 + halfB * 0.35;
+        float arm = abs(abs(sl.x) - (halfB * 0.2 + bz * 0.4));
+        float bow = smoothstep(armW, 0.0, arm) * smoothstep(-armW, armW * 0.5, bz) * smoothstep(halfL * 1.2 + sb.x * 2.0, halfL * 0.2, bz) * min(sway * sway, 1.6);
+        float d = sl.y - halfL * 0.8; // metres astern of the transom
+        float fade = clamp(1.0 - d / reach, 0.0, 1.0);
+        float astern = step(0.0, d) * min(sway, 1.3);
+        float width = halfB * 0.75 + d * 0.11;
+        float core = smoothstep(width, width * 0.25, abs(sl.x)) * fade * fade * astern;
+        float kel = abs(abs(sl.x) - (halfB + d * 0.34));
+        float arms = smoothstep(1.2 + d * 0.03, 0.0, kel) * fade * fade * fade * astern * 0.55;
+        shipFoam = max(shipFoam, collar + bow * smoothstep(0.3, 0.6, sNoise) + (core + arms) * mix(0.5, 1.0, smoothstep(0.28, 0.72, sNoise + core * 0.3)));
+      }
+      foam = max(foam, clamp(shipFoam, 0.0, 1.0));
+    }
+    vec3 foamCol = (uSunColor * (0.55 * sunUp + 0.08) + sky * 0.35) * 0.8 * (1.0 - 0.45 * shade);
     col = mix(col, foamCol, clamp(foam, 0.0, 1.0) * 0.92);
 
     // Melt into the sky at the horizon.
@@ -342,6 +416,8 @@ export class Ocean {
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
       uTrail: { value: this.trail },
+      uShipA: { value: vec4s(SHIP_SLOTS) },
+      uShipB: { value: vec4s(SHIP_SLOTS) },
     };
     const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms: this.uniforms });
     this.mesh = new THREE.Mesh(makeRadialGrid(), material);
@@ -360,6 +436,26 @@ export class Ocean {
     const toward = windFrom + Math.PI;
     (this.uniforms.uWind.value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
     this.uniforms.uWindKt.value = twsKt;
+  }
+
+  /**
+   * Tell the sea about the other vessels so it can draw their white water. Sim coordinates: x east, y north,
+   * heading in compass radians, speed in m/s. Only the nearest few to the camera are drawn.
+   */
+  setShips(vessels: Array<{ x: number; y: number; heading: number; sog: number; length: number; beam: number }>): void {
+    const a = this.uniforms.uShipA.value as THREE.Vector4[];
+    const b = this.uniforms.uShipB.value as THREE.Vector4[];
+    const c = this.uniforms.uCenter.value as THREE.Vector3;
+    const nearest = vessels
+      .map((v) => ({ v, d: (v.x - c.x) ** 2 + (-v.y - c.z) ** 2 }))
+      .sort((p, q) => p.d - q.d)
+      .slice(0, SHIP_SLOTS);
+    for (let i = 0; i < SHIP_SLOTS; i++) {
+      const n = nearest[i];
+      if (!n) { b[i].w = 0; continue; }
+      a[i].set(n.v.x, -n.v.y, Math.sin(n.v.heading), Math.cos(n.v.heading));
+      b[i].set(n.v.sog, n.v.length, n.v.beam, 1);
+    }
   }
 
   setSun(dir: THREE.Vector3, color: THREE.Color): void {

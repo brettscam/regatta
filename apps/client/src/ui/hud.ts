@@ -44,6 +44,7 @@ export class Hud {
   private readonly cells = new Map<string, HTMLElement>();
   private readonly needles: Record<string, SVGGElement> = {};
   private readonly tideLine: HTMLElement;
+  private readonly pilotLine: HTMLElement;
   private readonly clockTime: HTMLElement;
   private readonly clockSub: HTMLElement;
   private alarmTimer = 0;
@@ -69,6 +70,9 @@ export class Hud {
     this.tideLine = document.createElement('div');
     this.tideLine.className = 'tideline';
     this.readout.appendChild(this.tideLine);
+    this.pilotLine = document.createElement('div');
+    this.pilotLine.className = 'pilotline';
+    this.readout.appendChild(this.pilotLine);
     for (const [key, label, unit] of [
       ['spd', 'Speed', 'kt'], ['hdg', 'Heading', '°T'], ['dpt', 'Depth', 'm'],
       ['awa', 'App angle', ''], ['aws', 'App wind', 'kt'], ['tws', 'True wind', 'kt'],
@@ -137,11 +141,18 @@ export class Hud {
     if (el.textContent !== text) el.textContent = text;
   }
 
+  /** Who has the helm and the sheets, as a short line under the instruments. */
+  setPilot(html: string): void {
+    if (this.pilotLine.dataset.html === html) return;
+    this.pilotLine.innerHTML = html;
+    this.pilotLine.dataset.html = html;
+  }
+
   get readoutHidden(): boolean {
     return this.readout.classList.contains('hidden');
   }
 
-  update(state: SimState, out: SimOutputs, tide: TideNow, shipTime: Date, timeZone: string, paused: boolean, rate: number, dtReal: number): void {
+  update(state: SimState, out: SimOutputs, tide: TideNow, shipTime: Date, timeZone: string, paused: boolean, rate: number, dtReal: number, otherBoats = 0): void {
     this.set('spd', (out.sog / KT).toFixed(1));
     this.set('hdg', String(Math.round(state.heading * R2D) % 360).padStart(3, '0'));
     this.set('dpt', tide.depth === null ? '—' : tide.depth < 20 ? tide.depth.toFixed(1) : tide.depth.toFixed(0));
@@ -167,7 +178,7 @@ export class Hud {
 
     const time = shipTime.toLocaleTimeString('en-GB', { timeZone, hour12: false });
     if (this.clockTime.textContent !== time) this.clockTime.textContent = time;
-    const sub = paused ? 'Paused' : rate === 1 ? 'Real time' : `${rate}× time`;
+    const sub = otherBoats > 0 ? `Shared water · ${otherBoats + 1} boats` : paused ? 'Paused' : rate === 1 ? 'Real time' : `${rate}× time`;
     if (this.clockSub.textContent !== sub) this.clockSub.textContent = sub;
     this.clock.classList.toggle('paused', paused);
     this.clock.classList.toggle('fast', !paused && rate !== 1);

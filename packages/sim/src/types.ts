@@ -61,9 +61,10 @@ export interface BoatSpec {
   controls: ControlBinding[];
 }
 
-export type ControlName = 'rudder' | 'mainsheet' | 'jibsheet_port' | 'jibsheet_stbd' | 'furl' | 'reef';
+export type ControlName = 'rudder' | 'mainsheet' | 'jibsheet_port' | 'jibsheet_stbd' | 'furl' | 'reef' | 'pilot';
 
-export type HelmMode = 'hand' | 'heading' | 'wind';
+/** Who is steering: a hand on the wheel, or the pilot holding a heading, a wind angle, or a course to a mark. */
+export type HelmMode = 'hand' | 'heading' | 'wind' | 'route';
 
 export interface Maneuver {
   kind: 'tack' | 'gybe';
@@ -123,6 +124,21 @@ export interface SimState {
   helmIntegral: number;
   /** When true the crew trims both sails toward their best setting. */
   crewTrim: boolean;
+  /** The mark the pilot is steering for in route mode, and where that leg began. */
+  routeX: number;
+  routeY: number;
+  routeFromX: number;
+  routeFromY: number;
+  /** Smoothed angle between heading and course over ground, so the pilot can crab across the tide. */
+  routeCrab: number;
+  /** Sim time of the pilot's last tack or gybe on its own account. */
+  routeTurnAt: number;
+  /** How many times the pilot has tacked or gybed for the mark. */
+  routeTurns: number;
+  /** Seconds the pilot has been losing the fight with the helm. */
+  overpowered: number;
+  /** How many times the pilot has given up and handed the wheel back. */
+  pilotTrips: number;
   maneuver: Maneuver | null;
 }
 
@@ -174,6 +190,8 @@ export interface SimOutputs {
   rudderGrip: number;
   inIrons: boolean;
   roundingUp: boolean;
+  /** True when the pilot is working to windward toward a mark it cannot point at. */
+  pilotBeating: boolean;
   /** Water under the keel, metres. Null where the world gives no depth. */
   underKeel: number | null;
   aground: boolean;

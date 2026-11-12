@@ -18,34 +18,116 @@ export interface SailShape {
   aws: number;
 }
 
-function sailTexture(): THREE.CanvasTexture {
+type SailKind = 'main' | 'jib';
+
+/**
+ * Sailcloth drawn on a canvas. Across the canvas is luff to leech, up the canvas is foot to head.
+ * Seams, draft stripes, battens and numbers on the main, a sun-cover strip on the furling jib.
+ */
+function sailTexture(kind: SailKind): THREE.CanvasTexture {
   const c = document.createElement('canvas');
-  c.width = 256;
+  c.width = 512;
   c.height = 1024;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#f3f0e6';
-  g.fillRect(0, 0, c.width, c.height);
-  // Cross-cut panel seams and a few battens' worth of shading.
-  g.strokeStyle = 'rgba(120,125,130,0.35)';
-  g.lineWidth = 2;
-  for (let y = 40; y < c.height; y += 78) {
+  const W = c.width;
+  const H = c.height;
+  // Canvas y runs down, so height v on the sail is drawn at H * (1 - v).
+  const Y = (v: number) => H * (1 - v);
+  g.fillStyle = '#f4f1e7';
+  g.fillRect(0, 0, W, H);
+  // Panels: each a hair different in tone, with a stitched seam between.
+  const panels = kind === 'main' ? 15 : 13;
+  for (let i = 0; i < panels; i++) {
+    const y0 = Y((i + 1) / panels);
+    g.fillStyle = `rgba(${i % 2 ? '255,255,255' : '205,200,186'}, 0.16)`;
+    g.fillRect(0, y0, W, H / panels);
+    g.strokeStyle = 'rgba(120, 124, 128, 0.42)';
+    g.lineWidth = 1.5;
     g.beginPath();
-    g.moveTo(0, y);
-    g.lineTo(c.width, y - 14);
+    g.moveTo(0, y0 + 8);
+    g.lineTo(W, y0 - 6);
     g.stroke();
   }
+  // Draft stripes: dark bands across the sail that make its curve easy to read.
+  g.strokeStyle = kind === 'main' ? '#1f2a36' : '#1e3a66';
+  g.lineWidth = 5;
+  for (const v of [0.26, 0.5, 0.74]) {
+    g.beginPath();
+    g.moveTo(W * 0.03, Y(v));
+    g.lineTo(W * 0.97, Y(v));
+    g.stroke();
+  }
+  if (kind === 'main') {
+    // Full-length battens in their pockets.
+    for (const v of [0.2, 0.38, 0.56, 0.72, 0.87]) {
+      g.fillStyle = 'rgba(232, 228, 214, 1)';
+      g.fillRect(0, Y(v) - 7, W, 14);
+      g.strokeStyle = 'rgba(96, 100, 104, 0.6)';
+      g.lineWidth = 1.2;
+      g.strokeRect(-2, Y(v) - 7, W + 4, 14);
+    }
+    // Reef points: two rows of patches.
+    for (const v of [0.2, 0.38]) {
+      for (let i = 1; i < 6; i++) {
+        g.fillStyle = 'rgba(150, 152, 150, 0.7)';
+        g.fillRect((W * i) / 6 - 5, Y(v) + 16, 10, 12);
+      }
+    }
+    // Sail number, one way round on each side as on a real sail, and a class mark near the head.
+    g.fillStyle = '#12233d';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const number = (v: number, flip: number) => {
+      g.save();
+      g.translate(W * 0.6, Y(v));
+      g.scale(flip * 1.9, 1);
+      g.font = '700 40px ui-sans-serif, "Helvetica Neue", Arial, sans-serif';
+      g.fillText('USA 3838', 0, 0);
+      g.restore();
+    };
+    number(0.655, 1);
+    number(0.615, -1);
+    g.save();
+    g.translate(W * 0.6, Y(0.8));
+    g.scale(2.4, 1);
+    g.strokeStyle = '#b22a35';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(0, 0, 15, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = '#b22a35';
+    g.font = '700 17px ui-sans-serif, Arial, sans-serif';
+    g.fillText('38', 0, 1);
+    g.restore();
+    // Headboard and tabling.
+    g.fillStyle = 'rgba(60, 64, 70, 0.75)';
+    g.fillRect(0, Y(1), W, 12);
+    g.fillStyle = 'rgba(190, 186, 172, 0.7)';
+    g.fillRect(W - 9, 0, 9, H);
+    g.fillRect(0, H - 9, W, 9);
+  } else {
+    // Sun cover: a dark strip along the leech and foot that is all that shows when the sail is rolled away.
+    g.fillStyle = '#1b2d4a';
+    g.fillRect(W * 0.925, 0, W * 0.075, H);
+    g.fillRect(0, Y(0.04), W, H * 0.04);
+    // Clew and tack patches.
+    g.fillStyle = 'rgba(205, 200, 186, 0.75)';
+    g.beginPath();
+    g.moveTo(W * 0.925, Y(0.04));
+    g.lineTo(W * 0.62, Y(0.04));
+    g.lineTo(W * 0.925, Y(0.17));
+    g.fill();
+  }
   // Luff tape.
-  g.fillStyle = 'rgba(40,60,90,0.5)';
-  g.fillRect(0, 0, 7, c.height);
+  g.fillStyle = 'rgba(40, 60, 90, 0.55)';
+  g.fillRect(0, 0, 8, H);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   return tex;
 }
 
-let sharedTexture: THREE.CanvasTexture | null = null;
-
-function makeSailMesh(nu: number, nv: number): THREE.Mesh {
+function makeSailMesh(nu: number, nv: number, kind: SailKind): THREE.Mesh {
   const count = (nu + 1) * (nv + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -62,12 +144,21 @@ function makeSailMesh(nu: number, nv: number): THREE.Mesh {
     idx.push(a, b, a + 1, a + 1, b, b + 1);
   }
   g.setIndex(idx);
-  sharedTexture ??= sailTexture();
   const mat = new THREE.MeshStandardMaterial({
-    map: sharedTexture, color: 0xffffff, roughness: 0.9, metalness: 0, side: THREE.DoubleSide,
-    // Sailcloth lets some light through. A little glow stops the shaded side going dead.
-    emissive: 0x6f6a5c, emissiveIntensity: 0.22,
+    map: sailTexture(kind), color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
+    emissive: 0x6f6a5c, emissiveIntensity: 0.1,
   });
+  // Sailcloth lets light through. When the sun is behind the sail, the side you are looking at glows with it.
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      #if NUM_DIR_LIGHTS > 0
+        float sailBacklight = max(dot(-normal, directionalLights[0].direction), 0.0);
+        totalEmissiveRadiance += diffuseColor.rgb * directionalLights[0].color * (0.03 + 0.1 * sailBacklight);
+      #endif`,
+    );
+  };
   const mesh = new THREE.Mesh(g, mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -100,7 +191,7 @@ export class Mainsail {
   private hoist = 1;
 
   constructor(private readonly geo: SloopGeometry) {
-    this.mesh = makeSailMesh(this.nu, this.nv);
+    this.mesh = makeSailMesh(this.nu, this.nv, 'main');
     this.mesh.name = 'main';
   }
 
@@ -160,7 +251,7 @@ export class Jib {
   private readonly nv = 22;
 
   constructor(private readonly geo: SloopGeometry) {
-    this.mesh = makeSailMesh(this.nu, this.nv);
+    this.mesh = makeSailMesh(this.nu, this.nv, 'jib');
     this.mesh.name = 'jib';
   }
 

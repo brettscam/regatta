@@ -5,15 +5,19 @@ import boatJson from '../../../boats/sloop38.json';
 import { BoatView, type BoatPose } from './boat/boatView';
 import { DroneCamera, VIEWS } from './camera/drone';
 import { Controls } from './input/controls';
+import { Pilot } from './input/pilot';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
+import { Traffic, type TrafficVessel } from './scene/traffic';
+import { buildScenery } from './scene/scenery';
 import { buildWaves, setSeaState, waveHeight } from './scene/waves';
 import { Chart } from './ui/chart';
 import { Hud, TIME_RATES } from './ui/hud';
 import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
 import { loadCourse } from './world/loadCourse';
+import { Fleet } from './net/fleet';
 
 const boatSpec = boatJson as unknown as BoatSpec;
 
@@ -56,9 +60,12 @@ scene.fog = haze;
 const sky = new SkySystem(renderer, scene);
 const ocean = new Ocean(sky.reflection.texture);
 scene.add(ocean.mesh);
-scene.add(buildTerrain(course, data.terrain), buildBridge(course));
+scene.add(buildTerrain(course, data.terrain), buildBridge(course), buildScenery(course, data.terrain));
 const buoys = course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
 for (const b of buoys) scene.add(b.group);
+// Other vessels on the Bay. Where each one is depends only on the time, so everyone sees the same traffic.
+const traffic = new Traffic(course, world);
+scene.add(traffic.group);
 const boatView = new BoatView(boatSpec);
 scene.add(boatView.root);
 
@@ -92,14 +99,36 @@ const chart = new Chart({
   polar: boatSpec.polar,
   now: () => sim.state.t,
   boat: () => ({ x: sim.state.x, y: sim.state.y, heading: sim.state.heading, cog: sim.out.cog, sog: sim.out.sog }),
+  traffic: () => everyoneElse(),
 });
 
 let paused = false;
 let rateIndex = 0;
-hud.onPause = () => { paused = !paused; };
-hud.onRate = (i) => { rateIndex = i; };
+const pilot = new Pilot(sim, passage, {
+  say: (text) => hud.raiseAlarm(text, 4),
+  alarm: (text) => alarm(text),
+});
+// Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
+const fleet = new Fleet(boatSpec, world, scene);
+void fleet.connect();
+const sharing = () => fleet.boats.length > 0;
+/** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
+function everyoneElse(): TrafficVessel[] {
+  if (!fleet.boats.length) return traffic.vessels;
+  const company: TrafficVessel[] = fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.name, kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: 11.6, beam: 3.8 }));
+  return [...traffic.vessels, ...company];
+}
+const togglePause = (): void => {
+  if (sharing()) hud.raiseAlarm('The clock is shared while other boats are here', 4);
+  else paused = !paused;
+};
+hud.onPause = togglePause;
+hud.onRate = (i) => {
+  if (sharing()) { hud.setRate(0); hud.raiseAlarm('Time runs at real speed while other boats are here', 4); }
+  else rateIndex = i;
+};
 const controls = new Controls(canvas, drone, boatView, sim, hud, sound, {
-  togglePause: () => { paused = !paused; },
+  togglePause,
   announce: (text) => hud.raiseAlarm(text, 4),
   toggleChart: () => chart.toggle(),
   closeChart: () => chart.toggle(false),
@@ -107,6 +136,10 @@ const controls = new Controls(canvas, drone, boatView, sim, hud, sound, {
     hud.toggleReadout();
     chart.setMiniHidden(hud.readoutHidden);
   },
+  togglePilot: () => pilot.toggle(),
+  cyclePilotMode: () => pilot.cycle(),
+  sheetsInHand: () => pilot.sheetsInHand(),
+  pilotTag: () => pilot.tag(),
 });
 
 function resize(): void {
@@ -120,7 +153,7 @@ window.addEventListener('resize', resize);
 resize();
 
 // ---- alarms: a line of text when something needs the player, and time drops back to real speed ----
-const watch = { shallow: false, aground: false, marksReached: 0 };
+const watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>() };
 function alarm(text: string): void {
   hud.raiseAlarm(text, 6);
   rateIndex = 0;
@@ -146,6 +179,17 @@ function checkAlarms(): void {
     }
   }
   watch.marksReached = reached;
+
+  // Close quarters: a vessel that will pass close within the next two minutes. One warning per vessel per encounter.
+  const near = traffic.closest({ x: sim.state.x, y: sim.state.y, cog: sim.out.cog, sog: sim.out.sog });
+  if (near && near.tcpa > 0 && near.tcpa < 120 && near.range < 1200 && near.cpa < 70 + near.vessel.length * 0.6) {
+    const lastWarned = watch.warned.get(near.vessel.id) ?? -1e9;
+    if (sim.state.t - lastWarned > 180) {
+      watch.warned.set(near.vessel.id, sim.state.t);
+      const brg = Math.round((Math.atan2(near.vessel.x - sim.state.x, near.vessel.y - sim.state.y) * R2D + 360) % 360);
+      alarm(`${near.vessel.name} bearing ${String(brg).padStart(3, '0')}°, closing. Will pass ${Math.round(near.cpa / 10) * 10} m off in ${Math.round(near.tcpa / 5) * 5} s`);
+    }
+  }
 }
 
 // ---- loop ---------------------------------------------------------------------------------------
@@ -207,6 +251,7 @@ function frame(now: number): void {
       after = grab(sim.state);
       passage.update(sim.state, sim.state.t);
       checkAlarms();
+      pilot.update();
     }
   }
   const alpha = paused ? 1 : acc / SIM_DT;
@@ -248,9 +293,18 @@ function frame(now: number): void {
   boatView.update(pose, sim.state, sim.out, seaTime, paused ? 0 : dtReal);
   boatView.root.updateMatrixWorld(true);
 
+  traffic.update(sim.state.t, seaTime, waves);
   for (const b of buoys) {
     const c = world.current(b.x, b.y, sim.state.t);
     b.update(waveHeight(waves, b.x, -b.y, seaTime), Math.atan2(c.x, c.y), Math.hypot(c.x, c.y), seaTime);
+  }
+
+  // Draw the other boats, tell them where this one is, and keep to the furthest-on clock.
+  const clockBehind = fleet.update(sim, world.seasonTime(sim.state.t), seaTime, waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
+  if (sharing()) {
+    paused = false;
+    if (rateIndex !== 0) { rateIndex = 0; hud.setRate(0); }
+    if (clockBehind > 1.5) world.shiftTime(clockBehind);
   }
 
   boatPos.set(x, pose.heave, z);
@@ -263,6 +317,7 @@ function frame(now: number): void {
   const up = THREE.MathUtils.clamp(Math.sin(sky.elevation) * 3, 0, 1);
   haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(sky.elevation) * 6 + 0.3, 0, 1));
   ocean.setSun(sky.sunDir, sky.sunColor);
+  ocean.setShips(everyoneElse());
   ocean.update(seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel });
 
   const stream = world.current(sim.state.x, sim.state.y, sim.state.t);
@@ -272,7 +327,9 @@ function frame(now: number): void {
     height: world.tide(sim.state.t),
     rate: world.tideRate(sim.state.t),
     depth: sim.out.underKeel === null ? null : sim.out.underKeel + boatSpec.dimensions.draft,
-  }, shipTime, course.timeZone, paused, rate, dtReal);
+  }, shipTime, course.timeZone, paused, rate, dtReal, fleet.boats.length);
+  hud.setPilot(pilot.line());
+  boatView.setPilot({ engaged: pilot.engaged, mode: pilot.mode, label: pilot.label() });
   chart.update(dtReal);
   const loose = Math.max(sim.out.main.luff * 0.7 + (sim.out.main.flogging ? 0.3 : 0), sim.state.furl > 0.03 ? sim.out.jib.luff * 0.7 + (sim.out.jib.flogging ? 0.3 : 0) : 0);
   sound.update(sim.out.aws / KT, sim.state.speed / KT, loose, paused);
@@ -304,4 +361,4 @@ if (hot?.ready) hot.ready(resume);
 else resume(hot?.data);
 
 // For play testing from the browser console.
-Object.assign(window, { slackTide: { sim, world, passage, chart, drone, boatView, renderer, views: VIEWS, setPaused: (p: boolean) => { paused = p; } } });
+Object.assign(window, { slackTide: { scene, traffic, sim, world, passage, chart, pilot, fleet, drone, boatView, renderer, views: VIEWS, setPaused: (p: boolean) => { paused = p; } } });

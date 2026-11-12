@@ -28,6 +28,10 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - Course coordinates are flat metres east and north of `course.origin`. Grids have row 0 at the southern edge
 - Chart and planning live in `apps/client/src/ui/chart.ts` and `passage.ts`. The maths is in `packages/nav` and is tested there
 
+- The autopilot's steering is in the sim (`helmMode` heading, wind or route, `setRoute`). The player-facing part is `apps/client/src/input/pilot.ts`. Pilot on means crew trimming on
+- Shared water is `apps/client/src/net/fleet.ts`, built on the artifact runtime's `room` presence. It needs `capabilities: { room: {}, user: { scopes: ["profile"] } }` when publishing. Clocks agree by everyone moving up to the furthest-on boat with `world.shiftTime`
+- Traffic positions are pure functions of session time, so every player sees the same vessels
+
 ## Status
 
-Milestone 1 is built and waiting on its play test gate. At the owner's request, parts of milestone 3 were built early: the Bay replay (wind, stream, tide, depth, land), the chartplotter with passage planning and plan against actual, the forecast timeline, an on-screen wind and tide dial, and crew figures. The owner asked for these on-screen instruments directly, which overrides the PRD's lean toward keeping information on the boat. They hide with H.
+Milestone 1 is built and waiting on its play test gate. At the owner's request, parts of milestone 3 were built early: the Bay replay (wind, stream, tide, depth, land), the chartplotter with passage planning and plan against actual, the forecast timeline, an on-screen wind and tide dial, crew figures, the autopilot, Bay traffic and scenery, and shared water for sailing in company. The owner asked for these on-screen instruments directly, which overrides the PRD's lean toward keeping information on the boat. They hide with H.

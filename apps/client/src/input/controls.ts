@@ -18,6 +18,14 @@ export interface ControlHost {
   toggleChart(): void;
   closeChart(): void;
   toggleInstruments(): void;
+  /** Engage the pilot in its selected mode, or release it. */
+  togglePilot(): void;
+  /** Step the pilot's mode: heading, wind angle, route. */
+  cyclePilotMode(): void;
+  /** The player has taken a sheet in hand, so the crew stops trimming. */
+  sheetsInHand(): void;
+  /** What the pilot is doing, for its tag. */
+  pilotTag(): string;
 }
 
 /**
@@ -99,6 +107,8 @@ export class Controls {
     const before = this.sim.getControl(binding.control);
     this.sim.nudgeControl(binding.control, delta);
     const moved = this.sim.getControl(binding.control) - before;
+    if (binding.control === 'pilot') return;
+    if (binding.control !== 'rudder') this.host.sheetsInHand();
     if (moved !== 0 && binding.control !== 'rudder') {
       const load = binding.control === 'mainsheet' ? this.sim.out.main.loadKg : this.sim.out.jib.loadKg;
       this.sound.winch(moved * R2D, Math.min(1, load / 400));
@@ -121,6 +131,8 @@ export class Controls {
         const loaded = this.sim.loadedJibSheet() === binding.control && !out.jib.flogging && s.furl > 0.02;
         return [binding.label, loaded ? `${Math.round(out.jib.loadKg)} kg` : 'slack'];
       }
+      case 'pilot':
+        return [binding.label, this.host.pilotTag()];
       default:
         return [binding.label, ''];
     }
@@ -223,6 +235,9 @@ export class Controls {
   }
 
   private onPointerUp = (e: PointerEvent): void => {
+    // A click on the pilot head, with no drag, steps its mode.
+    const d = this.drag;
+    if (d && d.kind === 'part' && d.slop < 4 && d.binding.control === 'pilot') this.host.cyclePilotMode();
     this.pointers.delete(e.pointerId);
     if (this.canvas.hasPointerCapture(e.pointerId)) this.canvas.releasePointerCapture(e.pointerId);
     this.drag = null;
@@ -244,7 +259,8 @@ export class Controls {
     }
     const step = (b.stepDeg ?? 2) * D2R * (e.shiftKey ? 5 : 1);
     // Wheel: scroll up or right steers to starboard. Sheets: scroll up hauls in, scroll down eases.
-    const sign = b.control === 'rudder' ? -1 : 1;
+    // The pilot's dial turns the same way as the wheel.
+    const sign = b.control === 'rudder' || b.control === 'pilot' ? -1 : 1;
     const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY) && !e.shiftKey;
     this.nudge(b, b.control === 'rudder' && sideways ? notches * step : sign * notches * step);
   };
@@ -263,6 +279,7 @@ export class Controls {
     if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); return; }
     switch (e.code) {
       case 'Space': this.host.togglePause(); e.preventDefault(); break;
+      case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
       case 'KeyT': this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh'); break;
       case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;

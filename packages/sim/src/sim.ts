@@ -80,6 +80,15 @@ export function initialState(init: InitialConditions = {}): SimState {
     helmTarget: 0,
     helmIntegral: 0,
     crewTrim: false,
+    routeX: 0,
+    routeY: 0,
+    routeFromX: 0,
+    routeFromY: 0,
+    routeCrab: 0,
+    routeTurnAt: -1e9,
+    routeTurns: 0,
+    overpowered: 0,
+    pilotTrips: 0,
     maneuver: null,
   };
 }
@@ -114,6 +123,7 @@ export class Sim {
       case 'jibsheet_stbd': return { min: 0, max: b.sails.jib.sheetMaxSlackDeg * D2R };
       case 'furl': return { min: 0, max: 1 };
       case 'reef': return { min: 0, max: b.sails.main.reefs.length - 1 };
+      case 'pilot': return { min: -Math.PI * 2, max: Math.PI * 4 };
     }
   }
 
@@ -126,6 +136,7 @@ export class Sim {
       case 'jibsheet_stbd': return s.jibSheetStbd;
       case 'furl': return s.furl;
       case 'reef': return s.reef;
+      case 'pilot': return s.helmTarget;
     }
   }
 
@@ -145,6 +156,12 @@ export class Sim {
       case 'jibsheet_stbd': s.jibSheetStbd = v; break;
       case 'furl': s.furl = v; break;
       case 'reef': s.reef = Math.round(v); break;
+      case 'pilot':
+        // The pilot's dial: the heading it holds, or the wind angle. It does nothing while steering a route.
+        if (s.helmMode === 'heading') s.helmTarget = wrapTau(v);
+        else if (s.helmMode === 'wind') s.helmTarget = clamp(wrapPi(v), -175 * D2R, 175 * D2R);
+        s.helmIntegral = 0;
+        break;
     }
   }
 
@@ -170,9 +187,93 @@ export class Sim {
     s.maneuver = null;
     s.helmMode = mode;
     s.helmIntegral = 0;
+    s.overpowered = 0;
     if (mode === 'heading') s.helmTarget = target ?? s.heading;
     else if (mode === 'wind') s.helmTarget = target ?? this.out.twa;
+    else if (mode === 'route') this.setRoute({ x: s.routeX, y: s.routeY });
     else s.rudderCmd = target ?? s.rudderCmd;
+  }
+
+  /**
+   * Hand the helm to the pilot to steer for a mark. It points at the mark when it can, allowing for the tide.
+   * When the mark is to windward it sails close-hauled and tacks when the mark can be laid, or when the water shoals.
+   */
+  setRoute(to: { x: number; y: number }, from?: { x: number; y: number }): void {
+    const s = this.state;
+    s.maneuver = null;
+    s.helmMode = 'route';
+    s.helmIntegral = 0;
+    s.overpowered = 0;
+    s.routeX = to.x;
+    s.routeY = to.y;
+    s.routeFromX = from?.x ?? s.x;
+    s.routeFromY = from?.y ?? s.y;
+  }
+
+  /** Turn the crew's sail trimming on or off. With the pilot steering, this is the boat sailing herself. */
+  setCrewTrim(on: boolean): void {
+    this.state.crewTrim = on;
+  }
+
+  /** Begin a turn through the wind to a new heading, with the crew handling the sheets. */
+  private turnTo(targetHeading: number): void {
+    const s = this.state;
+    s.maneuver = {
+      kind: Math.abs(this.out.twa) < Math.PI / 2 ? 'tack' : 'gybe',
+      targetHeading: wrapTau(targetHeading),
+      fromSide: this.out.awa >= 0 ? 1 : -1,
+      swapped: false,
+      prevMode: s.helmMode,
+      prevTarget: s.helmTarget,
+      elapsed: 0,
+    };
+    s.helmIntegral = 0;
+  }
+
+  /**
+   * The pilot's steering error in route mode, radians: positive means turn to starboard.
+   * May start a tack or gybe of its own.
+   */
+  private routeError(): number {
+    const s = this.state;
+    const o = this.out;
+    const CLOSE = 44 * D2R;
+    const draft = this.boat.dimensions.draft;
+    const dx = s.routeX - s.x;
+    const dy = s.routeY - s.y;
+    // Crab across the tide and leeway: learn the angle between where she points and where she goes.
+    if (o.sog > 1) s.routeCrab += (clamp(wrapPi(s.heading - o.cog), -0.5, 0.5) - s.routeCrab) * (1 - Math.exp(-this.dt / 8));
+    const desired = Math.atan2(dx, dy) + s.routeCrab;
+    const twaDirect = wrapPi(o.twd - desired);
+    const side = o.twa >= 0 ? 1 : -1;
+    const rested = s.t - s.routeTurnAt > 25;
+    const depthAhead = (heading: number, metres: number): number =>
+      this.env.sample(s.x + Math.sin(heading) * metres, s.y + Math.cos(heading) * metres, s.t).depth ?? Infinity;
+
+    o.pilotBeating = Math.abs(twaDirect) < CLOSE;
+    if (!o.pilotBeating) {
+      // The mark can be pointed at. If that means putting the wind on the other side, tack or gybe for it.
+      const newSide = twaDirect >= 0 ? 1 : -1;
+      if (newSide !== side && Math.abs(o.twa) > 8 * D2R && Math.abs(o.twa) < 172 * D2R && rested) {
+        s.routeTurnAt = s.t;
+        s.routeTurns++;
+        this.turnTo(desired);
+        return wrapPi(desired - s.heading);
+      }
+      return wrapPi(desired - s.heading);
+    }
+    // The mark is to windward: sail close-hauled on this tack until it can be laid on the other one.
+    // Short-tack off a shoal rather than run up it.
+    if (rested && s.speed > 1.2 && (depthAhead(s.heading, 140) < draft + 2 || depthAhead(s.heading, 280) < draft + 1)) {
+      const other = wrapTau(o.twd + side * CLOSE);
+      if (depthAhead(other, 200) > draft + 2) {
+        s.routeTurnAt = s.t;
+        s.routeTurns++;
+        this.turnTo(other);
+        return wrapPi(other - s.heading);
+      }
+    }
+    return wrapPi(o.twa - side * (CLOSE - D2R));
   }
 
   /**
@@ -279,8 +380,10 @@ export class Sim {
     if (m || s.helmMode !== 'hand') {
       rudderRate = PILOT_RUDDER_RATE;
       let err: number;
+      o.pilotBeating = false;
       if (m) err = wrapPi(m.targetHeading - s.heading);
       else if (s.helmMode === 'heading') err = wrapPi(s.helmTarget - s.heading);
+      else if (s.helmMode === 'route') err = this.routeError();
       else err = wrapPi(o.twa - s.helmTarget);
       if (Math.abs(err) < 15 * D2R) s.helmIntegral = clamp(s.helmIntegral + err * dt, -1.5, 1.5);
       const limit = m ? 30 * D2R : maxRudder;
@@ -351,6 +454,15 @@ export class Sim {
 
     o.inIrons = Math.abs(o.twa) < 30 * D2R && s.speed < 2 * KT;
     o.roundingUp = o.rudderGrip < 0.5 && Math.abs(o.weatherHelm) > Math.abs(rudderYaw);
+    // The pilot gives up when it is overpowered: a few seconds of losing to the helm and it hands the wheel back.
+    if (s.helmMode !== 'hand' && !s.maneuver) {
+      s.overpowered = o.roundingUp ? s.overpowered + dt : Math.max(0, s.overpowered - dt * 0.5);
+      if (s.overpowered > 4) {
+        s.helmMode = 'hand';
+        s.overpowered = 0;
+        s.pilotTrips++;
+      }
+    }
 
     s.tick += 1;
     s.t = s.tick * dt;
@@ -466,7 +578,7 @@ export class Sim {
     s.helmIntegral = 0;
     if (m.prevMode === 'hand') s.rudderCmd = 0;
     else if (m.prevMode === 'heading') s.helmTarget = m.targetHeading;
-    else s.helmTarget = -m.prevTarget;
+    else if (m.prevMode === 'wind') s.helmTarget = -m.prevTarget;
   }
 
   /** Put the sails and outputs where the current wind would have them, with no swing-in time. */
@@ -513,7 +625,7 @@ export class Sim {
       tws: 0, twd: 0, twa: 0, aws: 0, awa: 0, sog: 0, cog: 0,
       main: emptySail(), jib: emptySail(),
       targetSpeed: 0, polarSpeed: 0, heelLoad: 0, heelPenalty: 1, weatherHelm: 0, rudderGrip: 1,
-      inIrons: false, roundingUp: false, underKeel: null, aground: false,
+      inIrons: false, roundingUp: false, pilotBeating: false, underKeel: null, aground: false,
     };
   }
 }

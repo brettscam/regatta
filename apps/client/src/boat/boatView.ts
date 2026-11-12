@@ -81,7 +81,16 @@ export class BoatView {
   private winchSpin = { winch_port: 0, winch_stbd: 0 };
   private lastSheet = { winch_port: 0, winch_stbd: 0 };
 
-  private readonly mainsheet = new Rope(0xe8e4d8, 0.012);
+  /** The mainsheet is a four-part tackle between a block on the boom and one on the traveller. */
+  private readonly mainsheet = [new Rope(0xe8e4d8, 0.0065), new Rope(0xe8e4d8, 0.0065), new Rope(0xe8e4d8, 0.0065), new Rope(0xe8e4d8, 0.0065)];
+  private readonly sheetBlock = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12).rotateZ(Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6 }),
+  );
+  private ensignAngle = Math.PI / 2;
+  private readonly pilotCanvas = document.createElement('canvas');
+  private readonly pilotTexture: THREE.CanvasTexture;
+  private pilotShown = '';
   private readonly vang = new Rope(0x2a2d31, 0.014);
   private readonly sheetPort = [new Rope(0xb5332a), new Rope(0xb5332a), new Rope(0xb5332a)];
   private readonly sheetStbd = [new Rope(0x2f8f55), new Rope(0x2f8f55), new Rope(0x2f8f55)];
@@ -125,7 +134,9 @@ export class BoatView {
       this.glowMeshes.set(node, meshes);
     }
 
-    for (const r of [this.mainsheet, this.vang, ...this.sheetPort, ...this.sheetStbd]) this.root.add(r.mesh);
+    for (const r of [...this.mainsheet, this.vang, ...this.sheetPort, ...this.sheetStbd]) this.root.add(r.mesh);
+    this.sheetBlock.castShadow = true;
+    this.root.add(this.sheetBlock);
     for (const v of [0.28, 0.5, 0.72]) {
       const port = new Telltale(0xd8402f);
       const stbd = new Telltale(0x35b56a);
@@ -144,6 +155,15 @@ export class BoatView {
     this.displayTexture.colorSpace = THREE.SRGBColorSpace;
     const display = this.model.nodes.mast_display as THREE.Mesh;
     (display.material as THREE.Material[])[4] = new THREE.MeshBasicMaterial({ map: this.displayTexture, toneMapped: false });
+
+    // The autopilot head's screen.
+    this.pilotCanvas.width = 300;
+    this.pilotCanvas.height = 220;
+    this.pilotTexture = new THREE.CanvasTexture(this.pilotCanvas);
+    this.pilotTexture.colorSpace = THREE.SRGBColorSpace;
+    const pilotScreen = this.model.nodes.autopilot_screen as THREE.Mesh | undefined;
+    if (pilotScreen) pilotScreen.material = new THREE.MeshBasicMaterial({ map: this.pilotTexture, toneMapped: false });
+    this.setPilot({ engaged: false, mode: 'heading', label: '' });
 
     this.pickables.push(...this.model.hitProxies, this.main.mesh, this.jib.mesh, this.model.nodes.hull, this.model.nodes.deck);
     this.solids = [this.model.nodes.hull, this.model.nodes.deck];
@@ -204,6 +224,12 @@ export class BoatView {
       tangent.set(Math.cos(a) * side, 0, -Math.sin(a) * side).transformDirection(this.root.matrixWorld);
       return { metresPerUnit: geo.boomLength };
     }
+    if (node === 'autopilot') {
+      // The control head on the cabin bulkhead. Turning its dial to the right raises the value.
+      this.model.nodes.autopilot.getWorldPosition(point);
+      tangent.set(1, 0, 0).transformDirection(this.root.matrixWorld);
+      return { metresPerUnit: 1 };
+    }
     if (node === 'winch_port' || node === 'winch_stbd') {
       // Pulling in toward the centreline grinds the sheet in, which lowers the slack.
       const side = node === 'winch_port' ? -1 : 1;
@@ -240,7 +266,17 @@ export class BoatView {
     const boomA = nodes.boom.rotation.y;
     const onBoom = (dist: number, drop: number, o: THREE.Vector3) =>
       o.set(Math.sin(boomA) * dist, -drop, Math.cos(boomA) * dist).add(geo.gooseneck);
-    this.mainsheet.set(onBoom(geo.boomLength * 0.83, 0.09, this.v1), geo.traveller);
+    // Mainsheet: four parts fanned between the boom block and the traveller block.
+    const sheetTop = onBoom(geo.boomLength * 0.83, 0.2, this.v1);
+    this.sheetBlock.position.copy(sheetTop);
+    this.sheetBlock.position.y += 0.07;
+    this.sheetBlock.rotation.y = boomA;
+    this.mainsheet.forEach((part, i) => {
+      const off = (i - 1.5) * 0.022;
+      this.v2.set(sheetTop.x + Math.cos(boomA) * off, sheetTop.y + 0.05, sheetTop.z - Math.sin(boomA) * off);
+      this.v3.set(geo.traveller.x + off * 1.4, geo.traveller.y + 0.12, geo.traveller.z);
+      part.set(this.v2, this.v3);
+    });
     this.vang.set(onBoom(1.35, 0.08, this.v1), geo.vangBase);
     const clew = this.jib.clew;
     const jibUp = state.furl > 0.03;
@@ -311,6 +347,8 @@ export class BoatView {
     this.windexAngle += dA * Math.min(1, dt * 6);
     nodes.windex_arrow.rotation.y = this.windexAngle + Math.sin(time * 5.1) * 0.03;
 
+    this.updateEnsign(out, time, dt);
+
     if (this.glowNode) {
       this.glowLevel += (1 - this.glowLevel) * Math.min(1, dt * 12);
       this.applyGlow(this.glowNode, this.glowLevel * (1.1 + 0.25 * Math.sin(time * 5)));
@@ -323,6 +361,87 @@ export class BoatView {
       this.displayClock = 0.25;
       this.drawDisplay(state, out);
     }
+  }
+
+  /** The ensign streams away from the apparent wind, lifts as it freshens and hangs when it is light. */
+  private updateEnsign(out: SimOutputs, time: number, dt: number): void {
+    const group = this.model.nodes.ensign;
+    const flag = this.model.nodes.ensign_flag as THREE.Mesh | undefined;
+    if (!group || !flag) return;
+    // The fly is the flag's local +X. Turn it to point downwind in the boat's frame.
+    const want = Math.atan2(-Math.cos(out.awa), -Math.sin(out.awa));
+    let d = want - this.ensignAngle;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.ensignAngle += d * Math.min(1, dt * 4);
+    group.rotation.y = this.ensignAngle + Math.sin(time * 2.3) * 0.06;
+    const fly = flag.userData.fly as number;
+    const hoist = flag.userData.hoist as number;
+    const wind = Math.min(1.4, out.aws / 7);
+    const droop = 1 - Math.min(1, out.aws / 5);
+    const pos = flag.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const cols = 13;
+    for (let i = 0; i < pos.count; i++) {
+      const u = (i % cols) / (cols - 1);
+      const v = Math.floor(i / cols) / 5;
+      const wave = Math.sin(u * 8 - time * (9 + 6 * wind) + v * 1.7) * 0.05 * u * (0.25 + wind)
+        + Math.sin(u * 15 - time * 17 + v * 3.1) * 0.016 * u * wind;
+      pos.setXYZ(i, u * fly * (1 - 0.4 * droop * u), -v * hoist - droop * 0.8 * u * u * fly, wave);
+    }
+    pos.needsUpdate = true;
+    flag.geometry.computeVertexNormals();
+  }
+
+  /**
+   * Show the autopilot's state on its control head.
+   * Redraws only when something changes.
+   */
+  setPilot(info: { engaged: boolean; mode: 'heading' | 'wind' | 'route'; label: string }): void {
+    const key = `${info.engaged}|${info.mode}|${info.label}`;
+    if (key === this.pilotShown) return;
+    this.pilotShown = key;
+    const g = this.pilotCanvas.getContext('2d')!;
+    const W = this.pilotCanvas.width;
+    const H = this.pilotCanvas.height;
+    const on = info.engaged;
+    g.fillStyle = on ? '#0c3b33' : '#071216';
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = on ? '#57e6b6' : '#1d3c46';
+    g.lineWidth = on ? 6 : 3;
+    g.strokeRect(5, 5, W - 10, H - 10);
+    const modeName = info.mode === 'heading' ? 'HEADING' : info.mode === 'wind' ? 'WIND ANGLE' : 'ROUTE';
+    g.textBaseline = 'middle';
+    g.textAlign = 'left';
+    g.font = '700 26px ui-sans-serif, system-ui, sans-serif';
+    g.fillStyle = on ? '#9ff5d6' : '#5f8f9b';
+    g.fillText(modeName, 20, 38);
+    if (on) {
+      g.fillStyle = '#57e6b6';
+      g.fillRect(W - 96, 20, 78, 36);
+      g.fillStyle = '#062019';
+      g.textAlign = 'center';
+      g.font = '800 24px ui-sans-serif, system-ui, sans-serif';
+      g.fillText('AUTO', W - 57, 39);
+    }
+    // The big line: what she is holding. Shrink long names to fit.
+    g.textAlign = 'center';
+    const big = on ? info.label || '—' : 'STANDBY';
+    let size = on ? 92 : 52;
+    g.font = `800 ${size}px ui-sans-serif, system-ui, sans-serif`;
+    while (g.measureText(big).width > W - 36 && size > 26) {
+      size -= 4;
+      g.font = `800 ${size}px ui-sans-serif, system-ui, sans-serif`;
+    }
+    g.fillStyle = on ? '#f2fffb' : '#4f7480';
+    g.fillText(big, W / 2, on ? 128 : 112);
+    if (!on && info.label) {
+      g.font = '600 30px ui-sans-serif, system-ui, sans-serif';
+      g.fillStyle = '#3f616b';
+      g.fillText(info.label, W / 2, 168);
+    }
+    this.pilotTexture.needsUpdate = true;
+    // The dial's mark turns with the mode, as a small sign of life.
+    const knob = this.model.nodes.autopilot_knob;
+    if (knob) knob.rotation.z = info.mode === 'heading' ? 0.5 : info.mode === 'wind' ? 0 : -0.5;
   }
 
   private drawDisplay(state: SimState, out: SimOutputs): void {
