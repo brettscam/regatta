@@ -1,0 +1,21 @@
+{
+  "name": "slack-tide",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A realistic 3D sailing simulator for the browser (working title: Slack Tide)",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w @slack-tide/client",
+    "build": "npm run build -w @slack-tide/client",
+    "preview": "npm run preview -w @slack-tide/client",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty",
+    "golden:update": "UPDATE_GOLDEN=1 vitest run packages/sim/test/golden.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

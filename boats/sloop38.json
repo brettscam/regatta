@@ -1,0 +1,79 @@
+{
+  "id": "sloop38",
+  "name": "38 ft sloop",
+  "notes": "Generic ocean-ready 38 ft sloop. All figures approximate and open to tuning. The polar starts from the Farallones Run prototype table.",
+  "dimensions": {
+    "loa": 11.6,
+    "lwl": 10.4,
+    "beam": 3.8,
+    "draft": 2.0,
+    "freeboard": 1.15,
+    "displacementKg": 7500,
+    "mastHeight": 16.2,
+    "boomLength": 4.7,
+    "boomHeight": 1.45,
+    "mastFromBow": 4.55,
+    "jibFoot": 5.0,
+    "forestayHeight": 14.6
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail, flat water",
+    "twa": [0, 25, 32, 40, 52, 60, 75, 90, 110, 120, 135, 150, 165, 180],
+    "tws": [0, 6, 10, 14, 20, 25, 30],
+    "speeds": [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 2.09, 3.33, 4.37, 4.75, 5.04, 5.04, 4.85, 4.56, 3.90, 3.23, 2.76, 2.47],
+      [0, 0, 3.23, 5.04, 5.99, 6.27, 6.56, 6.65, 6.65, 6.46, 5.89, 5.13, 4.56, 4.18],
+      [0, 0, 3.71, 5.70, 6.56, 6.84, 7.13, 7.32, 7.51, 7.41, 6.94, 6.37, 5.80, 5.51],
+      [0, 0, 3.90, 5.99, 6.84, 7.13, 7.51, 7.79, 8.17, 8.27, 7.98, 7.51, 7.03, 6.75],
+      [0, 0, 3.99, 6.08, 6.94, 7.32, 7.70, 8.08, 8.55, 8.84, 8.74, 8.36, 7.79, 7.51],
+      [0, 0, 3.99, 6.08, 6.94, 7.32, 7.75, 8.15, 8.70, 9.05, 9.05, 8.75, 8.20, 7.90]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 38,
+      "reefs": [
+        { "name": "Full main", "drive": 1.0, "heel": 1.0, "luff": 1.0 },
+        { "name": "Reef 1", "drive": 0.78, "heel": 0.47, "luff": 0.80 },
+        { "name": "Reef 2", "drive": 0.60, "heel": 0.22, "luff": 0.62 }
+      ],
+      "sheetMinDeg": 3,
+      "sheetMaxDeg": 85
+    },
+    "jib": {
+      "areaM2": 35,
+      "sheetHardDeg": 8,
+      "sheetMaxSlackDeg": 80
+    }
+  },
+  "heel": {
+    "comment": "Phase 1 empirical heel law: degrees = max(0, perKnot * AWS - offset) * pointOfSail * sailFactors. Replaced by the righting curve in phase 2.",
+    "perKnot": 1.28,
+    "offset": 7.5,
+    "mainShare": 0.55,
+    "jibShare": 0.45,
+    "penaltyStartDeg": 20,
+    "penaltyPerDeg": 0.03,
+    "penaltyFloor": 0.55,
+    "rudderFadeStartDeg": 28,
+    "rudderFadeRangeDeg": 10,
+    "maxDeg": 48
+  },
+  "rightingCurve": {
+    "comment": "GZ in metres by heel angle. Unused by the phase 1 model, kept here for the phase 2 force model.",
+    "deg": [0, 10, 20, 30, 40, 50, 60, 90, 120],
+    "gz": [0, 0.32, 0.58, 0.76, 0.86, 0.9, 0.88, 0.55, 0]
+  },
+  "helm": {
+    "maxRudderDeg": 35,
+    "turnGain": 0.138,
+    "rudderDrag": 0.03
+  },
+  "controls": [
+    { "node": "wheel", "control": "rudder", "label": "Wheel", "view": "helm", "stepDeg": 2, "keys": { "dec": ["KeyA", "ArrowLeft"], "inc": ["KeyD", "ArrowRight"] } },
+    { "node": "boom", "control": "mainsheet", "label": "Mainsheet", "view": "mast", "stepDeg": 2, "keys": { "dec": ["KeyW"], "inc": ["KeyS"] } },
+    { "node": "winch_port", "control": "jibsheet_port", "label": "Port jib sheet", "view": "helm", "stepDeg": 2 },
+    { "node": "winch_stbd", "control": "jibsheet_stbd", "label": "Starboard jib sheet", "view": "helm", "stepDeg": 2 }
+  ]
+}
