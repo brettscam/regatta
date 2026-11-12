@@ -36,6 +36,8 @@ export class Controls {
     | null = null;
   /** After a key moves a control, its tag shows at the part for a moment. */
   private keyTag: { binding: ControlBinding; ttl: number } | null = null;
+  private repick = 0;
+  private mouse = false;
   private readonly p = new THREE.Vector3();
   private readonly t = new THREE.Vector3();
   private readonly s0 = new THREE.Vector3();
@@ -153,6 +155,7 @@ export class Controls {
     this.pointer.x = e.clientX;
     this.pointer.y = e.clientY;
     this.pointer.inside = true;
+    this.mouse = e.pointerType !== 'touch';
     const prev = this.pointers.get(e.pointerId);
     const dx = prev ? e.clientX - prev.x : 0;
     const dy = prev ? e.clientY - prev.y : 0;
@@ -270,6 +273,12 @@ export class Controls {
 
   /** Apply held keys and keep the pointer tag current. Call once a frame. */
   update(dt: number, paused: boolean): void {
+    // The boat and camera move under a still pointer, so look again a few times a second.
+    this.repick -= dt;
+    if (this.repick <= 0 && !this.drag && this.mouse && this.pointer.inside && this.pointers.size === 0) {
+      this.repick = 0.15;
+      this.setHover(this.pick(this.pointer.x, this.pointer.y));
+    }
     const fast = this.held.has('ShiftLeft') || this.held.has('ShiftRight') ? 2.5 : 1;
     if (!paused) {
       for (const b of this.boat.spec.controls) {

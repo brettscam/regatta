@@ -91,9 +91,32 @@ const boatPos = new THREE.Vector3();
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const mixAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
+// Hold 60 frames a second: if frames run long for a while, render fewer pixels. Never below 1x.
+// It only ever steps down, so the picture cannot flicker between two sizes.
+let pixelRatio = Math.min(window.devicePixelRatio, 2);
+const pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
+function keepPace(dtReal: number): void {
+  if (pace.warmup > 0) { pace.warmup -= dtReal; return; }
+  if (document.hidden) return;
+  pace.time += dtReal;
+  pace.frames++;
+  if (pace.time < 2) return;
+  const avg = pace.time / pace.frames;
+  pace.time = 0;
+  pace.frames = 0;
+  pace.slowWindows = avg > 1 / 50 ? pace.slowWindows + 1 : 0;
+  if (pace.slowWindows >= 2 && pixelRatio > 1) {
+    pace.slowWindows = 0;
+    pixelRatio = Math.max(1, pixelRatio - 0.25);
+    renderer.setPixelRatio(pixelRatio);
+    resize();
+  }
+}
+
 function frame(now: number): void {
   const dtReal = Math.min(0.1, (now - last) / 1000);
   last = now;
+  keepPace(dtReal);
   const rate = TIME_RATES[rateIndex];
 
   controls.update(dtReal, paused);

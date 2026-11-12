@@ -196,10 +196,12 @@ const fragmentShader = /* glsl */ `
     // Surface slope from every wave, including the ones too short for the mesh.
     vec2 slope = vec2(0.0);
     float pinch = 0.0;
+    // How much water one pixel covers. A wave shorter than a couple of pixels is faded out rather than left to shimmer.
+    float footprint = max(length(dFdx(vBase)), length(dFdy(vBase)));
     for (int i = 0; i < NW; i++) {
       vec4 a = uWaveA[i];
       vec4 b = uWaveB[i];
-      float fade = 1.0 - smoothstep(b.w * 70.0, b.w * 260.0, dist);
+      float fade = 1.0 - smoothstep(0.18, 0.5, footprint / b.w);
       float ph = a.z * dot(a.xy, vBase) - b.x * uTime + b.z;
       float ka = a.z * a.w * fade;
       slope += a.xy * (ka * cos(ph));
@@ -230,7 +232,7 @@ const fragmentShader = /* glsl */ `
     R.y = abs(R.y) + 0.015;
     R = normalize(R);
     // Distant water averages many tiny facets, so it reflects a blurred sky.
-    float blur = clamp(1.0 + log2(1.0 + dist * 0.02), 1.0, 5.0);
+    float blur = clamp(1.0 + log2(1.0 + dist * 0.02) + footprint * 0.6, 1.0, 5.5);
     vec3 sky = textureCube(uSky, R, blur).rgb;
 
     // Light scattered back out of the water, strongest through the thin tops of waves.
