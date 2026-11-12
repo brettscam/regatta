@@ -185,8 +185,10 @@ describe('irons', () => {
     }
     expect(slowest).toBeLessThan(2);
     expect(wasInIrons).toBe(true);
-    expect(sim.out.twa * R2D).toBeGreaterThan(30);
-    expect(sim.state.speed / KT).toBeGreaterThan(3);
+    // Left alone with the sheets hard in she ends up pinching, slow but sailing.
+    expect(sim.out.twa * R2D).toBeGreaterThan(25);
+    expect(sim.state.speed / KT).toBeGreaterThan(2);
+    expect(sim.out.inIrons).toBe(false);
   });
 
   it('caught aback, the jib pushes the bow through and the boat lies quietly off the wind', () => {

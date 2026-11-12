@@ -306,7 +306,9 @@ export class Sim {
 
     // --- leeway --------------------------------------------------------------------------------
     const slowGain = clamp((2.8 / Math.max(s.speed, 0.8)) ** 2, 1, 6);
-    const leeway = Math.min(25 * D2R, pointOfSail * (3 + 0.12 * heelDeg) * D2R * slowGain);
+    // Leeway comes from the side force of sails that are drawing. Flogging sails push nothing sideways.
+    const sideForce = clamp(sailLoad, 0, 1.2);
+    const leeway = Math.min(25 * D2R, pointOfSail * sideForce * (3 + 0.12 * heelDeg) * D2R * slowGain);
     const lateralTarget = -windSide * s.speed * Math.tan(leeway);
     s.lateral += (lateralTarget - s.lateral) * (1 - Math.exp(-dt / 1.0));
 
