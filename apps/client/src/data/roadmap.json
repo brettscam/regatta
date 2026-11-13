@@ -125,6 +125,13 @@
           "area": "world",
           "title": "Anchoring, moorings and a night aboard",
           "text": "Stop the boat on her anchor, a mooring buoy or a dock, with sails stowed, and sleep through to the morning."
+        },
+        {
+          "id": "catch1",
+          "status": "shipped",
+          "area": "world",
+          "title": "Crab pots and fishing",
+          "text": "Drop pots and come back for them, troll or bottom fish for the Bay's real species, and log what you land."
         }
       ],
       "theme": ""
@@ -186,9 +193,9 @@
         },
         {
           "id": "fishing",
-          "status": "building",
-          "title": "Crab pots and fishing",
-          "text": "Anchor, drop a pot and come back to check it. Dungeness in the Bay, tuna offshore. A good catch lifts the crew's morale and stretches the provisions.",
+          "status": "later",
+          "title": "A catch worth cooking",
+          "text": "Pots and lines shown on the chart, tides and seasons that matter, and a catch the galley can turn into supper and morale.",
           "area": "world"
         }
       ],

@@ -60,6 +60,10 @@ const KEYS: Array<[string, Array<[string, string]>]> = [
     ['X', 'Anchor, pick up a mooring or come alongside. X again to get under way'],
     ['Z', 'At anchor or moored: turn in for the night'],
   ]],
+  ['Catching supper', [
+    ['K', 'Drop a crab pot (under 3 kt, in 4 to 35 m). K again beside its buoy hauls it'],
+    ['L', 'Fishing line out or in. When a fish is on, L strikes'],
+  ]],
   ['The game', [
     ['Space', 'Pause (alone on the water)'],
     ['Drag the clock', 'Speed time up (alone on the water)'],

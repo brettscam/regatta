@@ -50,7 +50,7 @@ export interface Feature {
   readonly id: string;
   /**
    * A key was pressed that the game itself does not use. Return true if this feature took it.
-   * Taken already: Space P T H C M B R F X Z Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
+   * Taken already: Space P T H C M B R F X Z K L O Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */
