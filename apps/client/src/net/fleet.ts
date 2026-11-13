@@ -231,6 +231,8 @@ export class Fleet {
   private readonly remotes = new Map<string, Remote>();
   private sendClock = 0;
   private nameClock = 0;
+  /** Season time past which another boat's clock is not followed: there is no weather out there. */
+  clockLimit = Infinity;
 
   constructor(private readonly yard: Record<string, YardBoat>, private readonly me: Identity, private readonly env: Environment, private readonly scene: THREE.Scene) {}
 
@@ -346,7 +348,7 @@ export class Fleet {
     for (const r of this.remotes.values()) {
       r.update(now, seaTime, waves, dt, camera, width, height);
       // A boat that has gone quiet (a hidden tab) does not hold the clock.
-      if (r.silence(now) < 5) ahead = Math.max(ahead, r.seasonTime - seasonTime);
+      if (r.silence(now) < 5 && r.seasonTime < this.clockLimit) ahead = Math.max(ahead, r.seasonTime - seasonTime);
     }
 
     // Names come from the platform, as this viewer is allowed to see them.

@@ -117,8 +117,10 @@ const resume = (saved: unknown): void => {
   castOff(settle(s.choice), s.sim);
 };
 
+let begun = false;
 function begin(): void {
-  if (session) return;
+  if (session || begun) return;
+  begun = true;
   if (params.has('go')) {
     castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, skipper: params.get('skipper') ?? undefined, tutorial: params.get('tutorial') === '1' }));
     return;
@@ -142,6 +144,8 @@ function begin(): void {
 
 if (hot?.ready) {
   hot.ready((saved) => { resume(saved); begin(); });
+  // If the hand-over never answers, start anyway.
+  setTimeout(begin, 2500);
 } else {
   resume(hot?.data);
   begin();

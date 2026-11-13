@@ -121,6 +121,7 @@ export class Session {
 
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
     this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
+    this.fleet.clockLimit = world.seasonLength;
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
     this.bindHail();
@@ -368,6 +369,8 @@ export class Session {
       if (this.rateIndex !== 0) { this.rateIndex = 0; hud.setRate(0); }
       if (clockBehind > 1.5) world.shiftTime(clockBehind);
     }
+    // The replay runs out of weather eventually. The day comes round again rather than freezing in the dark.
+    if (world.wrapSeason(sim.state.t)) this.alarm('End of the recorded weather. The same day starts over.');
 
     this.boatPos.set(x, pose.heave, z);
     drone.update(dtReal, this.boatPos, heading, (px, pz) => stage.seaLevel(px, pz, seaTime), boatView.solids, boatView.thin);
@@ -417,7 +420,7 @@ export class Session {
     return {
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
       sim: this.sim, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
-      boatView: this.boatView, coach: this.coach, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      boatView: this.boatView, coach: this.coach, hints: this.hints, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
     };
   }
 }

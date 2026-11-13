@@ -123,6 +123,25 @@ export class ReplayWorld implements Environment {
     if (seconds > 0) this.startOffset += seconds;
   }
 
+  /** Seconds of baked weather in the whole season. */
+  get seasonLength(): number {
+    return this.course.season.hours * this.course.season.stepSeconds;
+  }
+
+  /**
+   * The replay only holds so much weather. When a session reaches the end of it, go back whole days until it is inside
+   * again, so the sun stays where it was and the day simply comes round again.
+   * @returns true if the clock was moved
+   */
+  wrapSeason(t: number): boolean {
+    let moved = false;
+    while (this.startOffset + t >= this.seasonLength - 1 && this.seasonLength > 86400) {
+      this.startOffset -= 86400;
+      moved = true;
+    }
+    return moved;
+  }
+
   /** Seconds of season available after the session start. */
   get seasonSeconds(): number {
     return this.course.season.hours * this.course.season.stepSeconds - this.startOffset;
