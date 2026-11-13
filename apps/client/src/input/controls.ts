@@ -83,7 +83,13 @@ export class Controls {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', (e) => this.held.delete(e.code));
-    window.addEventListener('blur', () => this.held.clear());
+    canvas.addEventListener('lostpointercapture', this.onPointerUp);
+    window.addEventListener('blur', () => {
+      this.held.clear();
+      // Whatever was being dragged is let go: the release may never arrive.
+      this.pointers.clear();
+      this.drag = null;
+    });
   }
 
   // ---- picking --------------------------------------------------------------------------------
@@ -158,6 +164,9 @@ export class Controls {
   private onPointerDown = (e: PointerEvent): void => {
     this.sound.start();
     this.canvas.focus();
+    // A mouse is one pointer. If an earlier release was never heard (the window lost focus mid-drag, the button came up
+    // over another frame), forget it, or this press would be taken for the second finger of a pinch.
+    if (e.pointerType === 'mouse') this.pointers.clear();
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.canvas.setPointerCapture(e.pointerId);
     if (this.pointers.size === 2) {
