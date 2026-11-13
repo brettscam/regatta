@@ -82,6 +82,14 @@ This uses the claude.ai artifact room, so it only works on the published page, f
 
 There is other traffic on the Bay too: ferries, a ship in the channel and a few sailboats. They show on the chart with their course and speed, and an alarm sounds when one will pass close.
 
+## Racing
+
+Press R for the fleet and racing panel. It lists who is on the water with you, and lets anyone call a race: pick a course (Raccoon Strait to McCovey Cove, Round Alcatraz, the Golden Gate dash, or the route on your own chart), the minutes to the gun, and how many pace boats. Everyone on the water is told and joins with R. The first mark is the start: be there at the gun and pass it after. The bar under the clock counts down, then shows your time and place. Pace boats are full sims on the autopilot, in the same boat as the caller, each a little off the pace. Courses are data in `courses/sf-bay/races.json`.
+
+## The wind tunnel
+
+Press F. Smoke lines run with the apparent wind past the sails at four heights: pale and smooth where the air follows the sail, red and broken behind a sail sheeted too hard, grey and shaking past one that is luffing. A card puts numbers to it, and turns the trim rule round to say what apparent wind angle the sails as set are asking for, so you can either steer to the sails or trim to the course.
+
 ## Roadmap, release notes and feedback
 
 Press B, or click Roadmap · Feedback at the bottom left.
