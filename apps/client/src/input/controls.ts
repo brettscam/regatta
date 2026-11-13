@@ -32,6 +32,10 @@ export interface ControlHost {
   toggleHints(): void;
   /** Open the box for hailing the other boats. */
   openHail(): void;
+  /** Open or close the fleet and racing panel. */
+  toggleFleet(): void;
+  /** A key the game itself does not use. True if something aboard took it. */
+  featureKey(code: string, shift: boolean): boolean;
 }
 
 /**
@@ -79,7 +83,13 @@ export class Controls {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', (e) => this.held.delete(e.code));
-    window.addEventListener('blur', () => this.held.clear());
+    canvas.addEventListener('lostpointercapture', this.onPointerUp);
+    window.addEventListener('blur', () => {
+      this.held.clear();
+      // Whatever was being dragged is let go: the release may never arrive.
+      this.pointers.clear();
+      this.drag = null;
+    });
   }
 
   // ---- picking --------------------------------------------------------------------------------
@@ -154,6 +164,9 @@ export class Controls {
   private onPointerDown = (e: PointerEvent): void => {
     this.sound.start();
     this.canvas.focus();
+    // A mouse is one pointer. If an earlier release was never heard (the window lost focus mid-drag, the button came up
+    // over another frame), forget it, or this press would be taken for the second finger of a pinch.
+    if (e.pointerType === 'mouse') this.pointers.clear();
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.canvas.setPointerCapture(e.pointerId);
     if (this.pointers.size === 2) {
@@ -289,7 +302,10 @@ export class Controls {
     switch (e.code) {
       case 'Space': this.host.togglePause(); e.preventDefault(); break;
       case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
-      case 'KeyT': this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh'); break;
+      case 'KeyT':
+        if (this.sim.state.hold !== 'none') this.host.announce(`She is ${this.sim.state.hold === 'anchor' ? 'at anchor' : 'made fast'}, so there is nothing to tack. X gets her under way`);
+        else this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh');
+        break;
       case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
@@ -298,11 +314,19 @@ export class Controls {
       case 'KeyC': this.host.toggleHints(); break;
       case 'Enter': this.host.openHail(); e.preventDefault(); break;
       case 'KeyM': this.host.toggleChart(); break;
+      case 'KeyR': this.host.toggleFleet(); break;
       case 'Escape': this.host.closeChart(); break;
       case 'Backquote': this.hud.toggleFps(); break;
-      default: if (e.code.startsWith('Arrow')) e.preventDefault();
+      default:
+        if (e.code.startsWith('Arrow')) e.preventDefault();
+        else if (this.host.featureKey(e.code, e.shiftKey)) e.preventDefault();
     }
   };
+
+  /** True while a key is down. */
+  isHeld(code: string): boolean {
+    return this.held.has(code);
+  }
 
   /** Apply held keys and keep the pointer tag current. Call once a frame. */
   update(dt: number, paused: boolean): void {

@@ -3,6 +3,8 @@
  * It always keeps a copy on this device. On the shared page it is also saved to the page's database under the
  * person's own id, where the rest of the fleet can read it. This is the seed of experience points and accounts.
  */
+import { db as askDb, user as askUser, type Db } from './platform';
+
 export interface LogTotals {
   miles: number;
   hours: number;
@@ -11,6 +13,14 @@ export interface LogTotals {
   tacks: number;
   knockdowns: number;
   topKt: number;
+  /** Races finished, and races won. */
+  races: number;
+  wins: number;
+  /** Crab and fish landed, nights spent at anchor or on a mooring, and places gone ashore at. */
+  crabs: number;
+  fish: number;
+  nights: number;
+  ashore: number;
 }
 
 export interface Profile {
@@ -22,17 +32,12 @@ export interface Profile {
   updated: string;
 }
 
-interface DocSnap { id: string; exists: boolean; data(): Record<string, unknown> | undefined }
-interface Db {
-  doc(path: string): { get(): Promise<DocSnap>; set(data: Record<string, unknown>): Promise<void> };
-  collection(path: string): { onSnapshot(next: (s: { docs: DocSnap[] }) => void, error?: (e: unknown) => void): () => void };
-}
-
 const SAVED = 'regatta.log';
-const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0 };
+const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0 };
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
 const clean = (l: Partial<LogTotals> | undefined): LogTotals => ({
   miles: num(l?.miles), hours: num(l?.hours), sails: num(l?.sails), marks: num(l?.marks), tacks: num(l?.tacks), knockdowns: num(l?.knockdowns), topKt: num(l?.topKt),
+  races: num(l?.races), wins: num(l?.wins), crabs: num(l?.crabs), fish: num(l?.fish), nights: num(l?.nights), ashore: num(l?.ashore),
 });
 
 export class Logbook {
@@ -57,12 +62,10 @@ export class Logbook {
 
   private async connect(): Promise<void> {
     try {
-      const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
-      if (!claude?.use) return;
-      const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
-      this.uid = (await (user as { id(): Promise<string | null> } | null)?.id()) ?? null;
+      const [db, user] = await Promise.all([askDb(), askUser()]);
+      this.uid = (await user?.id()) ?? null;
       if (!db || !this.uid) return;
-      this.db = db as Db;
+      this.db = db;
       // If this person has sailed on another device, carry on from whichever book has more in it.
       const snap = await this.db.doc(`profiles/${this.uid}`).get();
       const theirs = snap.exists ? clean((snap.data()?.log ?? {}) as Partial<LogTotals>) : ZERO;
@@ -100,7 +103,7 @@ export class Logbook {
     this.sinceSave += seconds;
   }
 
-  count(what: 'marks' | 'tacks' | 'knockdowns', n = 1): void {
+  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore', n = 1): void {
     this.totals[what] += n;
     this.dirty = true;
   }
@@ -124,7 +127,7 @@ export class Logbook {
     const t = this.totals;
     const body: Profile = {
       ...this.who,
-      log: { miles: r(t.miles, 100), hours: r(t.hours, 100), sails: t.sails, marks: t.marks, tacks: t.tacks, knockdowns: t.knockdowns, topKt: r(t.topKt, 10) },
+      log: { ...t, miles: r(t.miles, 100), hours: r(t.hours, 100), topKt: r(t.topKt, 10) },
       updated: new Date().toISOString(),
     };
     this.db.doc(`profiles/${this.uid}`).set(body as unknown as Record<string, unknown>).catch(() => { this.db = null; }).finally(() => { this.saving = false; this.dirty = false; });

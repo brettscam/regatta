@@ -1,6 +1,48 @@
 {
   "notes": [
     {
+      "id": "v10",
+      "date": "2026-11-13",
+      "title": "Ashore in the outrigger, and a tow off the mud",
+      "items": [
+        "The outrigger. With the boat at anchor or on a mooring, O launches the canoe alongside. Paddle with W A S D. The tide carries her, so think before crossing a strong stream.",
+        "Go ashore. Run her up on any beach, or come in at Sam's in Tiburon, Ayala Cove, Sausalito, Aquatic Park, Pier 39, Clipper Cove, Horseshoe Cove or McCovey Cove, ease up and press O. Each place you land at goes in your logbook.",
+        "O again shoves off. Back alongside the boat, O brings you aboard.",
+        "Aground and stuck? U calls for a tow to the nearest deep water.",
+        "Fixed: pointing at the wheel, boom and winches with the mouse could stop working after you switched to another window in the middle of a drag. It now recovers by itself."
+      ]
+    },
+    {
+      "id": "v9",
+      "date": "2026-11-13",
+      "title": "Anchor, spend the night, and catch your supper",
+      "items": [
+        "X stops the boat. Slow down first: under 2 kt she lets go her anchor in up to 25 m of water. Near a mooring or a dock (Ayala Cove, Sam's, Sausalito, Pier 39, Horseshoe Cove) and under 2.5 kt, X picks up the buoy or brings her alongside.",
+        "While she is held the sails are stowed, the cover is on the boom, and you can see her rode or mooring line. She swings to the wind and the tide.",
+        "X again gets her under way, on the tack with more water ahead.",
+        "Z turns in for the night when you are alone on the water. You wake at 06:30 to the next morning's wind and tide, and the night goes in your logbook. She will not let you sleep in a gale or where she would touch bottom at low water.",
+        "Other boats see what you are doing: at anchor, on a mooring, alongside.",
+        "Crab pots. K drops a pot (up to three, in 4 to 35 m, going slowly). It marks itself with a buoy in your colours. Leave it to soak for three quarters of an hour, come back alongside, and K hauls it. Red rock crab are the keepers inside the Bay; the Dungeness there are mostly too small and go back.",
+        "Fishing. L puts a line out. Troll under sail for striped bass, and king salmon out by the Gate. Stop or anchor on the flats for halibut, leopard shark and bat ray, or off the city piers for jacksmelt and perch. When a fish is on you have twelve seconds to strike with L. Undersized fish go back.",
+        "Crab and fish landed are counted in your logbook."
+      ]
+    },
+    {
+      "id": "v8",
+      "date": "2026-11-13",
+      "title": "Racing, and a wind tunnel for your sails",
+      "items": [
+        "Racing. Press R, pick a course and the minutes to the gun, and call it. Everyone on the water is told and can join. Raccoon Strait to McCovey Cove, Round Alcatraz, the Golden Gate dash, or the route on your own chart.",
+        "Pace boats. Up to three boats sailed by the autopilot race with you, in the same boat as yours, each a little off the pace. Race them alone or alongside your friends.",
+        "A countdown under the clock, the course on your chart, live places while you race, and your time at the finish. Races and wins go in your logbook.",
+        "Who is out. The same panel lists every boat on the water with you: skipper, boat, what she is doing, and her range and bearing.",
+        "Wind tunnel, suggested by Scott. Press F to see the air over your sails: smooth where it follows the sail, red and broken where a sail is sheeted too hard, grey and shaking where it luffs.",
+        "The wind tunnel card also tells you the wind angle your sails, as set, are asking for: steer to the sails, or trim to the course.",
+        "Keys. The board (B) now has a page listing every control.",
+        "The roadmap is now a board: sprint columns across, lanes for sailing experience, multiplayer, places, platform and progression. Filter by lane, and the most wanted cards rise to the top."
+      ]
+    },
+    {
       "id": "v7",
       "date": "2026-11-13",
       "title": "Gust warnings and release notes",

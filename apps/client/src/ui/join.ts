@@ -2,6 +2,7 @@ import { KT, R2D, polarSpeed } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import type { ReplayWorld } from '@slack-tide/world';
 import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
+import { onWeb } from '../net/platform';
 
 export interface StartSpot {
   id: string;
@@ -200,6 +201,7 @@ export class JoinFlow {
       <header><h1>Regatta</h1><p>San Francisco Bay, as the wind and tide really were on ${day}</p></header>
       <ol class="join-steps">${STEPS.map((s, i) => `<li><button type="button" data-step="${i}" aria-current="${i === this.step ? 'step' : 'false'}"><i>${i + 1}</i>${s}</button></li>`).join('')}</ol>
       <div class="join-body">${body}</div>
+      ${onWeb() ? '<p class="soon">On this website you sail single-handed for now. Sailing in company, votes, sending feedback and the shared logbook are not available here yet.</p>' : ''}
       <footer>${this.step > 0 ? '<button type="button" data-act="back">Back</button>' : '<span></span>'}
         <button type="button" class="primary" data-act="next">${last ? 'Cast off' : 'Next'}</button></footer>`;
   }
