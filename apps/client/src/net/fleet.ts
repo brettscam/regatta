@@ -117,6 +117,8 @@ class Remote implements RemoteBoat {
   private wire: Wire | null = null;
   private heardAt = 0;
   private placed = false;
+  /** How she says she is held, and to what point, so she is drawn with her sails stowed and her line out. */
+  private hold: { kind: 'none' | 'anchor' | 'mooring'; x: number; y: number } = { kind: 'none', x: 0, y: 0 };
   private readonly pos = new THREE.Vector3();
   private readonly motion = { heave: 0, pitch: 0 };
   private heel = 0;
@@ -149,6 +151,7 @@ class Remote implements RemoteBoat {
     this.guest = p.guest;
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
+    this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.raceCall = v.rc ?? null;
     this.raceId = typeof v.rj === 'string' ? v.rj.slice(0, 32) : '';
     this.raceLeg = num(v.rp);
@@ -200,6 +203,7 @@ class Remote implements RemoteBoat {
     s.rudder = w.r / 1000; s.boomAngle = w.b / 1000; s.jibAngle = w.j / 1000;
     s.furl = w.furl; s.reef = Math.max(0, Math.min(2, Math.round(w.reef)));
     s.speed = this.sog; s.mainSide = Math.sign(s.boomAngle) || 1;
+    s.hold = this.hold.kind; s.holdX = this.hold.x; s.holdY = this.hold.y;
     o.awa = w.a / 1000; o.aws = w.w / 10; o.sog = this.sog; o.cog = this.cog;
     o.twa = o.awa; o.tws = o.aws;
     o.main.luff = w.ml / 100; o.main.flogging = w.mf > 0; o.main.stall = 0;

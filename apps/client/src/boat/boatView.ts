@@ -104,9 +104,17 @@ export class BoatView {
   private readonly displayTexture: THREE.CanvasTexture;
   private displayClock = 0;
 
+  /** At anchor or on a mooring: the main under its cover on the boom, the jib rolled on the forestay, and the line she lies to. */
+  private readonly sailCover: THREE.Mesh;
+  private readonly jibRoll = new Rope(0x1b2d4a, 0.042);
+  private readonly rode = new Rope(0xd9d3c2, 0.014);
+  /** 0 with the jib as the furling line has it, 1 with it rolled right away for a stop. */
+  private jibStow = 0;
+
   private readonly v1 = new THREE.Vector3();
   private readonly v2 = new THREE.Vector3();
   private readonly v3 = new THREE.Vector3();
+  private readonly q1 = new THREE.Quaternion();
 
   constructor(readonly spec: BoatSpec, readonly livery: Livery = {}) {
     this.model = buildSloop(spec, livery);
@@ -137,6 +145,22 @@ export class BoatView {
     }
 
     for (const r of [...this.mainsheet, this.vang, ...this.sheetPort, ...this.sheetStbd]) this.root.add(r.mesh);
+
+    // The stowed main: a cover zipped over the sail where it lies flaked on the boom, fuller at the mast.
+    const coverLength = this.model.geo.boomLength - 0.5;
+    this.sailCover = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.115, 0.2, coverLength, 12, 1).rotateX(Math.PI / 2).scale(0.8, 1.2, 1),
+      new THREE.MeshStandardMaterial({ color: 0x1b2d4a, roughness: 0.95 }),
+    );
+    this.sailCover.position.set(0, 0.27, coverLength / 2 + 0.22);
+    this.sailCover.castShadow = true;
+    this.sailCover.visible = false;
+    this.model.nodes.boom.add(this.sailCover);
+    this.jibRoll.set(this.model.geo.jibTack, this.model.geo.jibHead);
+    this.jibRoll.mesh.visible = false;
+    this.rode.mesh.visible = false;
+    this.rode.mesh.castShadow = false;
+    this.root.add(this.jibRoll.mesh, this.rode.mesh);
     this.sheetBlock.castShadow = true;
     this.root.add(this.sheetBlock);
     for (const v of [0.28, 0.5, 0.72]) {
@@ -256,13 +280,20 @@ export class BoatView {
     const bellyTarget = Math.abs(out.awa) < 0.05 ? 0 : -windSide;
     this.belly += THREE.MathUtils.clamp(bellyTarget - this.belly, -dt * 3.5, dt * 3.5);
 
+    // Held by an anchor or a mooring, the sails are not set: the main comes down onto the boom and the jib rolls away.
+    const held = state.hold !== 'none';
     const mainShape: SailShape = { angle: pose.boom, luff: out.main.luff, stall: out.main.stall, flogging: out.main.flogging, belly: this.belly, aws: out.aws };
-    this.main.update(mainShape, this.spec.sails.main.reefs[state.reef].luff, time, dt);
+    this.main.update(mainShape, held ? 0 : this.spec.sails.main.reefs[state.reef].luff, time, dt);
+    const mainStowed = held && this.main.hoisted < 0.06;
+    this.main.mesh.visible = !mainStowed;
+    this.sailCover.visible = mainStowed;
     // A loose boom shakes with the sail.
     if (out.main.flogging) nodes.boom.rotation.y += Math.sin(time * 9.5) * 0.035 * Math.min(1.5, out.aws / 8);
 
     const jibShape: SailShape = { angle: pose.jib, luff: out.jib.luff, stall: out.jib.stall, flogging: out.jib.flogging, belly: this.belly, aws: out.aws };
-    this.jib.update(jibShape, state.furl, time);
+    this.jibStow = THREE.MathUtils.clamp(this.jibStow + (held ? dt : -dt) * 0.7, 0, 1);
+    const furl = state.furl * (1 - this.jibStow);
+    this.jib.update(jibShape, furl, time);
 
     // Running rigging.
     const boomA = nodes.boom.rotation.y;
@@ -281,7 +312,8 @@ export class BoatView {
     });
     this.vang.set(onBoom(geo.boomLength * 0.29, 0.08, this.v1), geo.vangBase);
     const clew = this.jib.clew;
-    const jibUp = state.furl > 0.03;
+    const jibUp = furl > 0.03;
+    this.jibRoll.mesh.visible = !jibUp;
     const leeIsPort = clew.x <= 0;
     const around = this.v2.set((leeIsPort ? -1 : 1) * 0.16, geo.jibClewY - 0.3, geo.mastZ - 0.24);
     const lead = (ropes: Rope[], car: THREE.Vector3, winch: THREE.Vector3, working: boolean) => {
@@ -333,6 +365,8 @@ export class BoatView {
     }
     for (let i = 0; i < this.leechTells.length; i++) {
       const lt = this.leechTells[i];
+      lt.t.mesh.visible = !mainStowed;
+      if (mainStowed) continue;
       const at = this.main.leechPoint(lt.v, this.v1);
       const a = boomA;
       flow.set(Math.sin(a), 0, Math.cos(a));
@@ -350,6 +384,7 @@ export class BoatView {
     nodes.windex_arrow.rotation.y = this.windexAngle + Math.sin(time * 5.1) * 0.03;
 
     this.updateEnsign(out, time, dt);
+    this.updateRode(state);
 
     if (this.glowNode) {
       this.glowLevel += (1 - this.glowLevel) * Math.min(1, dt * 12);
@@ -363,6 +398,35 @@ export class BoatView {
       this.displayClock = 0.25;
       this.drawDisplay(state, out);
     }
+  }
+
+  /**
+   * The line she lies to. At anchor the rode leads from the bow roller down into the water toward the anchor.
+   * On a mooring a short line leads from the bow to the buoy, once she has been brought up to it.
+   */
+  private updateRode(state: SimState): void {
+    const rode = this.rode.mesh;
+    if (state.hold === 'none') {
+      rode.visible = false;
+      return;
+    }
+    const pos = this.root.position;
+    const bow = this.v1.copy(this.model.nodes.furler.position);
+    bow.y -= 0.12;
+    bow.z -= 0.22;
+    const bowWorld = this.v3.copy(bow).applyQuaternion(this.root.quaternion).add(pos);
+    const dx = state.holdX - bowWorld.x;
+    const dz = -state.holdY - bowWorld.z;
+    const away = Math.hypot(dx, dz);
+    // On a mooring the line goes to the buoy itself. An anchor cable sags, so it goes into the water close ahead
+    // of the bow and steeply, whatever length is out.
+    const mooring = state.hold === 'mooring';
+    const k = mooring ? 1 : Math.min(away, 5) / Math.max(away, 0.01);
+    const end = this.v2.set(bowWorld.x + dx * k, mooring ? 0.3 : -3, bowWorld.z + dz * k);
+    end.sub(pos).applyQuaternion(this.q1.copy(this.root.quaternion).invert());
+    // Still coming up to the buoy: the line is not on yet.
+    rode.visible = !mooring || away < 16;
+    if (rode.visible) this.rode.set(bow, end);
   }
 
   /** The ensign streams away from the apparent wind, lifts as it freshens and hangs when it is light. */

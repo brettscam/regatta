@@ -349,3 +349,14 @@ body.lobby .hint, body.lobby .hails { display: none; }
 .fleetpanel tr.me td { color: var(--amber); }
 body.lobby .racebar, body.lobby .fleetpanel { display: none; }
 @media (max-width: 760px) { .fleetpanel { max-height: calc(100% - 240px); } }
+
+/* ---- Mooring: the night aboard ------------------------------------------------------------------ */
+/* Turning in fades the whole screen to black and back, so the sun is not seen to jump. */
+.night {
+  position: fixed; inset: 0; z-index: 6; background: #04080b; display: grid; place-items: center;
+  opacity: 0; transition: opacity 1.2s ease; pointer-events: none;
+}
+.night.on { opacity: 1; }
+.night .title { font-size: clamp(26px, 4.6vw, 48px); font-weight: 300; letter-spacing: 0.2em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; }
+.night .title small { display: block; margin-top: 14px; font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
+body.lobby .night { display: none; }

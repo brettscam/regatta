@@ -293,7 +293,10 @@ export class Controls {
     switch (e.code) {
       case 'Space': this.host.togglePause(); e.preventDefault(); break;
       case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
-      case 'KeyT': this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh'); break;
+      case 'KeyT':
+        if (this.sim.state.hold !== 'none') this.host.announce(`She is ${this.sim.state.hold === 'anchor' ? 'at anchor' : 'made fast'}, so there is nothing to tack. X gets her under way`);
+        else this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh');
+        break;
       case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
