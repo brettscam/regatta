@@ -238,6 +238,17 @@ body.lobby .hud, body.lobby .tag { display: none; }
 .boardlink { left: var(--edge-left); bottom: var(--edge-bottom); padding: 7px 12px; font: inherit; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); cursor: pointer; }
 .boardlink:hover { color: var(--ink); }
 body.lobby .boardlink { display: block; left: auto; right: var(--edge-right); }
+.boardlink.new::after { content: 'New'; margin-left: 9px; padding: 1px 6px; border-radius: 6px; background: var(--amber); color: #1a1205; font-weight: 700; letter-spacing: 0.06em; }
+.newsflash[hidden] { display: none; }
+.newsflash { left: var(--edge-left); bottom: calc(var(--edge-bottom) + 42px); z-index: 3; display: grid; gap: 2px; text-align: left; padding: 10px 14px; max-width: min(300px, calc(100% - 32px)); font: inherit; color: var(--ink); border-color: var(--amber); cursor: pointer; }
+.newsflash b { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); }
+.newsflash span { font-size: 14px; line-height: 1.35; }
+.newsflash i { font-style: normal; font-size: 12px; color: var(--dim); text-decoration: underline; }
+body.lobby .newsflash { left: auto; right: var(--edge-right); }
+.board .notes { list-style: disc; padding-left: 20px; gap: 5px; }
+.board .notes li { font-size: 13.5px; line-height: 1.5; color: rgba(238, 243, 244, 0.86); }
+.board .release.unread > header h3 { color: var(--amber); }
+.sailline .gust { color: var(--amber); }
 .fps { bottom: calc(var(--edge-bottom) + 40px); }
 .board[hidden] { display: none; }
 .board { position: fixed; inset: 0; z-index: 6; display: grid; place-items: center; background: rgba(6, 12, 16, 0.62); padding: calc(14px + env(safe-area-inset-top, 0px)) var(--edge-right) calc(14px + env(safe-area-inset-bottom, 0px)) var(--edge-left); user-select: text; -webkit-user-select: text; }

@@ -146,8 +146,8 @@ export class Hud {
   }
 
   /** The point of sail and the tack, in words. */
-  setSail(point: string, tack: string): void {
-    const html = `<b>${point}</b>${tack}`;
+  setSail(point: string, tack: string, gust = ''): void {
+    const html = `<b>${point}</b>${tack}${gust ? ` · <span class="gust">${gust}</span>` : ''}`;
     if (this.sailLine.dataset.html === html) return;
     this.sailLine.innerHTML = html;
     this.sailLine.dataset.html = html;

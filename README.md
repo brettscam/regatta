@@ -82,6 +82,23 @@ This uses the claude.ai artifact room, so it only works on the published page, f
 
 There is other traffic on the Bay too: ferries, a ship in the channel and a few sailboats. They show on the chart with their course and speed, and an alarm sounds when one will pass close.
 
+## Roadmap, release notes and feedback
+
+Press B, or click Roadmap · Feedback at the bottom left.
+
+- **Roadmap**: what is planned, grouped in releases, with a vote up or down on each item. It is data in `apps/client/src/data/roadmap.json`
+- **What's new**: release notes, newest first, in `apps/client/src/data/releases.json`. A returning player sees a New marker until they have read the latest
+- **Feedback**: a note, a problem or an idea, sent from the boat. It can attach what the boat was doing at the time
+- **Logbook**: miles, hours, marks and knockdowns for this skipper, and the fleet's
+
+Votes, feedback and logbooks are kept in the published page's database, so they need the page shared with the player as a contributor. Feedback is readable only by its sender and by the page's editors, and is copied to a Google Sheet for triage.
+
+## Coaching and gusts
+
+- The readout names the point of sail and the tack, and shows a gust on its way with the seconds until it arrives, or that she is in a gust or a lull
+- A strong gust raises an alert and drops time back to real speed
+- Coaching hints (C turns them off) say one line when a sail has been luffing or stalled for a while, the jib is aback, she is in irons or overpowered, or the other tack would lay the mark
+
 ## Instruments, chart and passage plan
 
 - **Wind and tide dial** (top left): bow up. The solid pointer is where the apparent wind comes from, the hollow one the true wind, and the blue arrow is which way the tide is setting the boat. Underneath: true wind, height of tide and whether it is rising, and the stream at the boat. **H** hides all of it

@@ -9,6 +9,7 @@ import { Pilot } from './input/pilot';
 import type { TrafficVessel } from './scene/traffic';
 import { Chart } from './ui/chart';
 import { Coach } from './ui/coach';
+import { GustWatch } from './ui/gusts';
 import { Hints, pointOfSail } from './ui/hints';
 import type { Logbook } from './net/logbook';
 import { Hud, TIME_RATES } from './ui/hud';
@@ -63,6 +64,7 @@ export class Session {
   readonly chart: Chart;
   readonly pilot: Pilot;
   readonly fleet: Fleet;
+  private readonly gusts: GustWatch;
   readonly coach: Coach | null;
   readonly hints: Hints;
   private readonly hailBox = document.getElementById('hail') as HTMLElement;
@@ -122,6 +124,7 @@ export class Session {
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
     this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
     this.fleet.clockLimit = world.seasonLength;
+    this.gusts = new GustWatch(world, this.sim);
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
     this.bindHail();
@@ -383,7 +386,9 @@ export class Session {
       rate: world.tideRate(sim.state.t),
       depth: sim.out.underKeel === null ? null : sim.out.underKeel + this.opts.spec.dimensions.draft,
     }, world.dateAt(sim.state.t), stage.course.timeZone, paused, rate, dtReal, fleet.boats.length);
-    hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`);
+    const gust = this.gusts.update(paused ? 0 : dtReal);
+    if (gust.alert) this.alarm(gust.alert);
+    hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, gust.line);
     hud.setPilot(pilot.line());
     this.hints.update(paused ? 0 : dtReal);
     this.opts.logbook.update(dtReal);
@@ -420,7 +425,7 @@ export class Session {
     return {
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
       sim: this.sim, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
-      boatView: this.boatView, coach: this.coach, hints: this.hints, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      boatView: this.boatView, coach: this.coach, hints: this.hints, gusts: this.gusts, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
     };
   }
 }

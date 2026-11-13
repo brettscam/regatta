@@ -1,0 +1,70 @@
+{
+  "notes": [
+    {
+      "id": "v7",
+      "date": "2026-11-13",
+      "title": "Gust warnings and release notes",
+      "items": [
+        "Gust warnings. The readout shows a gust on its way and how long until it reaches you, and says when you are in one. A strong one raises an alert and drops time back to real speed so you can ease the main.",
+        "What's new. This page. A marker on the Roadmap link tells you when there is something you have not read.",
+        "The recorded weather runs for 36 hours. When a boat reaches the end, the same day now starts over instead of freezing in the dark.",
+        "A boat left running for days no longer drags everyone who joins into her clock."
+      ]
+    },
+    {
+      "id": "v6",
+      "date": "2026-11-13",
+      "title": "Roadmap, feedback and coaching",
+      "items": [
+        "Roadmap. Press B to see what is planned, in releases, and vote things up or down.",
+        "Feedback. Tell us what you think or report a problem without leaving the boat. It can attach what the boat was doing at the time.",
+        "Point of sail. The readout now names it: close-hauled, beam reach, running, in irons, and which tack you are on.",
+        "Coaching hints. If a sail has been luffing or stalled for a while, or you are stuck in irons, one line says what to do. C turns them off.",
+        "Hail other boats with Enter. Their words show on your screen.",
+        "Places to meet on the chart: McCovey Cove, Ayala Cove, Sam's in Tiburon and more. Click one to add it to your route.",
+        "A logbook of your miles, hours and marks, and the fleet's.",
+        "Fixed: a boat could come back broken after the game updated under her, and then would not start again."
+      ]
+    },
+    {
+      "id": "v5",
+      "date": "2026-11-13",
+      "title": "Real 3 km wind, a choice of when to cast off, knockdowns",
+      "items": [
+        "The wind is now NOAA's 3 km HRRR model for 14 July 2024. It builds through the day, funnels through the Gate and shifts the way it did.",
+        "Gusts and lulls sized from the model's own gust speeds.",
+        "Choose when to cast off: a light morning, the afternoon sea breeze, or the evening as it eases.",
+        "Crash gybes. Let the boom fly across in a breeze with the main out and she can be knocked flat."
+      ]
+    },
+    {
+      "id": "v4",
+      "date": "2026-11-13",
+      "title": "Regatta",
+      "items": [
+        "A new name, and a join screen: where to sail, an optional first lesson, then your boat.",
+        "Three boats: a 30 ft sloop, a 38 and a 45 ft performance cruiser. Name her and choose her colours."
+      ]
+    },
+    {
+      "id": "v3",
+      "date": "2026-11-12",
+      "title": "Autopilot, traffic and sailing in company",
+      "items": [
+        "An autopilot that holds a heading, a wind angle or your route, with the crew trimming.",
+        "Ferries, ships and other boats on the Bay, and more of the shore.",
+        "Open the same link as a friend and you are on the same water."
+      ]
+    },
+    {
+      "id": "v2",
+      "date": "2026-11-12",
+      "title": "The Bay, the chart and the crew",
+      "items": [
+        "San Francisco Bay with NOAA's tidal stream, tide and depths.",
+        "A chartplotter with waypoints, leg times, plan against actual and the forecast.",
+        "A wind and tide dial, and crew aboard."
+      ]
+    }
+  ]
+}

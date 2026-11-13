@@ -38,6 +38,14 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - Entry is `main.ts` (boot and frame loop), `stage.ts` (scene everyone shares), `lobby.ts` plus `ui/join.ts` (the join screen), `session.ts` (one sail). `window.regatta` holds debug handles once a sail starts
 - Boat display fields and the picker order live in `boats/*.json` and `boats/lineup.json`. `BoatView` takes a livery (topsides colour, transom name)
 
+- The board (key B) is `ui/board.ts`: roadmap with votes, release notes, feedback form, logbook. The roadmap is `src/data/roadmap.json`, release notes `src/data/releases.json` (newest first). Every publish adds a note there: the newest note's id is what marks the "New" flag for returning players
+- Votes, feedback and logbooks are in the artifact's `db` (`net/store.ts`, `net/logbook.ts`): `votes/<uid>`, `feedback/<uid>`, `profiles/<uid>`. Feedback is readable only by its sender and by editors. Writing needs Contributor access to the page
+- Publishing needs `capabilities` with `room`, `user` (profile scope) and `db` with the six rules (votes, feedback, profiles, each with a `{self}` rule). Omitting `capabilities` on a republish carries them forward
+- Feedback is copied to the Google Sheet "Regatta feedback" in the owner's Drive by hand for now (read `feedback` with ArtifactData, append rows). The page cannot post to Google itself
+- Coaching hints are `ui/hints.ts`, gust look-ahead is `ui/gusts.ts`. Both only read the sim and the world
+- A saved boat is only restored if `isSoundState` passes. `Sim.restore` fills fields a saved state lacks from a fresh state, so adding a field to `SimState` cannot break a boat handed across a republish
+- The recorded weather is 36 hours. `world.wrapSeason` moves a session back a day when it reaches the end. Boats whose clock is past the end are not followed
+
 ## Status
 
-Milestone 1 is built and waiting on its play test gate. At the owner's request, parts of milestone 3 were built early: the Bay replay (wind, stream, tide, depth, land), the chartplotter with passage planning and plan against actual, the forecast timeline, an on-screen wind and tide dial, crew figures, the autopilot, Bay traffic and scenery, and shared water for sailing in company. The owner asked for these on-screen instruments directly, which overrides the PRD's lean toward keeping information on the boat. They hide with H.
+Milestone 1 is built and waiting on its play test gate. At the owner's request, parts of milestone 3 were built early: the Bay replay (wind, stream, tide, depth, land), the chartplotter with passage planning and plan against actual, the forecast timeline, an on-screen wind and tide dial, crew figures, the autopilot, Bay traffic and scenery, shared water for sailing in company with hails, the roadmap and feedback board, coaching hints and gust warnings. The owner asked for these on-screen instruments directly, which overrides the PRD's lean toward keeping information on the boat. They hide with H.

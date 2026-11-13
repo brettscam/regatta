@@ -72,6 +72,18 @@
           "status": "shipped",
           "title": "Crash gybes",
           "text": "Let the boom come across on its own in a breeze and she rounds up, or goes flat on her side."
+        },
+        {
+          "id": "gusts",
+          "status": "shipped",
+          "title": "Gust warnings",
+          "text": "The readout shows a gust on its way and how long until it arrives. A strong one raises an alert and drops time back to real speed."
+        },
+        {
+          "id": "news",
+          "status": "shipped",
+          "title": "Release notes",
+          "text": "What's new lists every update, and a marker tells you when there is one you have not read."
         }
       ]
     },

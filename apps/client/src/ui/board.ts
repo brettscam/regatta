@@ -1,3 +1,4 @@
+import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
 import type { Logbook } from '../net/logbook';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
@@ -5,6 +6,10 @@ import { Store, type FeedbackEntry, type Tally } from '../net/store';
 interface RoadmapItem { id: string; status: string; title: string; text: string }
 interface Release { id: string; name: string; when: string; blurb: string; items: RoadmapItem[] }
 const roadmap = roadmapJson as { updated: string; releases: Release[] };
+interface Note { id: string; date: string; title: string; items: string[] }
+/** Release notes, newest first. */
+const notes = (releasesJson as { notes: Note[] }).notes;
+const SEEN = 'regatta.seen';
 
 const STATUS: Record<string, string> = { shipped: 'Shipped', building: 'Being built', next: 'Up next', later: 'Planned', idea: 'Idea' };
 const KINDS: Array<[string, string, string]> = [
@@ -12,7 +17,7 @@ const KINDS: Array<[string, string, string]> = [
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
-type Tab = 'roadmap' | 'feedback' | 'logbook';
+type Tab = 'roadmap' | 'news' | 'feedback' | 'logbook';
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
@@ -31,6 +36,10 @@ export class Board {
   private note = '';
   private sent: FeedbackEntry[] = [];
   private busy = false;
+  private readonly link = document.getElementById('boardlink');
+  private readonly flash = document.getElementById('newsflash');
+  /** The newest release note this person has read. */
+  private seen = '';
 
   /** Supplies what the boat is doing, to attach to feedback when the sender allows it. */
   context: () => Record<string, unknown> = () => ({});
@@ -50,6 +59,40 @@ export class Board {
     });
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
+    this.announce();
+  }
+
+  /** True when there is a release note this person has not opened. */
+  get hasNews(): boolean {
+    return notes.length > 0 && this.seen !== notes[0].id;
+  }
+
+  /** Tell someone who has sailed before that the game has changed since. A first-time sailor is not told: all of it is new. */
+  private announce(): void {
+    let returning = false;
+    try {
+      this.seen = localStorage.getItem(SEEN) ?? '';
+      returning = this.seen !== '' || localStorage.getItem('regatta.join') !== null;
+    } catch { /* no storage: nothing is remembered, so nothing is announced */ }
+    if (!returning) return this.markSeen();
+    if (!this.hasNews) return;
+    this.link?.classList.add('new');
+    if (this.flash) {
+      this.flash.innerHTML = `<b>New in Regatta</b><span>${esc(notes[0].title)}</span><i>See what changed</i>`;
+      this.flash.hidden = false;
+      this.flash.addEventListener('click', () => this.toggle(true, 'news'));
+      setTimeout(() => { if (this.flash) this.flash.hidden = true; }, 20000);
+    }
+  }
+
+  private markSeen(): void {
+    if (!notes.length) return;
+    this.seen = notes[0].id;
+    this.link?.classList.remove('new');
+    if (this.flash) this.flash.hidden = true;
+    try {
+      localStorage.setItem(SEEN, this.seen);
+    } catch { /* nothing to remember */ }
   }
 
   get isOpen(): boolean {
@@ -58,7 +101,9 @@ export class Board {
 
   toggle(open = !this.isOpen, tab?: Tab): void {
     if (tab) this.tab = tab;
+    else if (open && this.hasNews) this.tab = 'news';
     this.el.hidden = !open;
+    if (this.flash) this.flash.hidden = true;
     if (open) {
       this.start();
       this.render();
@@ -177,6 +222,13 @@ export class Board {
       ${earlier}`;
   }
 
+  private news(): string {
+    const unread = this.hasNews ? notes[0].id : '';
+    const day = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    const list = notes.map((n) => `<section class="release ${n.id === unread ? 'unread' : ''}"><header><h3>${esc(n.title)}</h3><span>${n.id === unread ? 'New · ' : ''}${esc(day(n.date))}</span></header><ul class="notes">${n.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></section>`).join('');
+    return `<p class="lede">What has changed, newest first. The game updates under you while you sail: your boat carries on where she was.</p>${list}`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -200,11 +252,13 @@ export class Board {
       <div class="board-frame" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
       </div>`;
+    // Reading the notes is what marks them read, after they have been drawn as new once.
+    if (this.tab === 'news' && this.hasNews) this.markSeen();
     if (caret !== null) {
       const t = document.getElementById('board-text') as HTMLTextAreaElement | null;
       t?.focus();
