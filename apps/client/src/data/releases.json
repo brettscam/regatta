@@ -1,6 +1,18 @@
 {
   "notes": [
     {
+      "id": "v10",
+      "date": "2026-11-13",
+      "title": "Ashore in the outrigger, and a tow off the mud",
+      "items": [
+        "The outrigger. With the boat at anchor or on a mooring, O launches the canoe alongside. Paddle with W A S D. The tide carries her, so think before crossing a strong stream.",
+        "Go ashore. Run her up on any beach, or come in at Sam's in Tiburon, Ayala Cove, Sausalito, Aquatic Park, Pier 39, Clipper Cove, Horseshoe Cove or McCovey Cove, ease up and press O. Each place you land at goes in your logbook.",
+        "O again shoves off. Back alongside the boat, O brings you aboard.",
+        "Aground and stuck? U calls for a tow to the nearest deep water.",
+        "Fixed: pointing at the wheel, boom and winches with the mouse could stop working after you switched to another window in the middle of a drag. It now recovers by itself."
+      ]
+    },
+    {
       "id": "v9",
       "date": "2026-11-13",
       "title": "Anchor, spend the night, and catch your supper",

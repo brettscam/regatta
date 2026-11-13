@@ -91,6 +91,8 @@ Press R for the fleet and racing panel. It lists who is on the water with you, a
 - **X** stops her: on her own anchor (under 2 kt, in up to 25 m), or on a mooring or alongside a dock when she is within 90 m of one and under 2.5 kt. Her sails stow and she lies to the wind and tide. X again gets her under way
 - **Z**, while held and alone on the water, turns in for the night and wakes at 06:30
 - **K** drops a crab pot with a buoy in her colours (up to three). Back alongside the buoy, K hauls it. Pots fill over about an hour
+- **O**, while held, launches the outrigger. Paddle with W A S D on the tide, O lands her on a beach or at one of the named places, O alongside the boat comes back aboard
+- **U** calls for a tow to deep water when she is aground
 - **L** puts a fishing line out. Trolling and bottom fishing find different fish in different water. When one is on, L strikes
 
 ## Two homes

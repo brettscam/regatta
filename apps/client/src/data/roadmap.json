@@ -132,6 +132,13 @@
           "area": "world",
           "title": "Crab pots and fishing",
           "text": "Drop pots and come back for them, troll or bottom fish for the Bay's real species, and log what you land."
+        },
+        {
+          "id": "ashore1",
+          "status": "shipped",
+          "area": "world",
+          "title": "The outrigger",
+          "text": "Launch from the anchored boat, paddle in on the tide, land at the Bay's bars and beaches, and paddle home."
         }
       ],
       "theme": ""
@@ -172,9 +179,9 @@
         },
         {
           "id": "ashore",
-          "status": "building",
-          "title": "Go ashore",
-          "text": "Launch the outrigger from your anchored boat and paddle in to the bars and beaches.",
+          "status": "next",
+          "title": "Somewhere to go ashore",
+          "text": "Drawn docks and beaches at each landing, a walk up to the bar, and other crews you can see in their canoes.",
           "area": "world"
         },
         {
@@ -380,6 +387,20 @@
           "title": "What you would really see",
           "text": "Sea lions on the buoys, pelicans, harbour porpoise in the Gate, humpbacks and greys off the coast in season. Each water gets its own.",
           "area": "world"
+        },
+        {
+          "id": "touch",
+          "status": "next",
+          "area": "experience",
+          "title": "Phones and tablets",
+          "text": "Touch already steers and trims by dragging the boat's parts. Everything that is on a key today needs a way in without a keyboard."
+        },
+        {
+          "id": "easier",
+          "status": "next",
+          "area": "experience",
+          "title": "Controls that explain themselves",
+          "text": "Make it plain what can be grabbed and what each key does, without reading a list first."
         }
       ],
       "theme": "Seamanship"

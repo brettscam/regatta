@@ -308,7 +308,7 @@ export class Session {
   private checkAlarms(): void {
     const { sim, passage, watch } = this;
     const o = sim.out;
-    if (o.aground && !watch.aground) this.alarm('Aground. Get her head round to deeper water');
+    if (o.aground && !watch.aground) this.alarm('Aground. Get her head round to deeper water, or press U for a tow');
     else if (!o.aground && o.underKeel !== null && o.underKeel < 2.5 && !watch.shallow) this.alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under the keel`);
     // The boom came across on its own.
     if (sim.state.knockdowns > watch.knockdowns) this.alarm(`Knocked down. Crash gybe in ${Math.round(o.tws / KT)} kt with the main let out. She will come up: ease the sheets`);
