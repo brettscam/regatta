@@ -15,7 +15,11 @@ import type { Logbook } from './net/logbook';
 import { Hud, TIME_RATES } from './ui/hud';
 import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
+import { createFeatures } from './aboard/index';
+import type { Feature } from './aboard/feature';
 import { Fleet } from './net/fleet';
+import { Race, type RaceCourse } from './race/race';
+import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
 
 /** Somewhere worth sailing to. */
@@ -25,6 +29,10 @@ export interface Place {
   x: number;
   y: number;
   say: string;
+  /** How a boat stops here: on a mooring buoy, alongside a dock, or on her own anchor. */
+  kind?: 'mooring' | 'dock' | 'anchorage';
+  /** Where the crew goes once ashore. */
+  ashore?: { name: string; say: string };
 }
 
 export interface SessionOptions {
@@ -45,6 +53,8 @@ export interface SessionOptions {
   skipper: string;
   logbook: Logbook;
   places: Place[];
+  /** Race courses on offer. */
+  races: RaceCourse[];
   /** True while the roadmap and feedback screen is open. */
   boardOpen(): boolean;
 }
@@ -65,6 +75,10 @@ export class Session {
   readonly pilot: Pilot;
   readonly fleet: Fleet;
   private readonly gusts: GustWatch;
+  readonly race: Race;
+  readonly fleetPanel: FleetPanel;
+  /** Things to do aboard besides sailing. See `aboard/feature.ts`. */
+  readonly features: Feature[];
   readonly coach: Coach | null;
   readonly hints: Hints;
   private readonly hailBox = document.getElementById('hail') as HTMLElement;
@@ -127,6 +141,28 @@ export class Session {
     this.gusts = new GustWatch(world, this.sim);
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
+    this.race = new Race({
+      sim: this.sim, world, passage: this.passage, fleet: this.fleet, spec: opts.spec, scene: stage.scene, logbook: opts.logbook,
+      skipper: opts.skipper, boatName: opts.livery.name ?? '',
+      say: (text) => this.hud.raiseAlarm(text, 5),
+      alarm: (text) => this.alarm(text),
+      invite: (from, text) => {
+        this.heard(from, text);
+        this.hud.raiseAlarm(`${from} ${text}`, 8);
+      },
+    });
+    this.fleet.extra = () => {
+      const out: Record<string, unknown> = {};
+      for (const f of this.features) Object.assign(out, f.wire?.());
+      return { ...out, ...this.race.wire(), st: this.status() };
+    };
+    this.fleetPanel = new FleetPanel({
+      race: this.race,
+      courses: opts.races,
+      boats: () => this.fleet.boats,
+      me: () => ({ x: this.sim.state.x, y: this.sim.state.y, sog: this.sim.out.sog, name: opts.skipper, boatName: opts.livery.name ?? '', status: this.status() }),
+      chartRoute: () => this.passage.marks.map((m) => ({ name: m.name, x: m.x, y: m.y })),
+    });
     this.bindHail();
     opts.logbook.identify(opts.skipper, opts.spec.id, opts.livery.name ?? '', opts.livery.topsides ?? '');
 
@@ -172,7 +208,39 @@ export class Session {
       controlUsed: (control) => this.coach?.used(control),
       toggleHints: () => this.hud.raiseAlarm(this.hints.toggle(), 4),
       openHail: () => this.openHail(),
+      toggleFleet: () => this.fleetPanel.toggle(),
+      featureKey: (code, shift) => this.features.some((f) => f.key?.(code, shift) ?? false),
     });
+
+    this.features = createFeatures({
+      sim: this.sim, world, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
+      spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
+      say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
+      alarm: (text) => this.alarm(text),
+      sharing: () => this.sharing,
+      company: () => this.fleet.boats,
+      seasonNow: () => world.seasonTime(this.sim.state.t),
+      held: (code) => this.controls.isHeld(code),
+      feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
+    });
+  }
+
+  /** What this boat is doing when she is not simply sailing, in a few words, for the others to see. */
+  status(): string {
+    for (const f of this.features) {
+      const s = f.status?.();
+      if (s) return s;
+    }
+    return '';
+  }
+
+  /** Where the player is when not at the helm, in the outrigger for instance. */
+  private focus(): { x: number; y: number; heading: number; height: number } | null {
+    for (const f of this.features) {
+      const p = f.focus?.();
+      if (p) return p;
+    }
+    return null;
   }
 
   get sharing(): boolean {
@@ -223,7 +291,7 @@ export class Session {
 
   /** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
-    const traffic = this.stage.traffic.vessels;
+    const traffic = this.race.pacers.length ? [...this.stage.traffic.vessels, ...this.race.vessels()] : this.stage.traffic.vessels;
     if (!this.fleet.boats.length) return traffic;
     const company: TrafficVessel[] = this.fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.boatName || b.name || 'Another boat', kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: b.length, beam: b.length / 3 }));
     return [...traffic, ...company];
@@ -298,7 +366,8 @@ export class Session {
     const rate = TIME_RATES[this.rateIndex];
     const paused = this.paused;
 
-    this.controls.update(dtReal, paused);
+    const away = this.focus();
+    this.controls.update(dtReal, paused || away !== null);
 
     // Fixed steps. Faster time just means more of them per frame.
     if (!paused) {
@@ -309,6 +378,8 @@ export class Session {
       for (let i = 0; i < steps; i++) {
         if (i === steps - 1) this.before = this.after;
         sim.step();
+        this.race.step();
+        for (const f of this.features) f.step?.();
         // Keep the track and mark arrivals honest at high time rates.
         if (i % 30 === 0) passage.update(sim.state, sim.state.t);
       }
@@ -316,6 +387,7 @@ export class Session {
         this.opts.logbook.add(steps * SIM_DT, sim.out.sog * steps * SIM_DT, sim.out.sog / KT);
         this.after = grab(sim.state);
         passage.update(sim.state, sim.state.t);
+        this.race.update();
         this.checkAlarms();
         pilot.update();
       }
@@ -367,6 +439,8 @@ export class Session {
 
     // Draw the other boats, tell them where this one is, and keep to the furthest-on clock.
     const clockBehind = fleet.update(sim, world.seasonTime(sim.state.t), seaTime, stage.waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
+    this.race.draw(seaTime, stage.waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
+    this.fleetPanel.update(dtReal);
     if (this.sharing) {
       this.paused = false;
       if (this.rateIndex !== 0) { this.rateIndex = 0; hud.setRate(0); }
@@ -375,8 +449,10 @@ export class Session {
     // The replay runs out of weather eventually. The day comes round again rather than freezing in the dark.
     if (world.wrapSeason(sim.state.t)) this.alarm('End of the recorded weather. The same day starts over.');
 
-    this.boatPos.set(x, pose.heave, z);
-    drone.update(dtReal, this.boatPos, heading, (px, pz) => stage.seaLevel(px, pz, seaTime), boatView.solids, boatView.thin);
+    for (const f of this.features) f.update?.(dtReal, seaTime);
+    if (away) this.boatPos.set(away.x, away.height, -away.y);
+    else this.boatPos.set(x, pose.heave, z);
+    drone.update(dtReal, this.boatPos, away ? away.heading : heading, (px, pz) => stage.seaLevel(px, pz, seaTime), boatView.solids, boatView.thin);
 
     const stream = world.current(sim.state.x, sim.state.y, sim.state.t);
     hud.update(sim.state, sim.out, {
@@ -388,7 +464,9 @@ export class Session {
     }, world.dateAt(sim.state.t), stage.course.timeZone, paused, rate, dtReal, fleet.boats.length);
     const gust = this.gusts.update(paused ? 0 : dtReal);
     if (gust.alert) this.alarm(gust.alert);
-    hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, gust.line);
+    const doing = this.status();
+    if (doing) hud.setSail(doing, '', gust.line);
+    else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, gust.line);
     hud.setPilot(pilot.line());
     this.hints.update(paused ? 0 : dtReal);
     this.opts.logbook.update(dtReal);
@@ -425,7 +503,7 @@ export class Session {
     return {
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
       sim: this.sim, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
-      boatView: this.boatView, coach: this.coach, hints: this.hints, gusts: this.gusts, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      boatView: this.boatView, coach: this.coach, hints: this.hints, gusts: this.gusts, race: this.race, fleetPanel: this.fleetPanel, features: this.features, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
     };
   }
 }

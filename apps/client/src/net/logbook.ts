@@ -11,6 +11,14 @@ export interface LogTotals {
   tacks: number;
   knockdowns: number;
   topKt: number;
+  /** Races finished, and races won. */
+  races: number;
+  wins: number;
+  /** Crab and fish landed, nights spent at anchor or on a mooring, and places gone ashore at. */
+  crabs: number;
+  fish: number;
+  nights: number;
+  ashore: number;
 }
 
 export interface Profile {
@@ -29,10 +37,11 @@ interface Db {
 }
 
 const SAVED = 'regatta.log';
-const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0 };
+const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0 };
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
 const clean = (l: Partial<LogTotals> | undefined): LogTotals => ({
   miles: num(l?.miles), hours: num(l?.hours), sails: num(l?.sails), marks: num(l?.marks), tacks: num(l?.tacks), knockdowns: num(l?.knockdowns), topKt: num(l?.topKt),
+  races: num(l?.races), wins: num(l?.wins), crabs: num(l?.crabs), fish: num(l?.fish), nights: num(l?.nights), ashore: num(l?.ashore),
 });
 
 export class Logbook {
@@ -100,7 +109,7 @@ export class Logbook {
     this.sinceSave += seconds;
   }
 
-  count(what: 'marks' | 'tacks' | 'knockdowns', n = 1): void {
+  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore', n = 1): void {
     this.totals[what] += n;
     this.dirty = true;
   }
@@ -124,7 +133,7 @@ export class Logbook {
     const t = this.totals;
     const body: Profile = {
       ...this.who,
-      log: { miles: r(t.miles, 100), hours: r(t.hours, 100), sails: t.sails, marks: t.marks, tacks: t.tacks, knockdowns: t.knockdowns, topKt: r(t.topKt, 10) },
+      log: { ...t, miles: r(t.miles, 100), hours: r(t.hours, 100), topKt: r(t.topKt, 10) },
       updated: new Date().toISOString(),
     };
     this.db.doc(`profiles/${this.uid}`).set(body as unknown as Record<string, unknown>).catch(() => { this.db = null; }).finally(() => { this.saving = false; this.dirty = false; });

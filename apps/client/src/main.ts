@@ -3,6 +3,8 @@ import { ReplayWorld } from '@slack-tide/world';
 import startsJson from '../../../courses/sf-bay/starts.json';
 import timesJson from '../../../courses/sf-bay/times.json';
 import placesJson from '../../../courses/sf-bay/places.json';
+import racesJson from '../../../courses/sf-bay/races.json';
+import type { RaceCourse } from './race/race';
 import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
 import { Session, type Place } from './session';
@@ -97,6 +99,7 @@ function castOff(choice: Choice, resume?: SimState): void {
     skipper: choice.skipper,
     logbook,
     places,
+    races: racesJson as RaceCourse[],
     boardOpen: () => board.isOpen,
     boats: BOATS,
     resume,

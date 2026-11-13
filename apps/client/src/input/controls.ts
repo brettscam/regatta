@@ -32,6 +32,10 @@ export interface ControlHost {
   toggleHints(): void;
   /** Open the box for hailing the other boats. */
   openHail(): void;
+  /** Open or close the fleet and racing panel. */
+  toggleFleet(): void;
+  /** A key the game itself does not use. True if something aboard took it. */
+  featureKey(code: string, shift: boolean): boolean;
 }
 
 /**
@@ -298,11 +302,19 @@ export class Controls {
       case 'KeyC': this.host.toggleHints(); break;
       case 'Enter': this.host.openHail(); e.preventDefault(); break;
       case 'KeyM': this.host.toggleChart(); break;
+      case 'KeyR': this.host.toggleFleet(); break;
       case 'Escape': this.host.closeChart(); break;
       case 'Backquote': this.hud.toggleFps(); break;
-      default: if (e.code.startsWith('Arrow')) e.preventDefault();
+      default:
+        if (e.code.startsWith('Arrow')) e.preventDefault();
+        else if (this.host.featureKey(e.code, e.shiftKey)) e.preventDefault();
     }
   };
+
+  /** True while a key is down. */
+  isHeld(code: string): boolean {
+    return this.held.has(code);
+  }
 
   /** Apply held keys and keep the pointer tag current. Call once a frame. */
   update(dt: number, paused: boolean): void {
