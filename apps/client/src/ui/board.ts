@@ -235,6 +235,7 @@ export class Board {
     const mine = `<div class="stats">
       ${stat('Miles sailed', t.miles.toFixed(1))}${stat('Hours under way', t.hours.toFixed(1))}${stat('Sails', String(t.sails))}
       ${stat('Marks rounded', String(t.marks))}${stat('Tacks and gybes', String(t.tacks))}${stat('Knockdowns', String(t.knockdowns))}${stat('Top speed', `${t.topKt.toFixed(1)} kt`)}
+      ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}
     </div>`;
     const fleet = this.logbook.fleet;
     const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
