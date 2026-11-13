@@ -226,3 +226,7 @@ body.lobby .hud, body.lobby .tag { display: none; }
 }
 .join .chip b { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 .join .chip[aria-pressed="true"] { border-color: var(--amber); background: rgba(255, 196, 107, 0.1); }
+
+/* Long alarms wrap, and sit in the room to the left of the chart preview. */
+.alarm { left: calc((100% - 252px) / 2); max-width: min(640px, calc(100% - 300px)); white-space: normal; text-align: center; line-height: 1.35; }
+@media (max-width: 760px) { .alarm { left: 50%; max-width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 164px); } }

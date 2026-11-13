@@ -2,7 +2,7 @@
 
 A realistic 3D sailing simulator that runs in the browser. You sail by handling the boat itself: point at a part and scroll, or drag it. The full plan is in [docs/PRD.md](docs/PRD.md).
 
-**Status: milestone 1 built and waiting on its play test, with the chart, forecast and tide pulled forward from milestone 3 at the owner's request.** One 38 ft sloop on Central San Francisco Bay, replaying NOAA's wind, tidal stream and tide from 14 and 15 July 2024.
+**Status: milestone 1 built and waiting on its play test, with the chart, forecast and tide pulled forward from milestone 3 at the owner's request.** One 38 ft sloop on Central San Francisco Bay, replaying NOAA's wind (HRRR, 3 km), tidal stream and tide (SFBOFS) from 08:00 on 14 July 2024 for 36 hours.
 
 ## The way in
 
@@ -69,6 +69,10 @@ The pilot holds one of three things: a **heading**, a **wind angle**, or the **r
 - When the mark is to windward it sails close-hauled and tacks when the mark can be laid. It short-tacks away from shoal water rather than run up it
 - It gives up when overpowered: a few seconds of losing to the helm and it hands the wheel back with an alarm
 - It does not reef, avoid other vessels or look ahead for land on a reach. Keep a watch
+
+## Gybing
+
+Let the boom come across on its own with the main eased and the wind up, and it lands hard. How hard depends on how far it swings, how much wind there is and how much main is up: a lurch and a round-up in a moderate breeze, a knockdown from about 19 kt true with a full main let right out. She is a keelboat, so she comes back up, stopped and head to wind. Haul the main in before the stern goes through the wind and the same gybe is gentle. `T` has the crew tend the sheet, and so does having the pilot on.
 
 ## Sailing in company
 
@@ -137,6 +141,6 @@ docs/PRD.md      The product plan
 - The sim runs on the main thread. It is already isolated behind plain state and commands, so moving it into a Web Worker is mechanical, and it comes with the autopilot work in milestone 3
 - Reef and furler are in the sim and its tests, but have no parts to point at yet. They arrive with milestone 2
 - Waves do not break on the shore and the wind does not know about the hills. Wind shadows are milestone 3 work
-- Gusts and shifts are added on top of the hourly model wind, as the PRD allows. They are not from data
+- Gust strength comes from the model's gust speed. When each puff arrives does not
 - The crew are figures only. Skill, fatigue and watches are milestone 4
 - The sloop is a placeholder built in code, to be replaced by a proper model before milestone 3
