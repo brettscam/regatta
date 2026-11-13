@@ -672,6 +672,30 @@ export class Sim {
   }
 }
 
+/**
+ * A safe copy of a saved state. A state saved by an older build may lack fields added since, and a state that has
+ * gone wrong may hold numbers that are not numbers. Anything missing or not finite takes its starting value,
+ * so one bad field can never spread through the whole boat.
+ */
 function structuredCloneState(s: SimState): SimState {
-  return { ...s, maneuver: s.maneuver ? { ...s.maneuver } : null };
+  const fresh = initialState() as unknown as Record<string, unknown>;
+  const saved = s as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(fresh)) {
+    const want = fresh[key];
+    const have = saved[key];
+    if (typeof want === 'number') out[key] = typeof have === 'number' && Number.isFinite(have) ? have : want;
+    else if (typeof want === 'boolean') out[key] = typeof have === 'boolean' ? have : want;
+    else if (typeof want === 'string') out[key] = typeof have === 'string' ? have : want;
+    else out[key] = have ?? want;
+  }
+  const m = s.maneuver;
+  out.maneuver = m && Number.isFinite(m.targetHeading) ? { ...m } : null;
+  if (!['hand', 'heading', 'wind', 'route'].includes(out.helmMode as string)) out.helmMode = 'hand';
+  return out as unknown as SimState;
+}
+
+/** True when a saved state can be sailed on from: its position, heading and clock are real numbers. */
+export function isSoundState(s: Partial<SimState> | null | undefined): s is SimState {
+  return !!s && [s.x, s.y, s.heading, s.speed, s.t, s.tick].every((n) => typeof n === 'number' && Number.isFinite(n));
 }

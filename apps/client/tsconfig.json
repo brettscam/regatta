@@ -20,7 +20,8 @@
     "../../boats/*.json",
     "../../courses/*/course.json",
     "../../courses/*/starts.json",
-    "../../courses/*/times.json"
+    "../../courses/*/times.json",
+    "src/data/*.json"
   ],
   "references": [
     {

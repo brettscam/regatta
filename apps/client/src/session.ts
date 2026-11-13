@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Sim, SIM_DT, KT, R2D, type SimState } from '@slack-tide/sim';
+import { Sim, SIM_DT, KT, R2D, initialState, type SimState } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import { BoatView, type BoatPose, type Livery } from './boat/boatView';
 import type { YardBoat } from './boat/yard';
@@ -226,6 +226,15 @@ export class Session {
         pilot.update();
       }
     }
+    // A last line of defence: if the boat's numbers ever go bad, put her back where she started rather than lose her.
+    if (!Number.isFinite(sim.state.x + sim.state.y + sim.state.heading + sim.state.heel + sim.state.speed)) {
+      const t = sim.state.t;
+      sim.restore({ ...initialState({ x: this.opts.x, y: this.opts.y, headingDeg: this.opts.headingDeg ?? world.wind(this.opts.x, this.opts.y, 0).dir * R2D + 50, speedKt: 4 }), t: Number.isFinite(t) ? t : 0, tick: Number.isFinite(t) ? Math.round(t / SIM_DT) : 0 });
+      sim.trimForWind();
+      sim.setHelm('wind');
+      this.before = this.after = grab(sim.state);
+      this.alarm('Something went wrong with the boat. She is back at her start');
+    }
     const alpha = paused ? 1 : this.acc / SIM_DT;
     const seaTime = sim.state.t + (alpha - 1) * SIM_DT;
     const { before, after } = this;
@@ -290,6 +299,24 @@ export class Session {
     this.sound.update(o.aws / KT, sim.state.speed / KT, loose, paused);
 
     stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+  }
+
+  /** A short account of the boat and the conditions, for attaching to feedback. */
+  report(): Record<string, unknown> {
+    const s = this.sim.state;
+    const o = this.sim.out;
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    return {
+      boat: this.opts.spec.id,
+      clock: this.stage.world.dateAt(s.t).toISOString(),
+      minutesSailed: Math.round(s.t / 60),
+      x: Math.round(s.x), y: Math.round(s.y),
+      headingDeg: Math.round(s.heading * R2D), speedKt: r1(o.sog / KT), heelDeg: Math.round(s.heel * R2D),
+      windKt: r1(o.tws / KT), windFromDeg: Math.round(o.twd * R2D), windAngleDeg: Math.round(o.twa * R2D),
+      helm: s.helmMode, crewTrim: s.crewTrim, reef: s.reef,
+      aground: o.aground, knockdowns: s.knockdowns, boatsInCompany: this.fleet.boats.length,
+      screen: `${window.innerWidth}x${window.innerHeight}@${window.devicePixelRatio}`,
+    };
   }
 
   /** Handles for play testing from the browser console. */

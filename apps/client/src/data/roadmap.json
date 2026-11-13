@@ -1,0 +1,85 @@
+{
+  "updated": "2026-11-13",
+  "releases": [
+    {
+      "id": "now",
+      "name": "Sailing now",
+      "when": "Live",
+      "blurb": "What is in the build you are playing.",
+      "items": [
+        { "id": "bay", "status": "shipped", "title": "San Francisco Bay, replayed", "text": "Real wind, gusts, tide and tidal stream from NOAA for 14 July 2024, with real depths, coastline and the bridges." },
+        { "id": "boats3", "status": "shipped", "title": "Three boats", "text": "A 30 ft sloop, a 38 and a 45 ft performance cruiser, each with her own polar, heel and handling. Name her and choose her colours." },
+        { "id": "hands", "status": "shipped", "title": "Hands on the boat", "text": "Steer, trim and tack by pointing at the wheel, boom and winches. No sailing buttons on the screen." },
+        { "id": "pilot", "status": "shipped", "title": "Autopilot and crew", "text": "Hold a heading, a wind angle or the route while the crew trims. It beats to windward and tacks for the mark." },
+        { "id": "chart", "status": "shipped", "title": "Chartplotter and passage plan", "text": "Waypoints, leg times from the forecast, plan against actual, and a forecast you can scrub through." },
+        { "id": "company1", "status": "shipped", "title": "Sailing in company, first cut", "text": "Open the same link as a friend and see each other's boats live, on one clock, and hail each other." },
+        { "id": "coach1", "status": "shipped", "title": "First lesson and coaching hints", "text": "An optional guided first sail, then quiet hints when a sail has been luffing for a while or the boat is stuck in irons." }
+      ]
+    },
+    {
+      "id": "r1",
+      "name": "Release 1 · The Bay together",
+      "when": "Next",
+      "blurb": "The first target. Many people on the same Bay at once, racing or just out for a sail.",
+      "items": [
+        { "id": "race", "status": "building", "title": "Proper races", "text": "A start line with a countdown, marks to round, finish times and results. Race friends and a fleet of computer-sailed boats." },
+        { "id": "freeroam", "status": "next", "title": "A shared Bay to roam", "text": "Drop in any time and see who else is out and where they are on the chart. No race needed: just go sailing together." },
+        { "id": "meet", "status": "next", "title": "Meet up somewhere", "text": "Pick a place and tell the others: McCovey Cove for the ball game, Ayala Cove on Angel Island, the dock at Sam's in Tiburon." },
+        { "id": "ashore", "status": "later", "title": "Dock, anchor and go ashore", "text": "Come alongside or drop the hook, take the dinghy or kayak in, and walk into the bar. Docking and anchoring done by hand." },
+        { "id": "talk", "status": "next", "title": "Talk to the fleet", "text": "Text hails are in. Next: voice on a VHF channel, so it sounds like the real thing." },
+        { "id": "server", "status": "next", "title": "Its own home on the web", "text": "Move off this preview page to a website with accounts, so anyone can join by link and boats persist between sessions." }
+      ]
+    },
+    {
+      "id": "r2",
+      "name": "Release 2 · Passages",
+      "when": "After that",
+      "blurb": "Long races and deliveries that run for days, like a flight simulator for the sea.",
+      "items": [
+        { "id": "hahah", "status": "later", "title": "The Baja Ha-Ha", "text": "San Diego to Cabo San Lucas with two stops: a rally start, then days at sea in real time." },
+        { "id": "watches", "status": "later", "title": "Watches and crew", "text": "Set a watch schedule. Crew have skill and fatigue, and a tired watch misses a wind shift." },
+        { "id": "provisions", "status": "later", "title": "Provisions and tanks", "text": "Load water, food and fuel before you go. Run short and it costs you." },
+        { "id": "notify", "status": "later", "title": "Call me when she needs me", "text": "Leave her on autopilot and get a text or an email when the wind shifts, a reef is due or land is near." },
+        { "id": "berths", "status": "later", "title": "Night in port", "text": "Pick up a mooring or take a berth at each stop, sleep, and start the next leg in the morning." },
+        { "id": "farallones", "status": "later", "title": "Out the Gate to the Farallones", "text": "Fifty-two miles of ocean swell, the bar and fog, as the first step offshore." }
+      ]
+    },
+    {
+      "id": "r3",
+      "name": "Release 3 · Charter waters",
+      "when": "Later",
+      "blurb": "Warm water, short hops and a catamaran.",
+      "items": [
+        { "id": "cat", "status": "later", "title": "The 42 ft catamaran", "text": "No heel to warn you: reef by the numbers. Two engines for docking." },
+        { "id": "bvi", "status": "idea", "title": "British Virgin Islands", "text": "Line-of-sight island hopping, anchoring and mooring balls." },
+        { "id": "greece", "status": "idea", "title": "Greece", "text": "The Cyclades and the meltemi, stern-to in a harbour for dinner." },
+        { "id": "croatia", "status": "idea", "title": "Croatia", "text": "The Dalmatian islands, with the bora and the maestral." }
+      ]
+    },
+    {
+      "id": "r4",
+      "name": "Release 4 · Your boat, your logbook",
+      "when": "Later",
+      "blurb": "Something to sail for.",
+      "items": [
+        { "id": "xp", "status": "later", "title": "Logbook and experience", "text": "Miles, night hours and heavy-weather hours earn experience, the way a real logbook does." },
+        { "id": "purse", "status": "idea", "title": "Prize money", "text": "Win races, earn a purse." },
+        { "id": "upgrades", "status": "idea", "title": "Upgrade the boat", "text": "New sails, a spinnaker, a folding prop, better instruments: each one changes how she sails." }
+      ]
+    },
+    {
+      "id": "always",
+      "name": "Always · Seamanship and the real world",
+      "when": "Ongoing",
+      "blurb": "Making the sailing truer, release after release.",
+      "items": [
+        { "id": "anyday", "status": "next", "title": "Sail any day in the archive", "text": "Pick a date, right up to yesterday, and get that day's real wind and tide from NOAA's records. Never live feeds." },
+        { "id": "reef", "status": "next", "title": "Reefing and furling by hand", "text": "The physics is done. It needs a mast and a furler you can work." },
+        { "id": "coach2", "status": "next", "title": "A better coach", "text": "Hints that notice more: pinching, sailing by the lee, a missed layline, a foul tide you could have dodged." },
+        { "id": "laylines", "status": "later", "title": "Laylines and tide gates on the chart", "text": "See when to tack and when the stream turns in your favour." },
+        { "id": "night", "status": "later", "title": "Night and fog", "text": "Navigation lights, lit buoys, the city at night, and San Francisco's fog." },
+        { "id": "spinnaker", "status": "later", "title": "Spinnakers", "text": "An asymmetric first, then a pole, guys and a preventer." }
+      ]
+    }
+  ]
+}

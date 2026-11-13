@@ -1,4 +1,4 @@
-import type { SimState } from '@slack-tide/sim';
+import { isSoundState, type SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
 import startsJson from '../../../courses/sf-bay/starts.json';
 import timesJson from '../../../courses/sf-bay/times.json';
@@ -6,6 +6,7 @@ import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
 import { Session } from './session';
 import { Stage } from './stage';
+import { Board } from './ui/board';
 import { JoinFlow, type Choice, type StartSpot, type StartTime } from './ui/join';
 import { loadCourse } from './world/loadCourse';
 
@@ -53,6 +54,14 @@ function setClock(choice: Choice): void {
 setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
 
+// The roadmap and the feedback form are there from the first screen.
+const board = new Board();
+window.addEventListener('keydown', (e) => {
+  const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
+  if (e.code === 'KeyB' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) board.toggle();
+  else if (e.code === 'Escape' && board.isOpen) board.toggle(false);
+});
+
 let session: Session | null = null;
 let lobby: Lobby | null = null;
 let chosen: Choice | null = null;
@@ -83,6 +92,7 @@ function castOff(choice: Choice, resume?: SimState): void {
     boats: BOATS,
     resume,
   });
+  board.context = () => ({ ...session!.report(), spot: choice.spot, startTime: choice.time });
   const handles = session.debug();
   Object.assign(window, { regatta: handles, slackTide: handles });
 }
@@ -93,7 +103,8 @@ const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
 hot?.snapshot?.(() => (session && chosen ? { sim: session.snapshot(), choice: chosen } : {}));
 const resume = (saved: unknown): void => {
   const s = saved as { sim?: SimState; choice?: Partial<Choice> } | undefined;
-  if (session || !s?.sim || typeof s.sim.tick !== 'number' || !s.choice) return;
+  // Only carry on from a state that is whole. Anything else starts again from the join screen.
+  if (session || !isSoundState(s?.sim) || !s?.choice) return;
   castOff(settle(s.choice), s.sim);
 };
 
