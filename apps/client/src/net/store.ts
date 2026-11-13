@@ -1,24 +1,11 @@
 /**
  * The page's small shared database, for votes on the roadmap and for feedback.
- * It exists only on the published claude.ai page, and only people the page is shared with as contributors can write.
- * Everywhere else every call here quietly does nothing, and the screens that use it say so.
+ * It comes from `platform.ts`. Today it exists only on the published claude.ai page, and only people the page is
+ * shared with as contributors can write. Everywhere else every call here quietly does nothing, and the screens that
+ * use it say so.
  */
 
-interface DocSnap { id: string; exists: boolean; data(): Record<string, unknown> | undefined }
-interface QuerySnap { docs: DocSnap[] }
-interface DocRef {
-  get(): Promise<DocSnap>;
-  set(data: Record<string, unknown>): Promise<void>;
-  onSnapshot(next: (s: DocSnap) => void, error?: (e: { code: string }) => void): () => void;
-}
-interface Db {
-  doc(path: string): DocRef;
-  collection(path: string): { onSnapshot(next: (s: QuerySnap) => void, error?: (e: { code: string }) => void): () => void };
-}
-interface UserApi {
-  id(): Promise<string | null>;
-  can(name: string): Promise<boolean | null>;
-}
+import { db as askDb, user as askUser, type Db } from './platform';
 
 export interface FeedbackEntry {
   /** feedback, problem or idea */
@@ -48,13 +35,10 @@ export class Store {
 
   private async connect(): Promise<void> {
     try {
-      const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
-      if (!claude?.use) return;
-      const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
-      const u = user as UserApi | null;
+      const [db, u] = await Promise.all([askDb(), askUser()]);
       this.uid = (await u?.id()) ?? null;
       this.mayWrite = (await u?.can('data.write')) ?? null;
-      if (db && this.uid) this.db = db as Db;
+      if (db && this.uid) this.db = db;
     } catch {
       this.db = null;
     }

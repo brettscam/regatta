@@ -4,6 +4,7 @@ import { BoatView, type BoatPose } from '../boat/boatView';
 import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
+import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
  * Shared water. Everyone who has the page open at the same time sees everyone else's boat.
@@ -12,8 +13,8 @@ import { waveHeight } from '../scene/waves';
  * leave, and your boat is gone from the others' water. All boats sail in one clock, so they share one wind and tide:
  * whoever is furthest on in the season sets the time and the rest move up to it.
  *
- * The room is the claude.ai artifact runtime's. Anywhere else (a local build, a saved file) there is no room
- * and the game is simply single-handed.
+ * The room comes from `platform.ts`: today the claude.ai artifact runtime's. Anywhere else (the website, a local build,
+ * a saved file) there is no room yet and the game is simply single-handed.
  */
 
 /** What one boat tells the others. Short keys: this goes out many times a second. */
@@ -43,28 +44,6 @@ interface Wire {
   mt?: number;
 }
 
-interface RoomPeer {
-  peer: string;
-  by: string | null;
-  isMe: boolean;
-  sameTab: boolean;
-  kind: string;
-  guest: boolean;
-  presence: Readonly<Record<string, unknown>>;
-  updatedAt: number;
-}
-
-interface Room {
-  presence(patch: Record<string, unknown>): Promise<void>;
-  peers(): readonly RoomPeer[];
-  onPeers(handler: (change: { peers: readonly RoomPeer[] }) => void, onError?: (e: { code: string }) => void): () => void;
-}
-
-interface UserApi {
-  id(): Promise<string | null>;
-  profiles(ids: string[]): Promise<Record<string, { name: string }>>;
-}
-
 export interface RemoteBoat {
   peer: string;
   name: string;
@@ -80,6 +59,15 @@ export interface RemoteBoat {
   length: number;
   /** The name on her transom. */
   boatName: string;
+  /** What she says she is doing: at anchor, ashore at Sam's, fishing. Another page's word. */
+  status: string;
+  /** A race she has called, if any, exactly as she sent it. Check it before use. */
+  raceCall: unknown;
+  /** The race she is in, how many marks she has rounded, metres to her next one, and her time if she has finished. */
+  raceId: string;
+  raceLeg: number;
+  raceToGo: number;
+  raceFinish: number;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -104,6 +92,7 @@ class Remote implements RemoteBoat {
   onHail: (text: string) => void = () => {};
   private hailStamp = -1;
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
+  status = ''; raceCall: unknown = null; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
   private placed = false;
@@ -138,6 +127,12 @@ class Remote implements RemoteBoat {
     this.heardAt = now;
     this.guest = p.guest;
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
+    this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
+    this.raceCall = v.rc ?? null;
+    this.raceId = typeof v.rj === 'string' ? v.rj.slice(0, 32) : '';
+    this.raceLeg = num(v.rp);
+    this.raceToGo = num(v.rd);
+    this.raceFinish = num(v.rf);
     // A hail is new when its stamp changes. The first one seen on arrival is old news.
     const mt = typeof v.mt === 'number' ? v.mt : 0;
     if (mt !== this.hailStamp) {
@@ -236,6 +231,9 @@ export class Fleet {
 
   constructor(private readonly yard: Record<string, YardBoat>, private readonly me: Identity, private readonly env: Environment, private readonly scene: THREE.Scene) {}
 
+  /** More to tell the room with each position: what she is doing, and any race. Merged into what is sent. */
+  extra: () => Record<string, unknown> = () => ({});
+
   /** Called when another boat hails. */
   onHail: (from: string, text: string) => void = () => {};
   private hailed: { text: string; at: number } | null = null;
@@ -251,13 +249,11 @@ export class Fleet {
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
     try {
-      const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
-      if (!claude?.use) return;
-      const room = (await claude.use('room')) as Room | null;
+      const room = await askRoom();
       if (!room) return;
       this.room = room;
       room.onPeers((change) => this.hear(change.peers), () => { this.room = null; this.clear(); });
-      this.user = (await claude.use('user')) as UserApi | null;
+      this.user = await askUser();
       this.myId = (await this.user?.id()) ?? null;
     } catch {
       this.room = null;
@@ -341,7 +337,7 @@ export class Fleet {
         wire.msg = this.hailed.text;
         wire.mt = this.hailed.at;
       }
-      this.room.presence(wire as unknown as Record<string, unknown>).catch(() => {});
+      this.room.presence({ ...this.extra(), ...(wire as unknown as Record<string, unknown>) }).catch(() => {});
     }
 
     let ahead = 0;

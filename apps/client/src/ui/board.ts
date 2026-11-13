@@ -1,6 +1,7 @@
 import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
 import type { Logbook } from '../net/logbook';
+import { onWeb } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
 interface RoadmapItem { id: string; status: string; title: string; text: string }
@@ -22,7 +23,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 /**
  * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the page's
- * shared database, which only the published page has.
+ * shared database, which only the published claude.ai page has. On the website there is none yet, and each tab says so.
  */
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
@@ -197,7 +198,9 @@ export class Board {
       ? 'Vote for what you want most. One vote per item, and you can change it.'
       : this.store.online
         ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
-        : 'Voting works on the shared page when you are signed in.';
+        : onWeb()
+          ? 'Voting is not available on this website yet. It needs accounts, which have not been built here.'
+          : 'Voting works on the shared page when you are signed in.';
     return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}${releases}`;
   }
 
@@ -217,7 +220,7 @@ export class Board {
         ${canSend ? `<button type="button" class="primary" data-act="send" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Sending' : 'Send'}</button>` : ''}
         <button type="button" data-act="copy">Copy it instead</button>
       </div>
-      ${canSend ? '' : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on.</p>`}
+      ${canSend ? '' : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : onWeb() ? 'Feedback cannot be sent from this website yet.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on${onWeb() ? ' to whoever gave you the link' : ''}.</p>`}
       ${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       ${earlier}`;
   }
@@ -240,8 +243,11 @@ export class Board {
     const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
     const table = fleet.length
       ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
-      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
-    return `<p class="lede">Your logbook adds up every sail on this device. On the shared page it is also kept with your sign-in, so it follows you. Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
+      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : onWeb() ? 'The fleet\'s logbooks are not available on this website yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
+    const kept = onWeb()
+      ? 'On this website it is kept in this browser only: there are no accounts here yet, so it does not follow you to another device.'
+      : 'On the shared page it is also kept with your sign-in, so it follows you.';
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
   }
 
   private render(): void {
