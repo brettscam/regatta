@@ -417,3 +417,7 @@ body.lobby .trimcard { display: none; }
   .board .rm-cell::before { content: attr(data-col); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); padding: 2px 4px; }
   .board .chip.shipped { margin-left: 0; }
 }
+/* Cards stay short so more of the board fits. Point at one, or tab to it, to read the rest. */
+.board .item.card p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.board .item.card:hover p, .board .item.card:focus-within p { -webkit-line-clamp: unset; line-clamp: unset; }
+@media (max-width: 760px) { .board .item.card p { -webkit-line-clamp: unset; line-clamp: unset; } }
