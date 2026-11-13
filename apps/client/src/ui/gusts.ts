@@ -47,7 +47,7 @@ export class GustWatch {
       r.line = `Gust ${Math.round(peak)} kt in ${arrives} s`;
       if (peak >= 18 && rise >= 4 && this.quietUntil <= 0) {
         this.quietUntil = 90;
-        const reefed = s.reef > 0 ? '' : ' Be ready to ease the main';
+        const reefed = s.reef > 0 || s.hold !== 'none' ? '' : ' Be ready to ease the main';
         r.alert = `Gust coming: ${Math.round(peak)} kt in about ${arrives} seconds.${reefed}`;
       }
     } else if (now - mean >= 3 && now >= mean * 1.15) {
