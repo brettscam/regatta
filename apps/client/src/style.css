@@ -372,3 +372,9 @@ body.lobby .racebar, body.lobby .fleetpanel { display: none; }
 .trimcard .k.dead { background: #8b98a3; }
 body.lobby .trimcard { display: none; }
 @media (max-width: 760px) { .trimcard { width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 210px); } }
+
+/* ---- keys tab ----------------------------------------------------------------------------------- */
+.board .keys { display: grid; grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr); gap: 6px 16px; margin: 6px 0 0; font-size: 13.5px; line-height: 1.45; }
+.board .keys dt { font-weight: 600; color: var(--ink); }
+.board .keys dd { margin: 0; color: rgba(238, 243, 244, 0.82); }
+.board-frame nav { flex-wrap: wrap; }

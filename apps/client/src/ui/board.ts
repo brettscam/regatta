@@ -17,7 +17,42 @@ const KINDS: Array<[string, string, string]> = [
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
-type Tab = 'roadmap' | 'news' | 'feedback' | 'logbook';
+type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook';
+/** Every control, grouped. Sailing is done on the boat's own parts or with these keys: there are no sailing buttons. */
+const KEYS: Array<[string, Array<[string, string]>]> = [
+  ['Sailing', [
+    ['Point at the wheel, boom or a winch', 'Scroll or drag to turn, ease or trim it'],
+    ['A D or ← →', 'Wheel to port or starboard'],
+    ['W S', 'Mainsheet in, mainsheet out'],
+    ['Q E', 'Trim the working jib sheet, ease the loaded one'],
+    ['T', 'Tack or gybe, with the crew on the sheets'],
+    ['P, Shift+P', 'Autopilot on or off, and what it holds: heading, wind angle, route'],
+  ]],
+  ['Seeing', [
+    ['Drag, scroll', 'Look around, move in and out'],
+    ['1 2 3 4', 'Helm, mast, foredeck and drone views'],
+    ['M', 'Chart and passage plan'],
+    ['F', 'Wind tunnel: the air over the sails, and what the trim is asking for'],
+    ['H', 'Hide or show the instruments'],
+    ['C', 'Coaching hints on or off'],
+  ]],
+  ['With other boats', [
+    ['R', 'Fleet and racing: who is out, call a race, join one'],
+    ['Enter', 'Hail the fleet'],
+  ]],
+  ['Stopping, and life aboard', [
+    ['X', 'Anchor, pick up a mooring or come alongside. X again to get under way'],
+    ['Z', 'At anchor or moored: turn in for the night'],
+    ['K', 'Drop a crab pot, or haul one of yours when you are back beside it'],
+    ['L', 'Fishing line out or in. When a fish is on, L strikes'],
+    ['O', 'At anchor or moored: launch the outrigger, land, and come back aboard'],
+  ]],
+  ['The game', [
+    ['Space', 'Pause (alone on the water)'],
+    ['Drag the clock', 'Speed time up (alone on the water)'],
+    ['B', 'This board: roadmap, what is new, keys, feedback, logbook'],
+  ]],
+];
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
@@ -229,6 +264,10 @@ export class Board {
     return `<p class="lede">What has changed, newest first. The game updates under you while you sail: your boat carries on where she was.</p>${list}`;
   }
 
+  private keys(): string {
+    return KEYS.map(([group, rows]) => `<section class="release"><header><h3>${esc(group)}</h3></header><dl class="keys">${rows.map(([k, what]) => `<dt>${esc(k)}</dt><dd>${esc(what)}</dd>`).join('')}</dl></section>`).join('');
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -252,10 +291,10 @@ export class Board {
       <div class="board-frame" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
       </div>`;
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();
