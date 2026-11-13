@@ -107,7 +107,7 @@ export class BoatView {
   /** At anchor or on a mooring: the main under its cover on the boom, the jib rolled on the forestay, and the line she lies to. */
   private readonly sailCover: THREE.Mesh;
   private readonly jibRoll = new Rope(0x1b2d4a, 0.042);
-  private readonly rode = new Rope(0xd9d3c2, 0.014);
+  private readonly rode = new Rope(0xd9d3c2, 0.018);
   /** 0 with the jib as the furling line has it, 1 with it rolled right away for a stop. */
   private jibStow = 0;
 
@@ -422,7 +422,7 @@ export class BoatView {
     // of the bow and steeply, whatever length is out.
     const mooring = state.hold === 'mooring';
     const k = mooring ? 1 : Math.min(away, 5) / Math.max(away, 0.01);
-    const end = this.v2.set(bowWorld.x + dx * k, mooring ? 0.3 : -3, bowWorld.z + dz * k);
+    const end = this.v2.set(bowWorld.x + dx * k, mooring ? 0.55 : -3, bowWorld.z + dz * k);
     end.sub(pos).applyQuaternion(this.q1.copy(this.root.quaternion).invert());
     // Still coming up to the buoy: the line is not on yet.
     rode.visible = !mooring || away < 16;
