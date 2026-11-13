@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide/sim';
-import { buildSloop, type Livery, type SloopModel } from './buildSloop';
+import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './buildSloop';
 
 export type { BoatDisplay, Livery } from './buildSloop';
 import { Jib, Mainsail, type SailShape } from './sails';
@@ -240,6 +240,11 @@ export class BoatView {
       return { metresPerUnit: 2.2 };
     }
     return null;
+  }
+
+  /** Where the rig is, for anything that draws around the sails. */
+  get rig(): SloopGeometry {
+    return this.model.geo;
   }
 
   update(pose: BoatPose, state: SimState, out: SimOutputs, time: number, dt: number): void {
