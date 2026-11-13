@@ -2,7 +2,7 @@
   "name": "slack-tide",
   "private": true,
   "version": "0.1.0",
-  "description": "A realistic 3D sailing simulator for the browser (working title: Slack Tide)",
+  "description": "Regatta: a realistic 3D sailing simulator for the browser",
   "type": "module",
   "workspaces": [
     "packages/*",

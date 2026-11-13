@@ -1,6 +1,12 @@
 {
   "id": "sloop38",
   "name": "38 ft sloop",
+  "lengthFt": 38,
+  "tagline": "Coastal and offshore. Steady in a breeze, quick enough in a calm",
+  "role": "All-rounder",
+  "defaultName": "Slack Tide",
+  "homePort": "Sausalito",
+  "topsides": "#12233d",
   "notes": "Generic ocean-ready 38 ft sloop. All figures approximate and open to tuning. The polar starts from the Farallones Run prototype table.",
   "dimensions": {
     "loa": 11.6,

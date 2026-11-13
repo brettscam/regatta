@@ -26,6 +26,8 @@ export interface ControlHost {
   sheetsInHand(): void;
   /** What the pilot is doing, for its tag. */
   pilotTag(): string;
+  /** The player moved a control, by any means. */
+  controlUsed(control: ControlName): void;
 }
 
 /**
@@ -107,6 +109,7 @@ export class Controls {
     const before = this.sim.getControl(binding.control);
     this.sim.nudgeControl(binding.control, delta);
     const moved = this.sim.getControl(binding.control) - before;
+    if (moved !== 0) this.host.controlUsed(binding.control);
     if (binding.control === 'pilot') return;
     if (binding.control !== 'rudder') this.host.sheetsInHand();
     if (moved !== 0 && binding.control !== 'rudder') {

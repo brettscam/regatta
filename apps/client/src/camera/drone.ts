@@ -39,6 +39,8 @@ export class DroneCamera {
   private readonly offset = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
   private hop = 0;
+  /** How many times the player has moved the camera. */
+  moves = 0;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(46, aspect, 0.12, 40000);
@@ -55,6 +57,7 @@ export class DroneCamera {
   }
 
   flyTo(view: ViewPreset, duration = 1.15): void {
+    this.moves++;
     const from: ViewPreset = { target: this.target.toArray() as [number, number, number], yaw: this.yaw, pitch: this.pitch, dist: this.dist };
     // Take the short way round.
     let dy = view.yaw - from.yaw;
@@ -63,6 +66,7 @@ export class DroneCamera {
   }
 
   orbit(dxPixels: number, dyPixels: number): void {
+    this.moves++;
     this.fly = null;
     this.yaw -= dxPixels * 0.0055;
     this.pitch = THREE.MathUtils.clamp(this.pitch + dyPixels * 0.0045, MIN_PITCH, MAX_PITCH);
@@ -70,17 +74,20 @@ export class DroneCamera {
 
   /** Positive zooms out. `amount` is in scroll notches. */
   zoom(amount: number): void {
+    this.moves++;
     this.fly = null;
     this.dist = THREE.MathUtils.clamp(this.dist * Math.exp(amount * 0.14), MIN_DIST, MAX_DIST);
   }
 
   zoomBy(factor: number): void {
+    this.moves++;
     this.fly = null;
     this.dist = THREE.MathUtils.clamp(this.dist * factor, MIN_DIST, MAX_DIST);
   }
 
   /** Slide the look-at point across the screen. It stays in the boat's frame, so the camera keeps following. */
   pan(dxPixels: number, dyPixels: number, viewportHeight: number): void {
+    this.moves++;
     this.fly = null;
     const scale = (2 * this.dist * Math.tan((this.camera.fov * Math.PI) / 360)) / viewportHeight;
     const a = this.yaw;

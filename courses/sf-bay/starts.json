@@ -1,0 +1,55 @@
+[
+  {
+    "id": "alcatraz",
+    "name": "Central Bay",
+    "where": "Off Alcatraz, in the middle of it all",
+    "teaches": "Room to learn in. A beat to the Gate, a run to Angel Island and a reach home.",
+    "x": 1300, "y": 250,
+    "route": [
+      { "name": "Harding Rock", "x": 290, "y": 763 },
+      { "name": "Golden Gate", "x": -2092, "y": -1145 },
+      { "name": "Point Blunt", "x": 3143, "y": 2037 },
+      { "name": "Alcatraz", "x": 2991, "y": -627 }
+    ]
+  },
+  {
+    "id": "gate",
+    "name": "The Golden Gate",
+    "where": "Just inside the bridge",
+    "teaches": "The strongest tide on the Bay. Go out under the bridge and come back with the stream, or against it.",
+    "x": -1300, "y": -950,
+    "route": [
+      { "name": "Golden Gate", "x": -2500, "y": -1150 },
+      { "name": "Outside the Gate", "x": -4900, "y": -1900 },
+      { "name": "Golden Gate", "x": -2500, "y": -1300 },
+      { "name": "Harding Rock", "x": 290, "y": 763 }
+    ]
+  },
+  {
+    "id": "cityfront",
+    "name": "City Front",
+    "where": "Off the piers, under the skyline",
+    "teaches": "Short tacking along the waterfront with ferries about. Keep a lookout.",
+    "x": 3300, "y": -1500,
+    "route": [
+      { "name": "Blossom Rock", "x": 4101, "y": -1150 },
+      { "name": "Alcatraz", "x": 2991, "y": -627 },
+      { "name": "Crissy Field", "x": -700, "y": -1750 },
+      { "name": "City Front", "x": 1757, "y": -1900 }
+    ]
+  },
+  {
+    "id": "raccoon",
+    "name": "Raccoon Strait",
+    "where": "Off Sausalito, bound round Angel Island",
+    "teaches": "Pilotage. A narrow strait with a fair or foul stream, then round the island and home.",
+    "x": -900, "y": 3300,
+    "route": [
+      { "name": "Point Stuart", "x": 600, "y": 4350 },
+      { "name": "Raccoon Strait", "x": 1800, "y": 4800 },
+      { "name": "Quarry Point", "x": 3300, "y": 4100 },
+      { "name": "Point Blunt", "x": 3300, "y": 2000 },
+      { "name": "Harding Rock", "x": 290, "y": 763 }
+    ]
+  }
+]

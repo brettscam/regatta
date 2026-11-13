@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide/sim';
-import { buildSloop, type SloopModel } from './buildSloop';
+import { buildSloop, type Livery, type SloopModel } from './buildSloop';
+
+export type { BoatDisplay, Livery } from './buildSloop';
 import { Jib, Mainsail, type SailShape } from './sails';
 import { Crew } from './crew';
 
@@ -106,11 +108,11 @@ export class BoatView {
   private readonly v2 = new THREE.Vector3();
   private readonly v3 = new THREE.Vector3();
 
-  constructor(readonly spec: BoatSpec) {
-    this.model = buildSloop(spec);
+  constructor(readonly spec: BoatSpec, readonly livery: Livery = {}) {
+    this.model = buildSloop(spec, livery);
     this.root = this.model.root;
     this.root.rotation.order = 'YXZ';
-    this.main = new Mainsail(this.model.geo);
+    this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38));
     this.jib = new Jib(this.model.geo);
     this.root.add(this.main.mesh, this.jib.mesh);
     this.crew = new Crew(this.model);
@@ -211,7 +213,7 @@ export class BoatView {
     const geo = this.model.geo;
     if (node === 'wheel') {
       // The top of the rim moves to starboard as the wheel turns to starboard.
-      const R = 0.52;
+      const R = geo.wheelRadius;
       this.root.localToWorld(point.copy(geo.wheel).add(this.v1.set(0, R, 0)));
       tangent.set(1, 0, 0).transformDirection(this.root.matrixWorld);
       return { metresPerUnit: R * WHEEL_RATIO };
@@ -277,7 +279,7 @@ export class BoatView {
       this.v3.set(geo.traveller.x + off * 1.4, geo.traveller.y + 0.12, geo.traveller.z);
       part.set(this.v2, this.v3);
     });
-    this.vang.set(onBoom(1.35, 0.08, this.v1), geo.vangBase);
+    this.vang.set(onBoom(geo.boomLength * 0.29, 0.08, this.v1), geo.vangBase);
     const clew = this.jib.clew;
     const jibUp = state.furl > 0.03;
     const leeIsPort = clew.x <= 0;

@@ -1,364 +1,127 @@
-import * as THREE from 'three';
-import { Sim, SIM_DT, KT, R2D, type BoatSpec, type SimState } from '@slack-tide/sim';
+import type { SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
-import boatJson from '../../../boats/sloop38.json';
-import { BoatView, type BoatPose } from './boat/boatView';
-import { DroneCamera, VIEWS } from './camera/drone';
-import { Controls } from './input/controls';
-import { Pilot } from './input/pilot';
-import { Ocean } from './scene/ocean';
-import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
-import { Traffic, type TrafficVessel } from './scene/traffic';
-import { buildScenery } from './scene/scenery';
-import { buildWaves, setSeaState, waveHeight } from './scene/waves';
-import { Chart } from './ui/chart';
-import { Hud, TIME_RATES } from './ui/hud';
-import { Passage } from './ui/passage';
-import { Sound } from './audio/sound';
+import startsJson from '../../../courses/sf-bay/starts.json';
+import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
+import { Lobby } from './lobby';
+import { Session } from './session';
+import { Stage } from './stage';
+import { JoinFlow, type Choice, type StartSpot } from './ui/join';
 import { loadCourse } from './world/loadCourse';
-import { Fleet } from './net/fleet';
 
-const boatSpec = boatJson as unknown as BoatSpec;
-
-// ---- session setup ------------------------------------------------------------------------------
-// The world is a real past afternoon on San Francisco Bay, replayed: NOAA's model of the wind, tidal stream and tide.
-// Overrides for play testing: ?start=2.5 (hours into the season) &x=1300&y=250&hdg=293
+// Regatta. The world is a real past afternoon on San Francisco Bay, replayed: NOAA's model of the wind, tidal stream and tide.
+// For play testing, the join screen can be skipped: ?go=1 with any of &spot=gate &boat=perf45 &tutorial=1
+// &start=2.5 (hours into the season) &x=1300&y=250&hdg=293
 const params = new URLSearchParams(location.search);
 const num = (key: string, fallback: number) => {
   const v = Number(params.get(key));
   return params.has(key) && Number.isFinite(v) ? v : fallback;
 };
+const spots = startsJson as StartSpot[];
+const SAVED = 'regatta.join';
+
+function savedChoice(): Partial<Choice> {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED) ?? '{}') as Partial<Choice>;
+  } catch {
+    return {};
+  }
+}
+
+/** A complete, valid choice from whatever was asked for or remembered. */
+function settle(c: Partial<Choice>): Choice {
+  const boat = c.boat && BOATS[c.boat] && LINEUP.some((e) => e.id === c.boat && e.status === 'ready') ? c.boat : DEFAULT_BOAT;
+  return {
+    spot: spots.some((s) => s.id === c.spot) ? c.spot! : spots[0].id,
+    boat,
+    colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
+    name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',
+    tutorial: c.tutorial ?? true,
+  };
+}
 
 const data = await loadCourse();
-const course = data.course;
-// 16:30 local: the afternoon westerly is in and the flood is running through the Gate.
 const world = new ReplayWorld(data, num('start', 2.5) * 3600);
-const startX = num('x', 1300);
-const startY = num('y', 250);
-const startWind = world.wind(startX, startY, 0);
-const sim = new Sim(boatSpec, world, { x: startX, y: startY, headingDeg: num('hdg', startWind.dir * R2D + 50), speedKt: 5 });
-sim.trimForWind();
-// Until the player takes the wheel, the boat holds her angle to the wind.
-sim.setHelm('wind');
+const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
 
-// ---- renderer and scene -------------------------------------------------------------------------
-const canvas = document.getElementById('view') as HTMLCanvasElement;
-canvas.tabIndex = 0;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.46;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+let session: Session | null = null;
+let lobby: Lobby | null = null;
+let chosen: Choice | null = null;
 
-const scene = new THREE.Scene();
-// Haze takes the far shore, as it does on the Bay.
-const haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
-scene.fog = haze;
-const sky = new SkySystem(renderer, scene);
-const ocean = new Ocean(sky.reflection.texture);
-scene.add(ocean.mesh);
-scene.add(buildTerrain(course, data.terrain), buildBridge(course), buildScenery(course, data.terrain));
-const buoys = course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
-for (const b of buoys) scene.add(b.group);
-// Other vessels on the Bay. Where each one is depends only on the time, so everyone sees the same traffic.
-const traffic = new Traffic(course, world);
-scene.add(traffic.group);
-const boatView = new BoatView(boatSpec);
-scene.add(boatView.root);
-
-const drone = new DroneCamera(window.innerWidth / window.innerHeight);
-drone.snap(VIEWS.drone, sim.state.heading);
-const hud = new Hud();
-const sound = new Sound();
-
-// The sea runs with the wind that was blowing when the session began. Its height follows the wind after that.
-const waves = buildWaves(startWind.dir, startWind.speed / KT);
-let seaKt = startWind.speed / KT;
-
-// ---- passage: the route, the plan from the forecast, and what really happens ----------------------
-const passage = new Passage(boatSpec.polar, {
-  wind: (x, y, t) => world.wind(x, y, t, 'forecast'),
-  current: (x, y, t) => world.current(x, y, t),
-});
-{
-  // A first route round the Central Bay. The player can change every mark on the chart.
-  const m = (id: string) => course.marks.find((k) => k.id === id)!;
-  passage.setRoute([
-    { name: 'Harding Rock', x: m('harding').x, y: m('harding').y - 160 },
-    { name: 'Golden Gate', x: m('gate').x + 420, y: m('gate').y },
-    { name: 'Point Blunt', x: m('blunt').x + 420, y: m('blunt').y - 520 },
-    { name: 'Alcatraz', x: m('alcatraz').x + 620, y: m('alcatraz').y - 260 },
-  ], { x: startX, y: startY }, 0);
-}
-const chart = new Chart({
-  world,
-  passage,
-  polar: boatSpec.polar,
-  now: () => sim.state.t,
-  boat: () => ({ x: sim.state.x, y: sim.state.y, heading: sim.state.heading, cog: sim.out.cog, sog: sim.out.sog }),
-  traffic: () => everyoneElse(),
-});
-
-let paused = false;
-let rateIndex = 0;
-const pilot = new Pilot(sim, passage, {
-  say: (text) => hud.raiseAlarm(text, 4),
-  alarm: (text) => alarm(text),
-});
-// Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
-const fleet = new Fleet(boatSpec, world, scene);
-void fleet.connect();
-const sharing = () => fleet.boats.length > 0;
-/** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
-function everyoneElse(): TrafficVessel[] {
-  if (!fleet.boats.length) return traffic.vessels;
-  const company: TrafficVessel[] = fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.name, kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: 11.6, beam: 3.8 }));
-  return [...traffic.vessels, ...company];
-}
-const togglePause = (): void => {
-  if (sharing()) hud.raiseAlarm('The clock is shared while other boats are here', 4);
-  else paused = !paused;
-};
-hud.onPause = togglePause;
-hud.onRate = (i) => {
-  if (sharing()) { hud.setRate(0); hud.raiseAlarm('Time runs at real speed while other boats are here', 4); }
-  else rateIndex = i;
-};
-const controls = new Controls(canvas, drone, boatView, sim, hud, sound, {
-  togglePause,
-  announce: (text) => hud.raiseAlarm(text, 4),
-  toggleChart: () => chart.toggle(),
-  closeChart: () => chart.toggle(false),
-  toggleInstruments: () => {
-    hud.toggleReadout();
-    chart.setMiniHidden(hud.readoutHidden);
-  },
-  togglePilot: () => pilot.toggle(),
-  cyclePilotMode: () => pilot.cycle(),
-  sheetsInHand: () => pilot.sheetsInHand(),
-  pilotTag: () => pilot.tag(),
-});
-
-function resize(): void {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  renderer.setSize(w, h, false);
-  drone.camera.aspect = w / h;
-  drone.camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', resize);
-resize();
-
-// ---- alarms: a line of text when something needs the player, and time drops back to real speed ----
-const watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>() };
-function alarm(text: string): void {
-  hud.raiseAlarm(text, 6);
-  rateIndex = 0;
-  hud.setRate(0);
-}
-function checkAlarms(): void {
-  const o = sim.out;
-  if (o.aground && !watch.aground) alarm('Aground. Get her head round to deeper water');
-  else if (!o.aground && o.underKeel !== null && o.underKeel < 2.5 && !watch.shallow) alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under the keel`);
-  watch.aground = o.aground;
-  watch.shallow = o.underKeel !== null && o.underKeel < (watch.shallow ? 4 : 2.5);
-  const reached = passage.nextIndex;
-  if (reached > watch.marksReached) {
-    const done = passage.marks[reached - 1];
-    const next = passage.marks[reached];
-    if (next) {
-      // Work out the rest of the route again from here, so the plan stays honest.
-      passage.replan({ x: sim.state.x, y: sim.state.y }, sim.state.t);
-      const brg = Math.round((Math.atan2(next.x - sim.state.x, next.y - sim.state.y) * R2D + 360) % 360);
-      alarm(`${done.name} astern. Next mark ${next.name}, bearing ${String(brg).padStart(3, '0')}°`);
-    } else {
-      alarm(`${done.name} reached. Route complete`);
-    }
+function castOff(choice: Choice, resume?: SimState): void {
+  chosen = choice;
+  try {
+    // Next time, the lesson is not offered by default: they have been aboard before.
+    localStorage.setItem(SAVED, JSON.stringify({ ...choice, tutorial: false }));
+  } catch { /* private window: nothing to remember */ }
+  // The afternoon moved on while the join screen was up.
+  if (lobby) {
+    world.shiftTime(lobby.elapsed);
+    lobby.dispose();
+    lobby = null;
   }
-  watch.marksReached = reached;
-
-  // Close quarters: a vessel that will pass close within the next two minutes. One warning per vessel per encounter.
-  const near = traffic.closest({ x: sim.state.x, y: sim.state.y, cog: sim.out.cog, sog: sim.out.sog });
-  if (near && near.tcpa > 0 && near.tcpa < 120 && near.range < 1200 && near.cpa < 70 + near.vessel.length * 0.6) {
-    const lastWarned = watch.warned.get(near.vessel.id) ?? -1e9;
-    if (sim.state.t - lastWarned > 180) {
-      watch.warned.set(near.vessel.id, sim.state.t);
-      const brg = Math.round((Math.atan2(near.vessel.x - sim.state.x, near.vessel.y - sim.state.y) * R2D + 360) % 360);
-      alarm(`${near.vessel.name} bearing ${String(brg).padStart(3, '0')}°, closing. Will pass ${Math.round(near.cpa / 10) * 10} m off in ${Math.round(near.tcpa / 5) * 5} s`);
-    }
-  }
+  const spot = spots.find((s) => s.id === choice.spot) ?? spots[0];
+  document.body.classList.remove('lobby');
+  session = new Session(stage, {
+    spec: BOATS[choice.boat],
+    livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort },
+    x: num('x', spot.x),
+    y: num('y', spot.y),
+    headingDeg: params.has('hdg') ? num('hdg', 0) : undefined,
+    route: spot.route,
+    tutorial: choice.tutorial && !resume,
+    boats: BOATS,
+    resume,
+  });
+  const handles = session.debug();
+  Object.assign(window, { regatta: handles, slackTide: handles });
 }
 
-// ---- loop ---------------------------------------------------------------------------------------
-type Snapshot = Pick<SimState, 'x' | 'y' | 'heading' | 'heel' | 'rudder' | 'boomAngle' | 'jibAngle'>;
-const grab = (s: SimState): Snapshot => ({ x: s.x, y: s.y, heading: s.heading, heel: s.heel, rudder: s.rudder, boomAngle: s.boomAngle, jibAngle: s.jibAngle });
-let before = grab(sim.state);
-let after = grab(sim.state);
-let acc = 0;
+// When this page is republished while someone is sailing, hand the boat across so they carry on where they were.
+interface HotReload { snapshot?: (fn: () => unknown) => void; ready?: (fn: (data: unknown) => void) => void; data?: unknown }
+const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
+hot?.snapshot?.(() => (session && chosen ? { sim: session.snapshot(), choice: chosen } : {}));
+const resume = (saved: unknown): void => {
+  const s = saved as { sim?: SimState; choice?: Partial<Choice> } | undefined;
+  if (session || !s?.sim || typeof s.sim.tick !== 'number' || !s.choice) return;
+  castOff(settle(s.choice), s.sim);
+};
+
+function begin(): void {
+  if (session) return;
+  if (params.has('go')) {
+    castOff(settle({ spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, tutorial: params.get('tutorial') === '1' }));
+    return;
+  }
+  document.body.classList.add('lobby');
+  lobby = new Lobby(stage, spots, BOATS);
+  new JoinFlow({
+    spots,
+    lineup: LINEUP,
+    boats: BOATS,
+    world,
+    initial: settle(savedChoice()),
+    onPreview: (choice, step) => lobby?.show(choice, step),
+    onCastOff: (choice) => castOff(choice),
+  });
+}
+
+if (hot?.ready) {
+  hot.ready((saved) => { resume(saved); begin(); });
+} else {
+  resume(hot?.data);
+  begin();
+}
+
 let last = performance.now();
-const motion = { heave: 0, pitch: 0, roll: 0 };
-const boatPos = new THREE.Vector3();
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
-const mixAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
-
-// Hold 60 frames a second: if frames run long for a while, render fewer pixels. Never below 1x.
-// It only ever steps down, so the picture cannot flicker between two sizes.
-let pixelRatio = Math.min(window.devicePixelRatio, 2);
-let frameCount = 0;
-const pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
-function keepPace(dtReal: number): void {
-  if (pace.warmup > 0) { pace.warmup -= dtReal; return; }
-  if (document.hidden || chart.isOpen) return;
-  pace.time += dtReal;
-  pace.frames++;
-  if (pace.time < 2) return;
-  const avg = pace.time / pace.frames;
-  pace.time = 0;
-  pace.frames = 0;
-  pace.slowWindows = avg > 1 / 50 ? pace.slowWindows + 1 : 0;
-  if (pace.slowWindows >= 2 && pixelRatio > 1) {
-    pace.slowWindows = 0;
-    pixelRatio = Math.max(1, pixelRatio - 0.25);
-    renderer.setPixelRatio(pixelRatio);
-    resize();
-  }
-}
-
 function frame(now: number): void {
-  const dtReal = Math.min(0.1, (now - last) / 1000);
+  const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  keepPace(dtReal);
-  const rate = TIME_RATES[rateIndex];
-
-  controls.update(dtReal, paused);
-
-  // Fixed steps. Faster time just means more of them per frame.
-  if (!paused) {
-    acc += dtReal * rate;
-    let steps = Math.floor(acc / SIM_DT);
-    acc -= steps * SIM_DT;
-    steps = Math.min(steps, 600);
-    for (let i = 0; i < steps; i++) {
-      if (i === steps - 1) before = after;
-      sim.step();
-      // Keep the track and mark arrivals honest at high time rates.
-      if (i % 30 === 0) passage.update(sim.state, sim.state.t);
-    }
-    if (steps > 0) {
-      after = grab(sim.state);
-      passage.update(sim.state, sim.state.t);
-      checkAlarms();
-      pilot.update();
-    }
-  }
-  const alpha = paused ? 1 : acc / SIM_DT;
-  const seaTime = sim.state.t + (alpha - 1) * SIM_DT;
-
-  // Blend between the last two steps so motion is smooth at any frame rate.
-  const heading = mixAngle(before.heading, after.heading, alpha);
-  const x = mix(before.x, after.x, alpha);
-  const z = -mix(before.y, after.y, alpha);
-
-  // The sea follows the hourly wind: slowly, as a real sea does.
-  const hourly = world.wind(sim.state.x, sim.state.y, sim.state.t);
-  seaKt += (hourly.speed / KT - seaKt) * Math.min(1, dtReal * rate * 0.004);
-  setSeaState(waves, seaKt);
-  ocean.setWaves(waves, hourly.dir, sim.out.tws / KT);
-
-  // Let the hull ride the long waves: heave, pitch and a little roll.
-  const fx = Math.sin(heading);
-  const fz = -Math.cos(heading);
-  const hBow = waveHeight(waves, x + fx * 4.2, z + fz * 4.2, seaTime);
-  const hStern = waveHeight(waves, x - fx * 4.2, z - fz * 4.2, seaTime);
-  const hStbd = waveHeight(waves, x - fz * 1.4, z + fx * 1.4, seaTime);
-  const hPort = waveHeight(waves, x + fz * 1.4, z - fx * 1.4, seaTime);
-  const hMid = waveHeight(waves, x, z, seaTime);
-  const ease = paused ? 0 : Math.min(1, dtReal * 5);
-  motion.heave += ((hBow + hStern + 2 * hMid) / 4 - motion.heave) * ease;
-  motion.pitch += (Math.atan2(hBow - hStern, 8.4) * 0.8 - motion.pitch) * ease;
-  motion.roll += (Math.atan2(hPort - hStbd, 2.8) * 0.5 - motion.roll) * ease;
-
-  const pose: BoatPose = {
-    x, z, heading,
-    heel: mix(before.heel, after.heel, alpha) + motion.roll,
-    pitch: motion.pitch,
-    heave: motion.heave - 0.03,
-    rudder: mix(before.rudder, after.rudder, alpha),
-    boom: mix(before.boomAngle, after.boomAngle, alpha),
-    jib: mix(before.jibAngle, after.jibAngle, alpha),
-  };
-  boatView.update(pose, sim.state, sim.out, seaTime, paused ? 0 : dtReal);
-  boatView.root.updateMatrixWorld(true);
-
-  traffic.update(sim.state.t, seaTime, waves);
-  for (const b of buoys) {
-    const c = world.current(b.x, b.y, sim.state.t);
-    b.update(waveHeight(waves, b.x, -b.y, seaTime), Math.atan2(c.x, c.y), Math.hypot(c.x, c.y), seaTime);
-  }
-
-  // Draw the other boats, tell them where this one is, and keep to the furthest-on clock.
-  const clockBehind = fleet.update(sim, world.seasonTime(sim.state.t), seaTime, waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
-  if (sharing()) {
-    paused = false;
-    if (rateIndex !== 0) { rateIndex = 0; hud.setRate(0); }
-    if (clockBehind > 1.5) world.shiftTime(clockBehind);
-  }
-
-  boatPos.set(x, pose.heave, z);
-  drone.update(dtReal, boatPos, heading, (px, pz) => waveHeight(waves, px, pz, seaTime, 6), boatView.solids, boatView.thin);
-
-  const shipTime = world.dateAt(sim.state.t);
-  sky.setTime(shipTime, course.origin.lat, course.origin.lon);
-  sky.follow(boatPos);
-  // Haze takes the colour of the low sky: pale by day, warm toward sunset, dark after.
-  const up = THREE.MathUtils.clamp(Math.sin(sky.elevation) * 3, 0, 1);
-  haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(sky.elevation) * 6 + 0.3, 0, 1));
-  ocean.setSun(sky.sunDir, sky.sunColor);
-  ocean.setShips(everyoneElse());
-  ocean.update(seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel });
-
-  const stream = world.current(sim.state.x, sim.state.y, sim.state.t);
-  hud.update(sim.state, sim.out, {
-    set: Math.atan2(stream.x, stream.y),
-    drift: Math.hypot(stream.x, stream.y),
-    height: world.tide(sim.state.t),
-    rate: world.tideRate(sim.state.t),
-    depth: sim.out.underKeel === null ? null : sim.out.underKeel + boatSpec.dimensions.draft,
-  }, shipTime, course.timeZone, paused, rate, dtReal, fleet.boats.length);
-  hud.setPilot(pilot.line());
-  boatView.setPilot({ engaged: pilot.engaged, mode: pilot.mode, label: pilot.label() });
-  chart.update(dtReal);
-  const loose = Math.max(sim.out.main.luff * 0.7 + (sim.out.main.flogging ? 0.3 : 0), sim.state.furl > 0.03 ? sim.out.jib.luff * 0.7 + (sim.out.jib.flogging ? 0.3 : 0) : 0);
-  sound.update(sim.out.aws / KT, sim.state.speed / KT, loose, paused);
-
-  // With the chart open the 3D view is mostly covered, so draw it only now and then.
-  frameCount++;
-  if (!chart.isOpen || frameCount % 6 === 0) renderer.render(scene, drone.camera);
+  if (session) session.frame(dt);
+  else lobby?.frame(dt);
   requestAnimationFrame(frame);
 }
-
 requestAnimationFrame((t) => {
   last = t;
   frame(t);
   document.getElementById('veil')?.classList.add('gone');
 });
-
-// When this page is republished while someone is sailing, hand the boat across so they carry on where they were.
-interface HotReload { snapshot?: (fn: () => unknown) => void; ready?: (fn: (data: unknown) => void) => void; data?: unknown }
-const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
-const resume = (saved: unknown): void => {
-  const state = (saved as { sim?: SimState } | undefined)?.sim;
-  if (!state || typeof state.tick !== 'number') return;
-  sim.restore(state);
-  before = after = grab(sim.state);
-  passage.replan({ x: sim.state.x, y: sim.state.y }, sim.state.t);
-};
-hot?.snapshot?.(() => ({ sim: sim.snapshot() }));
-if (hot?.ready) hot.ready(resume);
-else resume(hot?.data);
-
-// For play testing from the browser console.
-Object.assign(window, { slackTide: { scene, traffic, sim, world, passage, chart, pilot, fleet, drone, boatView, renderer, views: VIEWS, setPaused: (p: boolean) => { paused = p; } } });

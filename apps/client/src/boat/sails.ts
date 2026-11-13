@@ -24,7 +24,7 @@ type SailKind = 'main' | 'jib';
  * Sailcloth drawn on a canvas. Across the canvas is luff to leech, up the canvas is foot to head.
  * Seams, draft stripes, battens and numbers on the main, a sun-cover strip on the furling jib.
  */
-function sailTexture(kind: SailKind): THREE.CanvasTexture {
+function sailTexture(kind: SailKind, mark: string): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 1024;
@@ -82,7 +82,7 @@ function sailTexture(kind: SailKind): THREE.CanvasTexture {
       g.translate(W * 0.6, Y(v));
       g.scale(flip * 1.9, 1);
       g.font = '700 40px ui-sans-serif, "Helvetica Neue", Arial, sans-serif';
-      g.fillText('USA 3838', 0, 0);
+      g.fillText(`USA ${mark}${mark}`, 0, 0);
       g.restore();
     };
     number(0.655, 1);
@@ -97,7 +97,7 @@ function sailTexture(kind: SailKind): THREE.CanvasTexture {
     g.stroke();
     g.fillStyle = '#b22a35';
     g.font = '700 17px ui-sans-serif, Arial, sans-serif';
-    g.fillText('38', 0, 1);
+    g.fillText(mark, 0, 1);
     g.restore();
     // Headboard and tabling.
     g.fillStyle = 'rgba(60, 64, 70, 0.75)';
@@ -127,7 +127,7 @@ function sailTexture(kind: SailKind): THREE.CanvasTexture {
   return tex;
 }
 
-function makeSailMesh(nu: number, nv: number, kind: SailKind): THREE.Mesh {
+function makeSailMesh(nu: number, nv: number, kind: SailKind, mark: string): THREE.Mesh {
   const count = (nu + 1) * (nv + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -145,7 +145,7 @@ function makeSailMesh(nu: number, nv: number, kind: SailKind): THREE.Mesh {
   }
   g.setIndex(idx);
   const mat = new THREE.MeshStandardMaterial({
-    map: sailTexture(kind), color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
+    map: sailTexture(kind, mark), color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
     emissive: 0x6f6a5c, emissiveIntensity: 0.1,
   });
   // Sailcloth lets light through. When the sun is behind the sail, the side you are looking at glows with it.
@@ -190,15 +190,17 @@ export class Mainsail {
   /** Share of the luff hoisted, eased toward the reef setting. */
   private hoist = 1;
 
-  constructor(private readonly geo: SloopGeometry) {
-    this.mesh = makeSailMesh(this.nu, this.nv, 'main');
+  /** @param mark the boat's length in feet, for the class mark and sail number */
+  constructor(private readonly geo: SloopGeometry, mark = '38') {
+    this.mesh = makeSailMesh(this.nu, this.nv, 'main', mark);
     this.mesh.name = 'main';
   }
 
   /** Width of the sail at height v (0 foot, 1 head) for the full sail. */
   private chord(v: number): number {
     const foot = this.geo.mainFoot;
-    return THREE.MathUtils.lerp(foot, 0.22, v) + 0.95 * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
+    // Roach in proportion to the foot, so a small main and a big one have the same shape.
+    return THREE.MathUtils.lerp(foot, 0.22, v) + 0.2135 * foot * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
   }
 
   update(shape: SailShape, hoistTarget: number, time: number, dt: number): void {
@@ -251,7 +253,7 @@ export class Jib {
   private readonly nv = 22;
 
   constructor(private readonly geo: SloopGeometry) {
-    this.mesh = makeSailMesh(this.nu, this.nv, 'jib');
+    this.mesh = makeSailMesh(this.nu, this.nv, 'jib', '');
     this.mesh.name = 'jib';
   }
 

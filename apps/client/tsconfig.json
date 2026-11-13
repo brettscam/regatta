@@ -18,7 +18,8 @@
   "include": [
     "src",
     "../../boats/*.json",
-    "../../courses/*/course.json"
+    "../../courses/*/course.json",
+    "../../courses/*/starts.json"
   ],
   "references": [
     {

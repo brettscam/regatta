@@ -1,0 +1,31 @@
+[
+  {
+    "id": "sloop30",
+    "file": "sloop30.json",
+    "status": "ready"
+  },
+  {
+    "id": "sloop38",
+    "file": "sloop38.json",
+    "status": "ready"
+  },
+  {
+    "id": "perf45",
+    "file": "perf45.json",
+    "status": "ready"
+  },
+  {
+    "id": "cat42",
+    "status": "yard",
+    "name": "42 ft catamaran",
+    "lengthFt": 42,
+    "role": "No heel to warn you. Reef by the numbers"
+  },
+  {
+    "id": "blue50",
+    "status": "yard",
+    "name": "50 ft bluewater cruiser",
+    "lengthFt": 50,
+    "role": "Long passages and heavy weather"
+  }
+]

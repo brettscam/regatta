@@ -145,3 +145,75 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
   padding: 3px 9px; border-radius: 999px; background: rgba(9, 18, 24, 0.7); border: 1px solid var(--edge);
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
+
+/* ---- the way in: where, first sail, your boat -------------------------------------------------- */
+body.lobby .hud, body.lobby .tag { display: none; }
+.join[hidden], .coach[hidden] { display: none; }
+.join {
+  position: fixed; z-index: 4; left: var(--edge-left); top: var(--edge-top); bottom: var(--edge-bottom); width: min(440px, calc(100% - var(--edge-left) - var(--edge-right)));
+  display: flex; flex-direction: column; gap: 14px; padding: 22px 22px 18px;
+  background: rgba(9, 18, 24, 0.84); border: 1px solid var(--edge); border-radius: 14px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  user-select: text; -webkit-user-select: text;
+}
+.join header h1 { margin: 0; font-size: 30px; font-weight: 300; letter-spacing: 0.3em; text-transform: uppercase; }
+.join header p { margin: 8px 0 0; font-size: 12.5px; color: var(--dim); line-height: 1.4; }
+.join-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+.join-steps li { flex: 1; }
+.join-steps button {
+  width: 100%; display: flex; align-items: center; gap: 7px; padding: 7px 8px; font: inherit; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--dim); background: none; border: 0; border-bottom: 2px solid var(--edge); cursor: pointer; white-space: nowrap;
+}
+.join-steps button i { font-style: normal; font-variant-numeric: tabular-nums; width: 18px; height: 18px; border-radius: 50%; border: 1px solid currentColor; display: grid; place-items: center; font-size: 10.5px; flex: none; }
+.join-steps button[aria-current="step"] { color: var(--ink); border-bottom-color: var(--amber); }
+.join-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+.join h2 { margin: 2px 0 2px; font-size: 18px; font-weight: 600; text-wrap: balance; }
+.join .cards { display: flex; flex-direction: column; gap: 8px; }
+.join .card {
+  display: grid; gap: 3px; text-align: left; padding: 11px 13px; font: inherit; color: var(--ink); cursor: pointer;
+  background: rgba(238, 243, 244, 0.045); border: 1px solid var(--edge); border-radius: 10px;
+}
+.join .card:hover:not(:disabled) { background: rgba(238, 243, 244, 0.09); }
+.join .card[aria-pressed="true"] { border-color: var(--amber); background: rgba(255, 196, 107, 0.1); }
+.join .card b { font-size: 15px; font-weight: 600; }
+.join .card .sub { font-size: 12px; color: var(--dim); }
+.join .card .say { font-size: 13px; line-height: 1.4; color: rgba(238, 243, 244, 0.86); }
+.join .card .now { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.join .card.yard { cursor: default; opacity: 0.5; }
+.join .soon { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--dim); }
+.join .fit { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; margin-top: 4px; }
+.join .fit label, .join .fit .lab { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.join .fit input {
+  font: inherit; font-size: 15px; color: var(--ink); background: rgba(238, 243, 244, 0.07); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 10px; min-width: 0;
+  letter-spacing: 0.04em;
+}
+.join .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.join .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(238, 243, 244, 0.35); cursor: pointer; padding: 0; }
+.join .swatch[aria-pressed="true"] { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255, 196, 107, 0.35); }
+.join footer { display: flex; justify-content: space-between; gap: 10px; }
+.join footer button, .coach button {
+  font: inherit; font-size: 13.5px; font-weight: 600; padding: 9px 18px; border-radius: 9px; cursor: pointer;
+  color: var(--ink); background: rgba(238, 243, 244, 0.06); border: 1px solid var(--edge);
+}
+.join footer button.primary, .coach button.primary { color: #1a1205; background: var(--amber); border-color: var(--amber); }
+.join button:focus-visible, .join input:focus-visible, .coach button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .join { top: auto; height: min(64%, 560px); width: auto; right: var(--edge-right); padding: 16px 16px 14px; gap: 10px; }
+  .join header h1 { font-size: 22px; }
+  .join header p { display: none; }
+}
+
+/* ---- the first-sail coach: one prompt at a time ------------------------------------------------- */
+.coach {
+  /* Centred in the room to the left of the chart preview, so the two never overlap. */
+  position: fixed; z-index: 3; left: calc((100% - 252px) / 2); transform: translateX(-50%); bottom: calc(var(--edge-bottom) + 62px); width: min(520px, calc(100% - 300px));
+  padding: 14px 16px 12px; background: rgba(9, 18, 24, 0.86); border: 1px solid rgba(255, 196, 107, 0.45); border-radius: 12px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.coach.done { border-color: #86dba8; box-shadow: 0 0 0 3px rgba(134, 219, 168, 0.25); }
+.coach-step { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); display: flex; align-items: baseline; gap: 10px; }
+.coach-step b { font-size: 16px; letter-spacing: 0; text-transform: none; color: var(--ink); font-weight: 600; }
+.coach p { margin: 7px 0 10px; font-size: 14px; line-height: 1.45; }
+.coach-foot { display: flex; align-items: center; gap: 8px; }
+.coach-foot span { flex: 1; font-size: 12px; color: var(--amber); }
+.coach button { padding: 6px 12px; font-size: 12.5px; }
+@media (max-width: 760px) { .coach { left: 50%; width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 160px); } }

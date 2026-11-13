@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Sim, type BoatSpec, type Environment } from '@slack-tide/sim';
 import { BoatView, type BoatPose } from '../boat/boatView';
+import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 
@@ -31,6 +32,10 @@ interface Wire {
   t: number;
   /** This viewer's id from the platform, where it gives one, for looking up a name. */
   id?: string;
+  /** Which boat she is, her topsides colour and the name on her transom. */
+  boat?: string;
+  col?: string;
+  nm?: string;
 }
 
 interface RoomPeer {
@@ -66,17 +71,28 @@ export interface RemoteBoat {
   /** Seconds into the season on that boat's clock, run forward to now. */
   seasonTime: number;
   guest: boolean;
+  /** Length overall, metres. */
+  length: number;
+  /** The name on her transom. */
+  boatName: string;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
-const TINTS = [0x8f2f2a, 0x1f6b52, 0x6a4a1f, 0x4a2f6e, 0x2a5f7a];
+const HEX = /^#[0-9a-f]{6}$/i;
+/** What a boat tells the others about herself. */
+export interface Identity {
+  boat: string;
+  colour: string;
+  name: string;
+}
 
 class Remote implements RemoteBoat {
   readonly view: BoatView;
   readonly label = document.createElement('div');
   /** A sim used only as a holder for the state the view reads. It is never stepped. */
   private readonly holder: Sim;
-  name = 'Another boat';
+  name = '';
+  boatName = '';
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -85,18 +101,17 @@ class Remote implements RemoteBoat {
   private readonly motion = { heave: 0, pitch: 0 };
   private heel = 0;
 
-  constructor(readonly peer: string, spec: BoatSpec, env: Environment, index: number, scene: THREE.Scene) {
+  /** Which boat, colour and name this view was built for. A change means building her again. */
+  readonly identity: string;
+  readonly length: number;
+
+  constructor(readonly peer: string, spec: BoatSpec, who: Identity, env: Environment, scene: THREE.Scene) {
+    this.identity = `${who.boat}|${who.colour}|${who.name}`;
+    this.length = spec.dimensions.loa;
     this.holder = new Sim(spec, env, {});
-    this.view = new BoatView(spec);
-    // Each visiting boat gets her own topsides colour so the fleet can be told apart.
-    const hull = this.view.model.nodes.hull as THREE.Mesh | undefined;
-    if (hull) {
-      const mat = (hull.material as THREE.MeshStandardMaterial).clone();
-      mat.map = null;
-      mat.color.setHex(TINTS[index % TINTS.length]);
-      mat.needsUpdate = true;
-      hull.material = mat;
-    }
+    // She arrives in her own colours with her own name on the transom.
+    this.view = new BoatView(spec, { topsides: HEX.test(who.colour) ? who.colour : undefined, name: who.name || undefined });
+    this.boatName = who.name;
     scene.add(this.view.root);
     this.label.className = 'boat-label';
     document.body.appendChild(this.label);
@@ -175,7 +190,9 @@ class Remote implements RemoteBoat {
     const shown = this.pos.z < 1 && Math.abs(this.pos.x) < 1.1 && Math.abs(this.pos.y) < 1.1;
     this.label.style.display = shown ? 'block' : 'none';
     if (shown) {
-      const text = `${this.name} · ${(this.sog / 0.514444).toFixed(1)} kt`;
+      // The person's name where the platform gives one, and the boat's.
+      const who = [this.name, this.boatName].filter(Boolean).join(' · ') || 'Another boat';
+      const text = `${who} · ${(this.sog / 0.514444).toFixed(1)} kt`;
       if (this.label.textContent !== text) this.label.textContent = text;
       this.label.style.transform = `translate(-50%, -100%) translate(${Math.round(((this.pos.x + 1) / 2) * width)}px, ${Math.round(((1 - this.pos.y) / 2) * height)}px)`;
     }
@@ -196,9 +213,8 @@ export class Fleet {
   private readonly remotes = new Map<string, Remote>();
   private sendClock = 0;
   private nameClock = 0;
-  private count = 0;
 
-  constructor(private readonly spec: BoatSpec, private readonly env: Environment, private readonly scene: THREE.Scene) {}
+  constructor(private readonly yard: Record<string, YardBoat>, private readonly me: Identity, private readonly env: Environment, private readonly scene: THREE.Scene) {}
 
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
@@ -228,10 +244,19 @@ export class Fleet {
       if (p.sameTab || p.kind !== 'viewer') continue;
       if (typeof p.presence?.x !== 'number') continue;
       seen.add(p.peer);
+      // What she says she is. All of it is another page's word, so check it before using it.
+      const v = p.presence;
+      const boat = typeof v.boat === 'string' && this.yard[v.boat] ? v.boat : this.me.boat;
+      const who: Identity = { boat, colour: typeof v.col === 'string' ? v.col : '', name: typeof v.nm === 'string' ? v.nm.slice(0, 24) : '' };
       let r = this.remotes.get(p.peer);
+      if (r && r.identity !== `${who.boat}|${who.colour}|${who.name}`) {
+        r.dispose(this.scene);
+        this.remotes.delete(p.peer);
+        r = undefined;
+      }
       if (!r) {
         if (this.remotes.size >= 8) continue;
-        r = new Remote(p.peer, this.spec, this.env, this.count++, this.scene);
+        r = new Remote(p.peer, this.yard[who.boat], who, this.env, this.scene);
         this.remotes.set(p.peer, r);
         this.nameClock = 0;
       }
@@ -274,6 +299,9 @@ export class Fleet {
         furl: Math.round(s.furl * 100) / 100, reef: s.reef, t: Math.round(seasonTime * 10) / 10,
       };
       if (this.myId) wire.id = this.myId;
+      wire.boat = this.me.boat;
+      wire.col = this.me.colour;
+      wire.nm = this.me.name;
       this.room.presence(wire as unknown as Record<string, unknown>).catch(() => {});
     }
 

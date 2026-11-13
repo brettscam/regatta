@@ -13,7 +13,6 @@ const UPPER_ARM = 0.3;
 const FOREARM = 0.29;
 const TORSO = 0.54;
 const ANKLE = 0.07;
-const WHEEL_RADIUS = 0.52;
 
 const Y = new THREE.Vector3(0, 1, 0);
 const clamp = THREE.MathUtils.clamp;
@@ -261,7 +260,7 @@ export class Crew {
     const follow = clamp(-wheelTurn * 0.22, -0.4, 0.4);
     const shift = follow - lean * 1.3;
     const grip = (angle: number, o: THREE.Vector3) =>
-      o.set(geo.wheel.x + Math.sin(angle) * WHEEL_RADIUS, geo.wheel.y + Math.cos(angle) * WHEEL_RADIUS, geo.wheel.z + 0.055);
+      o.set(geo.wheel.x + Math.sin(angle) * geo.wheelRadius, geo.wheel.y + Math.cos(angle) * geo.wheelRadius, geo.wheel.z + 0.055);
     grip(-1.05 + shift, f.handL);
     grip(1.05 + shift, f.handR);
     f.elbowHintL.set(-0.6, -1, 0.35);
@@ -277,7 +276,7 @@ export class Crew {
     const f = this.trim;
     const geo = this.model.geo;
     const sole = geo.cockpitSoleY;
-    const seat = sole + 0.42;
+    const seat = geo.seatY;
     const c = this.across;
     const e = c * (1.5 - 0.5 * c * c); // eased, still -1 to +1
     const mid = 1 - e * e; // 1 half way across, 0 seated
@@ -289,8 +288,8 @@ export class Crew {
     f.fwd.set(-e, 0, -0.45 - 0.9 * mid).normalize();
     f.right.crossVectors(f.fwd, Y).normalize();
 
-    const z = geo.wheel.z - 1.48;
-    f.pelvis.set(0.77 * e, THREE.MathUtils.lerp(seat + 0.115, sole + 0.6, mid), z - 0.25 * mid);
+    const z = geo.trimmerZ;
+    f.pelvis.set(geo.seatX * e, THREE.MathUtils.lerp(seat + 0.115, sole + 0.6, mid), z - 0.25 * mid);
     f.neck.copy(f.pelvis).addScaledVector(f.up, TORSO - 0.02 - 0.06 * mid + Math.sin(time * 1.45 + 1) * 0.005);
     f.neck.addScaledVector(f.fwd, 0.05 + 0.24 * mid);
 

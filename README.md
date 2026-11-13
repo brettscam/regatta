@@ -1,8 +1,18 @@
-# Slack Tide (working title)
+# Regatta
 
 A realistic 3D sailing simulator that runs in the browser. You sail by handling the boat itself: point at a part and scroll, or drag it. The full plan is in [docs/PRD.md](docs/PRD.md).
 
 **Status: milestone 1 built and waiting on its play test, with the chart, forecast and tide pulled forward from milestone 3 at the owner's request.** One 38 ft sloop on Central San Francisco Bay, replaying NOAA's wind, tidal stream and tide from 14 and 15 July 2024.
+
+## The way in
+
+Opening the game asks three things, with the real water behind the panel showing each choice as it is made:
+
+1. **Where**: four starts on the Central Bay, each with its own route and the wind and stream there right now
+2. **First sail**: an optional lesson. One prompt at a time, each ticked off by doing it: look around, find the wind, take the wheel, trim the main, trim the jib, tack, hand over to the pilot, open the chart. Every control works throughout and it can be ended at any point
+3. **Your boat**: a 30 ft sloop, the 38, or a 45 ft performance cruiser, with a name for the transom and a colour for the topsides. In company, the others see your boat as you fitted her out
+
+Starts are data in `courses/sf-bay/starts.json`. Boats are data files in `boats/`, listed in `boats/lineup.json`. For play testing, `?go=1` skips the join screen, with `&spot=gate&boat=perf45&tutorial=1` to choose.
 
 ## Run it
 
@@ -77,7 +87,7 @@ There is other traffic on the Bay too: ferries, a ship in the channel and a few 
 - **Forecast timeline** (under the chart): wind, tide height and the stream through the Golden Gate for the next day. Drag it to look ahead and the chart shows the forecast stream and wind for that time. Double-click it to come back to now
 - **Alarms**: shallow water, aground and each mark reached. An alarm drops time back to real speed
 
-Play-test options go in the address: `?start=20` begins 20 hours into the season instead of 2.5, and `?x=1300&y=250&hdg=293` sets the starting position in metres from the course origin and the heading.
+Play-test options go in the address: `?go=1` skips the join screen, `?start=20` begins 20 hours into the season instead of 2.5, and `?x=1300&y=250&hdg=293` sets the starting position in metres from the course origin and the heading.
 
 ## How it is built
 

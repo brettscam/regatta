@@ -1,0 +1,297 @@
+{
+  "id": "sloop30",
+  "name": "30 ft sloop",
+  "lengthFt": 30,
+  "tagline": "Light on the helm and quick to forgive",
+  "role": "Starter",
+  "defaultName": "Piper",
+  "homePort": "Berkeley",
+  "topsides": "#ece8dc",
+  "notes": "Generic 30 ft sloop, the forgiving starter. All figures approximate and open to tuning. The polar is the 38's scaled by the square root of waterline length, a little kinder in light air.",
+  "dimensions": {
+    "loa": 9.1,
+    "lwl": 8.1,
+    "beam": 3.1,
+    "draft": 1.6,
+    "freeboard": 0.98,
+    "displacementKg": 4200,
+    "mastHeight": 12.9,
+    "boomLength": 3.7,
+    "boomHeight": 1.3,
+    "mastFromBow": 3.5,
+    "jibFoot": 3.95,
+    "forestayHeight": 11.7
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail, flat water",
+    "twa": [
+      0,
+      25,
+      32,
+      40,
+      52,
+      60,
+      75,
+      90,
+      110,
+      120,
+      135,
+      150,
+      165,
+      180
+    ],
+    "tws": [
+      0,
+      6,
+      10,
+      14,
+      20,
+      25,
+      30
+    ],
+    "speeds": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.93,
+        3.07,
+        4.03,
+        4.38,
+        4.65,
+        4.65,
+        4.47,
+        4.21,
+        3.6,
+        2.98,
+        2.55,
+        2.28
+      ],
+      [
+        0.0,
+        0.0,
+        2.91,
+        4.54,
+        5.39,
+        5.64,
+        5.91,
+        5.99,
+        5.99,
+        5.82,
+        5.3,
+        4.62,
+        4.1,
+        3.76
+      ],
+      [
+        0.0,
+        0.0,
+        3.27,
+        5.03,
+        5.79,
+        6.04,
+        6.29,
+        6.46,
+        6.63,
+        6.54,
+        6.12,
+        5.62,
+        5.12,
+        4.86
+      ],
+      [
+        0.0,
+        0.0,
+        3.44,
+        5.29,
+        6.04,
+        6.29,
+        6.63,
+        6.87,
+        7.21,
+        7.3,
+        7.04,
+        6.63,
+        6.2,
+        5.96
+      ],
+      [
+        0.0,
+        0.0,
+        3.52,
+        5.37,
+        6.12,
+        6.46,
+        6.8,
+        7.13,
+        7.55,
+        7.8,
+        7.71,
+        7.38,
+        6.87,
+        6.63
+      ],
+      [
+        0.0,
+        0.0,
+        3.52,
+        5.37,
+        6.12,
+        6.46,
+        6.84,
+        7.19,
+        7.68,
+        7.99,
+        7.99,
+        7.72,
+        7.24,
+        6.97
+      ]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 24,
+      "reefs": [
+        {
+          "name": "Full main",
+          "drive": 1.0,
+          "heel": 1.0,
+          "luff": 1.0
+        },
+        {
+          "name": "Reef 1",
+          "drive": 0.78,
+          "heel": 0.47,
+          "luff": 0.8
+        },
+        {
+          "name": "Reef 2",
+          "drive": 0.6,
+          "heel": 0.22,
+          "luff": 0.62
+        }
+      ],
+      "sheetMinDeg": 3,
+      "sheetMaxDeg": 85
+    },
+    "jib": {
+      "areaM2": 22,
+      "sheetHardDeg": 8,
+      "sheetMaxSlackDeg": 80
+    }
+  },
+  "heel": {
+    "comment": "Phase 1 empirical heel law: degrees = max(0, perKnot * AWS - offset) * pointOfSail * sailFactors. Replaced by the righting curve in phase 2.",
+    "perKnot": 1.24,
+    "offset": 8.0,
+    "mainShare": 0.55,
+    "jibShare": 0.45,
+    "penaltyStartDeg": 20,
+    "penaltyPerDeg": 0.03,
+    "penaltyFloor": 0.55,
+    "rudderFadeStartDeg": 28,
+    "rudderFadeRangeDeg": 10,
+    "maxDeg": 48
+  },
+  "rightingCurve": {
+    "comment": "GZ in metres by heel angle. Unused by the phase 1 model, kept here for the phase 2 force model.",
+    "deg": [
+      0,
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      90,
+      120
+    ],
+    "gz": [
+      0,
+      0.32,
+      0.58,
+      0.76,
+      0.86,
+      0.9,
+      0.88,
+      0.55,
+      0
+    ]
+  },
+  "helm": {
+    "maxRudderDeg": 35,
+    "turnGain": 0.176,
+    "rudderDrag": 0.03
+  },
+  "controls": [
+    {
+      "node": "wheel",
+      "control": "rudder",
+      "label": "Wheel",
+      "view": "helm",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyA",
+          "ArrowLeft"
+        ],
+        "inc": [
+          "KeyD",
+          "ArrowRight"
+        ]
+      }
+    },
+    {
+      "node": "boom",
+      "control": "mainsheet",
+      "label": "Mainsheet",
+      "view": "mast",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyW"
+        ],
+        "inc": [
+          "KeyS"
+        ]
+      }
+    },
+    {
+      "node": "winch_port",
+      "control": "jibsheet_port",
+      "label": "Port jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "winch_stbd",
+      "control": "jibsheet_stbd",
+      "label": "Starboard jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "autopilot",
+      "control": "pilot",
+      "label": "Autopilot",
+      "view": "helm",
+      "stepDeg": 1
+    }
+  ]
+}

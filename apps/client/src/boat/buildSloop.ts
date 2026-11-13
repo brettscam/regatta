@@ -3,10 +3,32 @@ import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { BoatSpec } from '@slack-tide/sim';
 
 /**
- * The milestone 1 placeholder sloop, built in code.
+ * A sloop built in code from a boat file, for any boat in the lineup from 30 to 45 feet.
  * Boat frame: +X starboard, +Y up, -Z forward. The origin is on the waterline amidships.
  * Every part a control binds to is a named node, exactly as the glTF model that replaces this will have.
+ * What belongs to the boat scales with her length and beam. What belongs to people (seat height, lifelines,
+ * the companionway, winches) stays the size of a person.
  */
+
+/** How one particular boat is painted and named. Anything left out comes from the boat file. */
+export interface Livery {
+  /** Hull colour above the boot stripe, as a CSS hex colour. */
+  topsides?: string;
+  /** Name across the transom. */
+  name?: string;
+  /** Hailing port under the name. */
+  homePort?: string;
+}
+
+/** Fields a boat file carries for the boat picker and for her default livery. The sim ignores them. */
+export interface BoatDisplay {
+  lengthFt: number;
+  tagline: string;
+  role: string;
+  defaultName: string;
+  homePort: string;
+  topsides: string;
+}
 export interface SloopModel {
   root: THREE.Group;
   nodes: Record<string, THREE.Object3D>;
@@ -38,6 +60,16 @@ export interface SloopGeometry {
   vangBase: THREE.Vector3;
   wheel: THREE.Vector3;
   cockpitSoleY: number;
+  wheelRadius: number;
+  /** Middle of the cockpit seat, metres off the centreline. */
+  seatX: number;
+  /** Top of the cockpit seats. */
+  seatY: number;
+  /** Where the trimmer sits, fore and aft. */
+  trimmerZ: number;
+  /** Fore and aft ends of the cockpit well. */
+  cockpitFwdZ: number;
+  cockpitAftZ: number;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -152,8 +184,24 @@ function nonSkidTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-export function buildSloop(spec: BoatSpec): SloopModel {
+/** Perceived brightness of a CSS hex colour, 0 to 1. */
+function brightness(hex: string): number {
+  const c = new THREE.Color(hex);
+  return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+}
+
+export function buildSloop(spec: BoatSpec, livery: Livery = {}): SloopModel {
   const d = spec.dimensions;
+  const display = spec as BoatSpec & Partial<BoatDisplay>;
+  const topsides = livery.topsides ?? display.topsides ?? '#12233d';
+  const boatName = (livery.name ?? display.defaultName ?? spec.name).trim().toUpperCase().slice(0, 24) || 'REGATTA';
+  const homePort = (livery.homePort ?? display.homePort ?? '').trim().toUpperCase().slice(0, 24);
+  const darkHull = brightness(topsides) < 0.45;
+  /** Her size against the 38-footer these lines were first drawn for. */
+  const k = d.loa / 11.6;
+  /** Her freeboard against the 38's. */
+  const fb = d.freeboard / 1.15;
+  const clampTo = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   const root = new THREE.Group();
   root.name = spec.id;
   const nodes: Record<string, THREE.Object3D> = {};
@@ -184,20 +232,21 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   const halfBeam = (t: number) => {
     if (t <= 0.58) return B * Math.pow(Math.sin((Math.max(t, 0) / 0.58) * (Math.PI / 2)), 0.82);
     const v = (t - 0.58) / 0.42;
-    return B - (B - 1.48) * v * v;
+    return B - B * 0.221 * v * v;
   };
-  const sheerY = (t: number) => d.freeboard - 0.15 + 0.38 * Math.pow(1 - t, 2.4) + 0.03 * t;
+  const sheerY = (t: number) => d.freeboard - 0.15 + 0.38 * k * Math.pow(1 - t, 2.4) + 0.03 * t;
   const keelY = spline([
-    [0, 1.3], [0.015, 0.75], [0.04, 0.12], [0.08, -0.16], [0.18, -0.36], [0.33, -0.5],
-    [0.5, -0.53], [0.66, -0.45], [0.8, -0.28], [0.92, -0.03], [1, 0.24],
+    [0, sheerY(0) - 0.08], [0.015, 0.75 * fb], [0.04, 0.12 * fb], [0.08, -0.16 * k], [0.18, -0.36 * k], [0.33, -0.5 * k],
+    [0.5, -0.53 * k], [0.66, -0.45 * k], [0.8, -0.28 * k], [0.92, -0.03 * k], [1, 0.24 * k],
   ]);
 
   // ---- materials ----------------------------------------------------------------------------------
-  const HULL_V0 = -0.8;
-  const HULL_VH = 2.4;
+  const HULL_V0 = -1.0;
+  const HULL_VH = 3.4;
   const v = (y: number) => (y - HULL_V0) / HULL_VH;
   const hullMat = new THREE.MeshPhysicalMaterial({
-    map: bandTexture([[0, '#5c1d1a'], [v(-0.02), '#e9e6dc'], [v(0.09), '#12233d']]),
+    // Antifouling, a boot stripe that stands out from the topsides, then the topsides colour she was given.
+    map: bandTexture([[0, '#5c1d1a'], [v(-0.02), darkHull ? '#e9e6dc' : '#12233d'], [v(0.09), topsides]], 1024),
     roughness: 0.28, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.2,
   });
   const white = new THREE.MeshStandardMaterial({ color: 0xeeece4, roughness: 0.55 });
@@ -304,33 +353,47 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       c.clearRect(0, 0, w, h);
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillStyle = '#d9b869';
-      c.font = '600 118px Georgia, "Times New Roman", serif';
-      c.fillText('SLACK TIDE', w / 2, 92);
-      c.font = '500 54px Georgia, "Times New Roman", serif';
-      c.fillText('S A U S A L I T O', w / 2, 204);
+      // Gold leaf on a dark hull, navy on a light one. A long name is set smaller so it still fits.
+      c.fillStyle = darkHull ? '#d9b869' : '#16284a';
+      const fit = (text: string, size: number, weight: number, maxWidth: number): void => {
+        c.font = `${weight} ${size}px Georgia, "Times New Roman", serif`;
+        const wide = c.measureText(text).width;
+        if (wide > maxWidth) c.font = `${weight} ${Math.floor((size * maxWidth) / wide)}px Georgia, "Times New Roman", serif`;
+      };
+      fit(boatName, 118, 600, w - 60);
+      c.fillText(boatName, w / 2, 92);
+      const port = homePort.split('').join(' ');
+      fit(port, 54, 500, w - 120);
+      c.fillText(port, w / 2, 204);
     });
-    const name = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.425), new THREE.MeshStandardMaterial({ map: nameTex, transparent: true, alphaTest: 0.35, roughness: 0.45, metalness: 0.3 }));
-    name.position.set(0, (tSy + Math.max(tKy, 0.3)) / 2 + 0.06, zAt(1) + 0.006);
+    const nameWidth = 2 * halfBeam(1) * 0.575;
+    const name = new THREE.Mesh(new THREE.PlaneGeometry(nameWidth, nameWidth / 4), new THREE.MeshStandardMaterial({ map: nameTex, transparent: true, alphaTest: 0.35, roughness: 0.45, metalness: darkHull ? 0.3 : 0 }));
+    name.position.set(0, (tSy + Math.max(tKy, 0.3 * k)) / 2 + 0.06, zAt(1) + 0.006);
     name.name = 'transom_name';
     root.add(name);
   }
 
   // ---- deck, cabin and cockpit, lofted as one skin ------------------------------------------------
+  // The cockpit is sized for people: never shorter than 2.5 m, never longer than 3.3 m, whatever the boat.
+  const cockpitLength = clampTo(0.258 * L, 2.5, 3.3);
   const T_CABIN0 = 0.285;
-  const T_CABIN1 = 0.655;
-  const T_COCK0 = 0.672;
   const T_COCK1 = 0.93;
+  const T_COCK0 = T_COCK1 - cockpitLength / L;
+  const T_CABIN1 = T_COCK0 - 0.017;
+  /** A station part of the way along the cockpit: 0 at its forward end, 1 at its aft end. */
+  const cockpitT = (f: number) => lerp(T_COCK0, T_COCK1, f);
+  const SIDE_DECK = clampTo(lerp(0.365, 0.465, (L - 9.1) / 4.6), 0.36, 0.47);
   type Regime = 'deck' | 'cabin' | 'cockpit';
   const cabinRise = (t: number) => 0.46 * smooth(T_CABIN0, T_CABIN0 + 0.09, t) + 0.05 * smooth(0.4, 0.65, t);
-  const cabinHalfWidth = (t: number) => Math.min(halfBeam(t) - 0.42, 1.12);
+  const cabinHalfWidth = (t: number) => Math.min(halfBeam(t) - SIDE_DECK, B * 0.59);
   const cabinTopY = (t: number) => sheerY(t) + 0.07 + cabinRise(t);
-  const SOLE_DROP = 0.5;
-  const SEAT_DROP = 0.08;
+  // Seats are 0.42 m above the sole on every boat. A boat with more freeboard has a deeper, more sheltered cockpit.
+  const SOLE_DROP = clampTo(0.5 * fb, 0.44, 0.56);
+  const SEAT_DROP = SOLE_DROP - 0.42;
   const COAMING = 0.2;
-  const WELL = 0.5;
-  const COAM_IN = 1.0;
-  const COAM_OUT = 1.16;
+  const COAM_IN = clampTo(0.526 * B, 0.86, 1.2);
+  const COAM_OUT = COAM_IN + 0.16;
+  const WELL = COAM_IN * 0.5;
 
   /** Height of the coachroof at a station and a distance off the centreline: crowned, highest in the middle. */
   const cabinCrownY = (t: number, x: number) => cabinTopY(t) + 0.085 * (1 - Math.min(1, Math.abs(x) / cabinHalfWidth(t)) ** 2);
@@ -472,8 +535,10 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       const bowTop = new THREE.Vector3(0, sheerY(0) + 0.66, zAt(0.004));
       const sternCorner = new THREE.Vector3(side * (halfBeam(1) - 0.08), sheerY(1) + 0.62, zAt(0.995));
       const sternMid = new THREE.Vector3(0, sheerY(1) + 0.62, zAt(0.998));
-      rails.add(tube([bowTop, new THREE.Vector3(side * 0.34, sheerY(0.06) + 0.64, zAt(0.06)), tops[0]], 0.013, steel));
-      rod(new THREE.Vector3(side * 0.3, sheerY(0.05), zAt(0.05)), new THREE.Vector3(side * 0.3, sheerY(0.05) + 0.64, zAt(0.055)), 0.013, steel, rails);
+      const pulpitX = Math.min(0.34, halfBeam(0.06) - 0.03);
+      const legX = Math.min(0.3, halfBeam(0.05) - 0.04);
+      rails.add(tube([bowTop, new THREE.Vector3(side * pulpitX, sheerY(0.06) + 0.64, zAt(0.06)), tops[0]], 0.013, steel));
+      rod(new THREE.Vector3(side * legX, sheerY(0.05), zAt(0.05)), new THREE.Vector3(side * legX, sheerY(0.05) + 0.64, zAt(0.055)), 0.013, steel, rails);
       rails.add(tube([tops[tops.length - 1], sternCorner, sternMid], 0.013, steel));
       rod(new THREE.Vector3(sternCorner.x, sheerY(1), sternCorner.z), sternCorner, 0.013, steel, rails);
       rails.add(tube(tops, 0.005, steel));
@@ -485,19 +550,23 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   // ---- keel and rudder ----------------------------------------------------------------------------
   {
     const keel = add('keel', new THREE.Group());
-    const fin = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.72, 1.5, 20), foilMat);
-    fin.scale.set(0.09, 1, 0.85);
-    fin.position.set(0, -1.2, -0.35);
+    // The fin runs from the bottom of the hull down to the bulb, which sits at her full draft.
+    const finTop = -0.45 * k;
+    const finHeight = Math.max(0.4, d.draft - 0.05 + finTop);
+    const fin = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.72, finHeight, 20), foilMat);
+    fin.scale.set(0.09 * k, 1, 0.85 * k);
+    fin.position.set(0, finTop - finHeight / 2, -0.35 * k);
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), foilMat);
-    bulb.scale.set(0.2, 0.18, 1.15);
-    bulb.position.set(0, -d.draft + 0.16, -0.25);
+    bulb.scale.set(0.2 * k, 0.18 * k, 1.15 * k);
+    bulb.position.set(0, -d.draft + 0.16 * k, -0.25 * k);
     keel.add(fin, bulb);
 
     const rudder = add('rudder', new THREE.Group());
     rudder.position.set(0, 0, zAt(0.9));
-    const blade = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.6, 1.55, 16), foilMat);
-    blade.scale.set(0.05, 1, 0.3);
-    blade.position.set(0, -0.82, 0.12);
+    const bladeHeight = 1.55 * (d.draft / 2.0) * 0.98;
+    const blade = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.6, bladeHeight, 16), foilMat);
+    blade.scale.set(0.05 * k, 1, 0.3 * k);
+    blade.position.set(0, -0.045 - bladeHeight / 2, 0.12);
     rudder.add(blade);
   }
 
@@ -511,7 +580,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   {
     const mastGroup = add('mast', new THREE.Group());
     const h = mastTopY - mastBaseY;
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, h, 14), alloy);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * Math.sqrt(k), 0.105 * Math.sqrt(k), h, 14), alloy);
     mast.scale.z = 1.4;
     mast.position.set(0, mastBaseY + h / 2, mastZ);
     mast.castShadow = true;
@@ -520,7 +589,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     proxy('mast', new THREE.CylinderGeometry(0.3, 0.3, 4.5, 8), mastGroup, new THREE.Vector3(0, mastBaseY + 3.6, mastZ));
 
     const chain = (side: number) => new THREE.Vector3(side * (halfBeam(mastT + 0.02) - 0.1), sheerY(mastT) + 0.03, mastZ + 0.28);
-    const spreaders = [{ y: mastBaseY + (mastTopY - mastBaseY) * 0.34, w: 0.98 }, { y: mastBaseY + (mastTopY - mastBaseY) * 0.64, w: 0.74 }];
+    const spreaders = [{ y: mastBaseY + (mastTopY - mastBaseY) * 0.34, w: 0.516 * B }, { y: mastBaseY + (mastTopY - mastBaseY) * 0.64, w: 0.39 * B }];
     for (const side of [-1, 1]) {
       const tips = spreaders.map((s) => new THREE.Vector3(side * s.w, s.y, mastZ + 0.2));
       spreaders.forEach((s, i) => {
@@ -604,7 +673,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       const batten = rod(new THREE.Vector3(side * 0.135, 0.305, 0.35), new THREE.Vector3(side * 0.135, 0.305, d.boomLength - 0.25), 0.012, cover, boom);
       batten.castShadow = true;
       const top = jackTop.clone().setX(side * 0.05);
-      const mid = new THREE.Vector3(side * 0.12, 1.55, d.boomLength * 0.42);
+      const mid = new THREE.Vector3(side * 0.12, (mastTopY - gooseneck.y) * 0.116, d.boomLength * 0.42);
       rod(top, mid, 0.003, white, boom);
       for (const f of [0.26, 0.52, 0.8]) rod(mid, new THREE.Vector3(side * 0.135, 0.31, d.boomLength * f), 0.003, white, boom);
     }
@@ -617,9 +686,11 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   }
 
   // ---- cockpit: wheel, pedestal, winches ----------------------------------------------------------
-  const tWheel = 0.845;
+  const tWheel = cockpitT(0.67);
   const soleY = sheerY(tWheel) - SOLE_DROP;
   const wheelPos = new THREE.Vector3(0, soleY + 0.98, zAt(tWheel));
+  // A bigger boat wants more leverage at the helm, within what a person can reach across.
+  const WHEEL_R = clampTo(0.52 * Math.sqrt(k), 0.44, 0.6);
   {
     const pedestal = new THREE.Group();
     pedestal.name = 'pedestal';
@@ -663,7 +734,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
 
     const wheel = add('wheel', new THREE.Group());
     wheel.position.copy(wheelPos);
-    const R = 0.52;
+    const R = WHEEL_R;
     const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.021, 10, 48), steel);
     rim.userData.glow = true;
     wheel.add(rim);
@@ -684,7 +755,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     proxy('wheel', new THREE.CylinderGeometry(R + 0.12, R + 0.12, 0.34, 20).rotateX(Math.PI / 2), wheel);
   }
 
-  const tWinch = 0.76;
+  const tWinch = cockpitT(0.34);
   const winchY = sheerY(tWinch) + COAMING;
   const winchX = (COAM_IN + COAM_OUT) / 2;
   const winchAt = (side: number) => new THREE.Vector3(side * winchX, winchY, zAt(tWinch));
@@ -752,7 +823,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       details.add(trim);
     }
     const hatch = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.035, 0.8), smoked);
-    hatch.position.set(0, cabinCrownY(T_CABIN1 - 0.035, 0) + 0.022, zAt(T_CABIN1 - 0.036));
+    hatch.position.set(0, cabinCrownY(T_CABIN1 - 0.42 / L, 0) + 0.022, zAt(T_CABIN1) - 0.42);
     details.add(way, hatch);
     // Portlights along the cabin sides: smoked glass in bright frames.
     for (const side of [-1, 1]) {
@@ -791,7 +862,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     const tails = [0xb5332a, 0x2a56a0, 0xe8e4d8];
     for (const side of [-1, 1]) {
       const wx = side * 0.5;
-      const wt = T_CABIN1 - 0.022;
+      const wt = T_CABIN1 - 0.255 / L;
       const winch = new THREE.Group();
       winch.position.set(wx, cabinCrownY(wt, wx), zAt(wt));
       const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.062, 0.1, 16), steel);
@@ -799,7 +870,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.055, 0.025, 16), steel);
       cap.position.y = 0.122;
       winch.add(drum, cap);
-      const ct = T_CABIN1 - 0.052;
+      const ct = T_CABIN1 - 0.6 / L;
       const clutch = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.055, 0.13), black);
       clutch.position.set(wx, cabinCrownY(ct, wx) + 0.03, zAt(ct));
       details.add(winch, clutch);
@@ -818,8 +889,8 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     const canvasCloth = new THREE.MeshStandardMaterial({ color: 0x1b2d4a, roughness: 0.95, side: THREE.DoubleSide });
     const vinyl = new THREE.MeshPhysicalMaterial({ color: 0x8fa6b2, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
     const zAft = zAt(T_CABIN1) + 0.1;
-    const zFore = zAft - 1.2;
-    const DODGER_HALF = 0.98;
+    const zFore = zAft - clampTo(0.103 * L, 1.0, 1.3);
+    const DODGER_HALF = cabinHalfWidth(T_CABIN1 - 0.01) - 0.14;
     const dodgerPoint = (u: number, v: number, lift: number): [number, number, number] => {
       const x = DODGER_HALF * u;
       const z = lerp(zFore, zAft, v) - 0.24 * (1 - u * u) * Math.pow(1 - v, 1.5);
@@ -867,7 +938,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     });
     [['DEPTH', '24.0', 'm'], ['SPEED', '5.8', 'kt']].forEach(([label, value, unit], i) => {
       const bezel = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.135, 0.03), black);
-      bezel.position.set(-0.5 - i * 0.16, bulkheadY + 0.33, bulkheadZ + 0.012);
+      bezel.position.set(-Math.min(0.5, cabinHalfWidth(T_CABIN1 - 0.005) - 0.4) - i * 0.16, bulkheadY + 0.33, bulkheadZ + 0.012);
       const face = new THREE.Mesh(new THREE.PlaneGeometry(0.108, 0.108), new THREE.MeshBasicMaterial({ map: dialTex(label, value, unit), toneMapped: false }));
       face.position.set(bezel.position.x, bezel.position.y, bulkheadZ + 0.0285);
       details.add(bezel, face);
@@ -878,7 +949,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
   // Autopilot control head, to starboard of the companionway. Its screen is drawn by the boat view.
   {
     const pilot = add('autopilot', new THREE.Group());
-    pilot.position.set(0.8, bulkheadY + 0.33, bulkheadZ + 0.02);
+    pilot.position.set(Math.min(0.8, cabinHalfWidth(T_CABIN1 - 0.005) - 0.2), bulkheadY + 0.33, bulkheadZ + 0.02);
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.18, 0.04), black);
     body.userData.glow = true;
     const screen = add('autopilot_screen', new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.11), new THREE.MeshBasicMaterial({ color: 0x0a1a1f })), pilot);
@@ -972,7 +1043,7 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     root.add(gear);
   }
 
-  const tTrav = 0.79;
+  const tTrav = cockpitT(0.457);
   const geo: SloopGeometry = {
     mastZ,
     mastTopY,
@@ -994,6 +1065,12 @@ export function buildSloop(spec: BoatSpec): SloopModel {
     vangBase: new THREE.Vector3(0, mastBaseY + 0.12, mastZ + 0.16),
     wheel: wheelPos,
     cockpitSoleY: soleY,
+    wheelRadius: WHEEL_R,
+    seatX: (WELL + COAM_IN) / 2 + 0.02,
+    seatY: soleY + 0.42,
+    trimmerZ: zAt(cockpitT(0.175)),
+    cockpitFwdZ: zAt(T_COCK0),
+    cockpitAftZ: zAt(T_COCK1),
   };
 
   // The traveller: a beam across the cockpit that the mainsheet leads to.
