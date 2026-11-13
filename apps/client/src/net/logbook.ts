@@ -3,6 +3,8 @@
  * It always keeps a copy on this device. On the shared page it is also saved to the page's database under the
  * person's own id, where the rest of the fleet can read it. This is the seed of experience points and accounts.
  */
+import { db as askDb, user as askUser, type Db } from './platform';
+
 export interface LogTotals {
   miles: number;
   hours: number;
@@ -28,12 +30,6 @@ export interface Profile {
   colour: string;
   log: LogTotals;
   updated: string;
-}
-
-interface DocSnap { id: string; exists: boolean; data(): Record<string, unknown> | undefined }
-interface Db {
-  doc(path: string): { get(): Promise<DocSnap>; set(data: Record<string, unknown>): Promise<void> };
-  collection(path: string): { onSnapshot(next: (s: { docs: DocSnap[] }) => void, error?: (e: unknown) => void): () => void };
 }
 
 const SAVED = 'regatta.log';
@@ -66,12 +62,10 @@ export class Logbook {
 
   private async connect(): Promise<void> {
     try {
-      const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
-      if (!claude?.use) return;
-      const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
-      this.uid = (await (user as { id(): Promise<string | null> } | null)?.id()) ?? null;
+      const [db, user] = await Promise.all([askDb(), askUser()]);
+      this.uid = (await user?.id()) ?? null;
       if (!db || !this.uid) return;
-      this.db = db as Db;
+      this.db = db;
       // If this person has sailed on another device, carry on from whichever book has more in it.
       const snap = await this.db.doc(`profiles/${this.uid}`).get();
       const theirs = snap.exists ? clean((snap.data()?.log ?? {}) as Partial<LogTotals>) : ZERO;

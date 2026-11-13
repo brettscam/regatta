@@ -1,5 +1,6 @@
 import { KT, R2D } from '@slack-tide/sim';
 import type { RemoteBoat } from '../net/fleet';
+import { onWeb } from '../net/platform';
 import { clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -85,7 +86,9 @@ export class FleetPanel {
       return `<li><b>${esc(b.name || 'A skipper')}</b><span>${esc(b.boatName || 'Another boat')}</span><span>${esc(doing)}</span><span>${(d / 1852).toFixed(d < 1852 ? 2 : 1)} nm at ${brg}°</span></li>`;
     }).join('');
     const mine = `<li class="me"><b>${esc(me.name || 'You')}</b><span>${esc(me.boatName)}</span><span>${esc(me.status || `${(me.sog / KT).toFixed(1)} kt`)}</span><span>you</span></li>`;
-    const alone = this.ctx.boats().length ? '' : '<p class="lede">Nobody else is out right now. Send someone the game link: anyone who opens it while you are sailing appears here, on your chart and on the water.</p>';
+    const alone = this.ctx.boats().length ? ''
+      : onWeb() ? '<p class="lede">Sailing in company is not available on this website yet. Other people who open it sail their own water and do not appear here.</p>'
+        : '<p class="lede">Nobody else is out right now. Send someone the game link: anyone who opens it while you are sailing appears here, on your chart and on the water.</p>';
     return `<h3>On the water</h3><ul class="roster">${mine}${rows}</ul>${alone}`;
   }
 
@@ -101,7 +104,7 @@ export class FleetPanel {
       <div class="courses">${courses}</div>
       ${chips('Gun in', 'minutes', [2, 3, 5, 10], this.minutes, ' min')}
       ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.pace, '')}
-      <p class="lede">Everyone on the water is told and can join with R. Pace boats are sailed by the autopilot in the same boat as yours. The first mark is the start: be there at the gun and pass it after.</p>
+      <p class="lede">${onWeb() ? 'On this website other people cannot join a race yet, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours. The first mark is the start: be there at the gun and pass it after.</p>
       <button type="button" class="primary" data-act="call">Call the race</button>`;
   }
 

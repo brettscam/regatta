@@ -4,6 +4,7 @@ import { BoatView, type BoatPose } from '../boat/boatView';
 import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
+import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
  * Shared water. Everyone who has the page open at the same time sees everyone else's boat.
@@ -12,8 +13,8 @@ import { waveHeight } from '../scene/waves';
  * leave, and your boat is gone from the others' water. All boats sail in one clock, so they share one wind and tide:
  * whoever is furthest on in the season sets the time and the rest move up to it.
  *
- * The room is the claude.ai artifact runtime's. Anywhere else (a local build, a saved file) there is no room
- * and the game is simply single-handed.
+ * The room comes from `platform.ts`: today the claude.ai artifact runtime's. Anywhere else (the website, a local build,
+ * a saved file) there is no room yet and the game is simply single-handed.
  */
 
 /** What one boat tells the others. Short keys: this goes out many times a second. */
@@ -41,28 +42,6 @@ interface Wire {
   /** The last thing she hailed, and when by her own clock. */
   msg?: string;
   mt?: number;
-}
-
-interface RoomPeer {
-  peer: string;
-  by: string | null;
-  isMe: boolean;
-  sameTab: boolean;
-  kind: string;
-  guest: boolean;
-  presence: Readonly<Record<string, unknown>>;
-  updatedAt: number;
-}
-
-interface Room {
-  presence(patch: Record<string, unknown>): Promise<void>;
-  peers(): readonly RoomPeer[];
-  onPeers(handler: (change: { peers: readonly RoomPeer[] }) => void, onError?: (e: { code: string }) => void): () => void;
-}
-
-interface UserApi {
-  id(): Promise<string | null>;
-  profiles(ids: string[]): Promise<Record<string, { name: string }>>;
 }
 
 export interface RemoteBoat {
@@ -270,13 +249,11 @@ export class Fleet {
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
     try {
-      const claude = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
-      if (!claude?.use) return;
-      const room = (await claude.use('room')) as Room | null;
+      const room = await askRoom();
       if (!room) return;
       this.room = room;
       room.onPeers((change) => this.hear(change.peers), () => { this.room = null; this.clear(); });
-      this.user = (await claude.use('user')) as UserApi | null;
+      this.user = await askUser();
       this.myId = (await this.user?.id()) ?? null;
     } catch {
       this.room = null;
