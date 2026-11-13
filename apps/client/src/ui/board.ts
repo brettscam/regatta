@@ -40,13 +40,6 @@ const KEYS: Array<[string, Array<[string, string]>]> = [
     ['R', 'Fleet and racing: who is out, call a race, join one'],
     ['Enter', 'Hail the fleet'],
   ]],
-  ['Stopping, and life aboard', [
-    ['X', 'Anchor, pick up a mooring or come alongside. X again to get under way'],
-    ['Z', 'At anchor or moored: turn in for the night'],
-    ['K', 'Drop a crab pot, or haul one of yours when you are back beside it'],
-    ['L', 'Fishing line out or in. When a fish is on, L strikes'],
-    ['O', 'At anchor or moored: launch the outrigger, land, and come back aboard'],
-  ]],
   ['The game', [
     ['Space', 'Pause (alone on the water)'],
     ['Drag the clock', 'Speed time up (alone on the water)'],

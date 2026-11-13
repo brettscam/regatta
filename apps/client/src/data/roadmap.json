@@ -84,6 +84,24 @@
           "status": "shipped",
           "title": "Release notes",
           "text": "What's new lists every update, and a marker tells you when there is one you have not read."
+        },
+        {
+          "id": "race1",
+          "status": "shipped",
+          "title": "Racing, first cut",
+          "text": "Call a race or join one: a course, a countdown, pace boats on the autopilot, live places and a finish time."
+        },
+        {
+          "id": "flow",
+          "status": "shipped",
+          "title": "Wind tunnel view",
+          "text": "The air over your sails drawn as smoke lines, and the wind angle your trim is asking for. Scott's idea."
+        },
+        {
+          "id": "roster",
+          "status": "shipped",
+          "title": "Who is on the water",
+          "text": "A list of every boat sailing with you, what she is doing, and her range and bearing."
         }
       ]
     },
@@ -101,9 +119,9 @@
         },
         {
           "id": "race",
-          "status": "building",
-          "title": "Proper races",
-          "text": "A start line with a countdown, marks to round, finish times and results. Race friends and a fleet of computer-sailed boats."
+          "status": "next",
+          "title": "Race days",
+          "text": "Start lines with a penalty for being over early, mark rounding rules, fleets by boat class, a season table, and results that every boat agrees on."
         },
         {
           "id": "freeroam",

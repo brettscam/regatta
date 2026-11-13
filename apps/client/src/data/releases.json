@@ -1,6 +1,20 @@
 {
   "notes": [
     {
+      "id": "v8",
+      "date": "2026-11-13",
+      "title": "Racing, and a wind tunnel for your sails",
+      "items": [
+        "Racing. Press R, pick a course and the minutes to the gun, and call it. Everyone on the water is told and can join. Raccoon Strait to McCovey Cove, Round Alcatraz, the Golden Gate dash, or the route on your own chart.",
+        "Pace boats. Up to three boats sailed by the autopilot race with you, in the same boat as yours, each a little off the pace. Race them alone or alongside your friends.",
+        "A countdown under the clock, the course on your chart, live places while you race, and your time at the finish. Races and wins go in your logbook.",
+        "Who is out. The same panel lists every boat on the water with you: skipper, boat, what she is doing, and her range and bearing.",
+        "Wind tunnel, suggested by Scott. Press F to see the air over your sails: smooth where it follows the sail, red and broken where a sail is sheeted too hard, grey and shaking where it luffs.",
+        "The wind tunnel card also tells you the wind angle your sails, as set, are asking for: steer to the sails, or trim to the course.",
+        "Keys. The board (B) now has a page listing every control."
+      ]
+    },
+    {
       "id": "v7",
       "date": "2026-11-13",
       "title": "Gust warnings and release notes",
