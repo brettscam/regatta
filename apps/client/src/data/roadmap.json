@@ -11,99 +11,116 @@
           "id": "bay",
           "status": "shipped",
           "title": "San Francisco Bay, replayed",
-          "text": "Real wind, gusts, tide and tidal stream from NOAA for 14 July 2024, with real depths, coastline and the bridges."
+          "text": "Real wind, gusts, tide and tidal stream from NOAA for 14 July 2024, with real depths, coastline and the bridges.",
+          "area": "world"
         },
         {
           "id": "boats3",
           "status": "shipped",
           "title": "Three boats",
-          "text": "A 30 ft sloop, a 38 and a 45 ft performance cruiser, each with her own polar, heel and handling. Name her and choose her colours."
+          "text": "A 30 ft sloop, a 38 and a 45 ft performance cruiser, each with her own polar, heel and handling. Name her and choose her colours.",
+          "area": "experience"
         },
         {
           "id": "hands",
           "status": "shipped",
           "title": "Hands on the boat",
-          "text": "Steer, trim and tack by pointing at the wheel, boom and winches. No sailing buttons on the screen."
+          "text": "Steer, trim and tack by pointing at the wheel, boom and winches. No sailing buttons on the screen.",
+          "area": "experience"
         },
         {
           "id": "pilot",
           "status": "shipped",
           "title": "Autopilot and crew",
-          "text": "Hold a heading, a wind angle or the route while the crew trims. It beats to windward and tacks for the mark."
+          "text": "Hold a heading, a wind angle or the route while the crew trims. It beats to windward and tacks for the mark.",
+          "area": "experience"
         },
         {
           "id": "chart",
           "status": "shipped",
           "title": "Chartplotter and passage plan",
-          "text": "Waypoints, leg times from the forecast, plan against actual, and a forecast you can scrub through."
+          "text": "Waypoints, leg times from the forecast, plan against actual, and a forecast you can scrub through.",
+          "area": "experience"
         },
         {
           "id": "company1",
           "status": "shipped",
           "title": "Sailing in company, first cut",
-          "text": "Open the same link as a friend and see each other's boats live, on one clock, and hail each other."
+          "text": "Open the same link as a friend and see each other's boats live, on one clock, and hail each other.",
+          "area": "multiplayer"
         },
         {
           "id": "coach1",
           "status": "shipped",
           "title": "First lesson and coaching hints",
-          "text": "An optional guided first sail, then quiet hints when a sail has been luffing for a while or the boat is stuck in irons."
+          "text": "An optional guided first sail, then quiet hints when a sail has been luffing for a while or the boat is stuck in irons.",
+          "area": "experience"
         },
         {
           "id": "pos",
           "status": "shipped",
           "title": "Point of sail on the instruments",
-          "text": "The readout names what she is doing: close-hauled, beam reach, running, in irons, and which tack."
+          "text": "The readout names what she is doing: close-hauled, beam reach, running, in irons, and which tack.",
+          "area": "experience"
         },
         {
           "id": "places1",
           "status": "shipped",
           "title": "Places to sail to",
-          "text": "McCovey Cove, Ayala Cove, Sam's in Tiburon and more are on the chart. Click one to head there."
+          "text": "McCovey Cove, Ayala Cove, Sam's in Tiburon and more are on the chart. Click one to head there.",
+          "area": "world"
         },
         {
           "id": "logbook1",
           "status": "shipped",
           "title": "Skipper's logbook",
-          "text": "Miles, hours, marks and knockdowns, added up across every sail and shown beside the rest of the fleet."
+          "text": "Miles, hours, marks and knockdowns, added up across every sail and shown beside the rest of the fleet.",
+          "area": "progress"
         },
         {
           "id": "gybe",
           "status": "shipped",
           "title": "Crash gybes",
-          "text": "Let the boom come across on its own in a breeze and she rounds up, or goes flat on her side."
+          "text": "Let the boom come across on its own in a breeze and she rounds up, or goes flat on her side.",
+          "area": "experience"
         },
         {
           "id": "gusts",
           "status": "shipped",
           "title": "Gust warnings",
-          "text": "The readout shows a gust on its way and how long until it arrives. A strong one raises an alert and drops time back to real speed."
+          "text": "The readout shows a gust on its way and how long until it arrives. A strong one raises an alert and drops time back to real speed.",
+          "area": "experience"
         },
         {
           "id": "news",
           "status": "shipped",
           "title": "Release notes",
-          "text": "What's new lists every update, and a marker tells you when there is one you have not read."
+          "text": "What's new lists every update, and a marker tells you when there is one you have not read.",
+          "area": "platform"
         },
         {
           "id": "race1",
           "status": "shipped",
           "title": "Racing, first cut",
-          "text": "Call a race or join one: a course, a countdown, pace boats on the autopilot, live places and a finish time."
+          "text": "Call a race or join one: a course, a countdown, pace boats on the autopilot, live places and a finish time.",
+          "area": "multiplayer"
         },
         {
           "id": "flow",
           "status": "shipped",
           "title": "Wind tunnel view",
-          "text": "The air over your sails drawn as smoke lines, and the wind angle your trim is asking for. Scott's idea."
+          "text": "The air over your sails drawn as smoke lines, and the wind angle your trim is asking for. Scott's idea.",
+          "area": "experience"
         },
         {
           "id": "roster",
           "status": "shipped",
           "title": "Who is on the water",
-          "text": "A list of every boat sailing with you, what she is doing, and her range and bearing."
+          "text": "A list of every boat sailing with you, what she is doing, and her range and bearing.",
+          "area": "multiplayer"
         }
-      ]
+      ],
+      "theme": ""
     },
     {
       "id": "r1",
@@ -113,53 +130,62 @@
       "items": [
         {
           "id": "accounts",
-          "status": "building",
+          "status": "next",
           "title": "Accounts and profiles",
-          "text": "Sign up with an email. Your skipper profile, boats, fit-out and logbook live with your account, on any device. The logbook in this build is the first piece."
+          "text": "Sign up with an email. Your skipper profile, boats, fit-out and logbook live with your account, on any device. The logbook in this build is the first piece.",
+          "area": "platform"
         },
         {
           "id": "race",
           "status": "next",
           "title": "Race days",
-          "text": "Start lines with a penalty for being over early, mark rounding rules, fleets by boat class, a season table, and results that every boat agrees on."
+          "text": "Start lines with a penalty for being over early, mark rounding rules, fleets by boat class, a season table, and results that every boat agrees on.",
+          "area": "multiplayer"
         },
         {
           "id": "freeroam",
           "status": "next",
           "title": "A shared Bay to roam",
-          "text": "Drop in any time and see who else is out and where they are on the chart. No race needed: just go sailing together."
+          "text": "Drop in any time and see who else is out and where they are on the chart. No race needed: just go sailing together.",
+          "area": "multiplayer"
         },
         {
           "id": "meet",
           "status": "next",
           "title": "Meet up somewhere",
-          "text": "Pick a place and tell the others: McCovey Cove for the ball game, Ayala Cove on Angel Island, the dock at Sam's in Tiburon."
+          "text": "Pick a place and tell the others: McCovey Cove for the ball game, Ayala Cove on Angel Island, the dock at Sam's in Tiburon.",
+          "area": "multiplayer"
         },
         {
           "id": "ashore",
           "status": "later",
           "title": "Dock, anchor and go ashore",
-          "text": "Come alongside or drop the hook, take the dinghy or kayak in, and walk into the bar. Docking and anchoring done by hand."
+          "text": "Come alongside or drop the hook, take the dinghy or kayak in, and walk into the bar. Docking and anchoring done by hand.",
+          "area": "world"
         },
         {
           "id": "talk",
           "status": "next",
           "title": "Talk to the fleet",
-          "text": "Text hails are in. Next: voice on a VHF channel, so it sounds like the real thing."
+          "text": "Text hails are in. Next: voice on a VHF channel, so it sounds like the real thing.",
+          "area": "multiplayer"
         },
         {
           "id": "server",
-          "status": "next",
+          "status": "building",
           "title": "Its own home on the web",
-          "text": "Move off this preview page to a website with accounts, so anyone can join by link and boats persist between sessions."
+          "text": "Regatta on its own website, with a server behind it for shared water, races and accounts. The build is going onto Vercel now.",
+          "area": "platform"
         },
         {
           "id": "fishing",
           "status": "later",
           "title": "Crab pots and fishing",
-          "text": "Anchor, drop a pot and come back to check it. Dungeness in the Bay, tuna offshore. A good catch lifts the crew's morale and stretches the provisions."
+          "text": "Anchor, drop a pot and come back to check it. Dungeness in the Bay, tuna offshore. A good catch lifts the crew's morale and stretches the provisions.",
+          "area": "world"
         }
-      ]
+      ],
+      "theme": "Bay together"
     },
     {
       "id": "r2",
@@ -171,45 +197,53 @@
           "id": "hahah",
           "status": "later",
           "title": "The Baja Ha-Ha",
-          "text": "San Diego to Cabo San Lucas with two stops: a rally start, then days at sea in real time."
+          "text": "San Diego to Cabo San Lucas with two stops: a rally start, then days at sea in real time.",
+          "area": "multiplayer"
         },
         {
           "id": "watches",
           "status": "later",
           "title": "Watches and crew",
-          "text": "Set a watch schedule. Crew have skill and fatigue, and a tired watch misses a wind shift."
+          "text": "Set a watch schedule. Crew have skill and fatigue, and a tired watch misses a wind shift.",
+          "area": "experience"
         },
         {
           "id": "provisions",
           "status": "later",
           "title": "Provisions and tanks",
-          "text": "Load water, food and fuel before you go. Run short and it costs you."
+          "text": "Load water, food and fuel before you go. Run short and it costs you.",
+          "area": "world"
         },
         {
           "id": "notify",
           "status": "later",
           "title": "Call me when she needs me",
-          "text": "Leave her on autopilot and get a text or an email when the wind shifts, a reef is due or land is near."
+          "text": "Leave her on autopilot and get a text or an email when the wind shifts, a reef is due or land is near.",
+          "area": "platform"
         },
         {
           "id": "berths",
           "status": "later",
           "title": "Night in port",
-          "text": "Pick up a mooring or take a berth at each stop, sleep, and start the next leg in the morning."
+          "text": "Pick up a mooring or take a berth at each stop, sleep, and start the next leg in the morning.",
+          "area": "world"
         },
         {
           "id": "farallones",
           "status": "later",
           "title": "Out the Gate to the Farallones",
-          "text": "Fifty-two miles of ocean swell, the bar and fog, as the first step offshore."
+          "text": "Fifty-two miles of ocean swell, the bar and fog, as the first step offshore.",
+          "area": "world"
         },
         {
           "id": "galley",
           "status": "idea",
           "title": "Feeding the crew",
-          "text": "What you catch and what you stowed decide what is for dinner, and a fed crew stands a better watch."
+          "text": "What you catch and what you stowed decide what is for dinner, and a fed crew stands a better watch.",
+          "area": "world"
         }
-      ]
+      ],
+      "theme": "Passages"
     },
     {
       "id": "r3",
@@ -221,27 +255,32 @@
           "id": "cat",
           "status": "later",
           "title": "The 42 ft catamaran",
-          "text": "No heel to warn you: reef by the numbers. Two engines for docking."
+          "text": "No heel to warn you: reef by the numbers. Two engines for docking.",
+          "area": "experience"
         },
         {
           "id": "bvi",
           "status": "idea",
           "title": "British Virgin Islands",
-          "text": "Line-of-sight island hopping, anchoring and mooring balls."
+          "text": "Line-of-sight island hopping, anchoring and mooring balls.",
+          "area": "world"
         },
         {
           "id": "greece",
           "status": "idea",
           "title": "Greece",
-          "text": "The Cyclades and the meltemi, stern-to in a harbour for dinner."
+          "text": "The Cyclades and the meltemi, stern-to in a harbour for dinner.",
+          "area": "world"
         },
         {
           "id": "croatia",
           "status": "idea",
           "title": "Croatia",
-          "text": "The Dalmatian islands, with the bora and the maestral."
+          "text": "The Dalmatian islands, with the bora and the maestral.",
+          "area": "world"
         }
-      ]
+      ],
+      "theme": "Charter waters"
     },
     {
       "id": "r4",
@@ -253,21 +292,25 @@
           "id": "xp",
           "status": "later",
           "title": "Logbook and experience",
-          "text": "Miles, night hours and heavy-weather hours earn experience, the way a real logbook does."
+          "text": "Miles, night hours and heavy-weather hours earn experience, the way a real logbook does.",
+          "area": "progress"
         },
         {
           "id": "purse",
           "status": "idea",
           "title": "Prize money",
-          "text": "Win races, earn a purse."
+          "text": "Win races, earn a purse.",
+          "area": "progress"
         },
         {
           "id": "upgrades",
           "status": "idea",
           "title": "Upgrade the boat",
-          "text": "New sails, a spinnaker, a folding prop, better instruments: each one changes how she sails."
+          "text": "New sails, a spinnaker, a folding prop, better instruments: each one changes how she sails.",
+          "area": "progress"
         }
-      ]
+      ],
+      "theme": "Your boat"
     },
     {
       "id": "always",
@@ -279,45 +322,53 @@
           "id": "anyday",
           "status": "next",
           "title": "Sail any day in the archive",
-          "text": "Pick a date, right up to yesterday, and get that day's real wind and tide from NOAA's records. Never live feeds."
+          "text": "Pick a date, right up to yesterday, and get that day's real wind and tide from NOAA's records. Never live feeds.",
+          "area": "world"
         },
         {
           "id": "reef",
           "status": "next",
           "title": "Reefing and furling by hand",
-          "text": "The physics is done. It needs a mast and a furler you can work."
+          "text": "The physics is done. It needs a mast and a furler you can work.",
+          "area": "experience"
         },
         {
           "id": "coach2",
           "status": "next",
           "title": "A better coach",
-          "text": "Hints that notice more: pinching, sailing by the lee, a missed layline, a foul tide you could have dodged."
+          "text": "Hints that notice more: pinching, sailing by the lee, a missed layline, a foul tide you could have dodged.",
+          "area": "experience"
         },
         {
           "id": "laylines",
           "status": "later",
           "title": "Laylines and tide gates on the chart",
-          "text": "See when to tack and when the stream turns in your favour."
+          "text": "See when to tack and when the stream turns in your favour.",
+          "area": "experience"
         },
         {
           "id": "night",
           "status": "later",
           "title": "Night and fog",
-          "text": "Navigation lights, lit buoys, the city at night, and San Francisco's fog."
+          "text": "Navigation lights, lit buoys, the city at night, and San Francisco's fog.",
+          "area": "world"
         },
         {
           "id": "spinnaker",
           "status": "later",
           "title": "Spinnakers",
-          "text": "An asymmetric first, then a pole, guys and a preventer."
+          "text": "An asymmetric first, then a pole, guys and a preventer.",
+          "area": "experience"
         },
         {
           "id": "wildlife",
           "status": "later",
           "title": "What you would really see",
-          "text": "Sea lions on the buoys, pelicans, harbour porpoise in the Gate, humpbacks and greys off the coast in season. Each water gets its own."
+          "text": "Sea lions on the buoys, pelicans, harbour porpoise in the Gate, humpbacks and greys off the coast in season. Each water gets its own.",
+          "area": "world"
         }
-      ]
+      ],
+      "theme": "Seamanship"
     },
     {
       "id": "voyages",
@@ -329,21 +380,25 @@
           "id": "magellan",
           "status": "idea",
           "title": "The age of sail",
-          "text": "Magellan's circumnavigation or a voyage of your own in a square-rigger: provision for months, keep a crew alive, and find your way by compass, lead line, sextant and stars."
+          "text": "Magellan's circumnavigation or a voyage of your own in a square-rigger: provision for months, keep a crew alive, and find your way by compass, lead line, sextant and stars.",
+          "area": "world"
         },
         {
           "id": "shackleton",
           "status": "idea",
           "title": "Shackleton's boat journey",
-          "text": "Eight hundred miles of Southern Ocean in a 22 ft lifeboat, with four sun sights and no margin."
+          "text": "Eight hundred miles of Southern Ocean in a 22 ft lifeboat, with four sun sights and no margin.",
+          "area": "world"
         },
         {
           "id": "pirates",
           "status": "idea",
           "title": "Pirates of the Caribbean trade",
-          "text": "Spanish, Dutch and British ships, islands to hide and refit in, and prizes to take. Sailing a ship in a fight, with the wind gauge deciding it."
+          "text": "Spanish, Dutch and British ships, islands to hide and refit in, and prizes to take. Sailing a ship in a fight, with the wind gauge deciding it.",
+          "area": "world"
         }
-      ]
+      ],
+      "theme": "Other voyages"
     }
   ]
 }

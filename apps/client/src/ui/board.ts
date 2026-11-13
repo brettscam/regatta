@@ -3,15 +3,30 @@ import roadmapJson from '../data/roadmap.json';
 import type { Logbook } from '../net/logbook';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
-interface RoadmapItem { id: string; status: string; title: string; text: string }
-interface Release { id: string; name: string; when: string; blurb: string; items: RoadmapItem[] }
+interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
+interface Release { id: string; name: string; theme: string; when: string; blurb: string; items: RoadmapItem[] }
+/** The lanes of the board: what part of the game an item belongs to. */
+const AREAS: Array<[string, string]> = [
+  ['experience', 'Sailing experience'],
+  ['multiplayer', 'Multiplayer and racing'],
+  ['world', 'Places and life aboard'],
+  ['platform', 'Platform'],
+  ['progress', 'Progression'],
+];
+/** The columns: how soon. An item's status puts it in one. */
+const COLUMNS: Array<[string, string]> = [
+  ['building', 'This sprint'],
+  ['next', 'Next sprint'],
+  ['later', 'Later'],
+  ['idea', 'Ideas'],
+  ['shipped', 'Shipped'],
+];
 const roadmap = roadmapJson as { updated: string; releases: Release[] };
 interface Note { id: string; date: string; title: string; items: string[] }
 /** Release notes, newest first. */
 const notes = (releasesJson as { notes: Note[] }).notes;
 const SEEN = 'regatta.seen';
 
-const STATUS: Record<string, string> = { shipped: 'Shipped', building: 'Being built', next: 'Up next', later: 'Planned', idea: 'Idea' };
 const KINDS: Array<[string, string, string]> = [
   ['feedback', 'Feedback', 'What do you think? What felt right, what felt off?'],
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
@@ -64,6 +79,9 @@ export class Board {
   private note = '';
   private sent: FeedbackEntry[] = [];
   private busy = false;
+  /** Which lane the roadmap is narrowed to, and whether what has shipped is shown. */
+  private area = 'all';
+  private showShipped = false;
   private readonly link = document.getElementById('boardlink');
   private readonly flash = document.getElementById('newsflash');
   /** The newest release note this person has read. */
@@ -161,6 +179,8 @@ export class Board {
     else if (d.tab) { this.tab = d.tab as Tab; this.note = ''; this.render(); }
     else if (d.kind) { this.kind = d.kind; this.render(); }
     else if (d.vote && d.item) void this.castVote(d.item, Number(d.vote));
+    else if (d.area) { this.area = d.area; this.render(); }
+    else if (d.act === 'shipped') { this.showShipped = !this.showShipped; this.render(); }
     else if (d.act === 'send') void this.send();
     else if (d.act === 'copy') void this.copy();
     else if (d.suggest) { this.tab = 'feedback'; this.kind = 'idea'; this.render(); }
@@ -207,26 +227,39 @@ export class Board {
 
   private roadmap(): string {
     const canVote = this.store.canWrite;
-    const releases = roadmap.releases.map((r) => {
-      const items = r.items.map((it) => {
-        const t = this.tally[it.id] ?? { up: 0, down: 0 };
-        const mine = this.store.vote(it.id);
-        const votes = it.status === 'shipped' ? '' : `
-          <div class="votes" role="group" aria-label="Vote on ${esc(it.title)}">
-            <button type="button" data-item="${it.id}" data-vote="1" aria-pressed="${mine === 1}" aria-label="Vote up" ${canVote ? '' : 'disabled'}>▲</button>
-            <b title="${t.up} up, ${t.down} down">${t.up - t.down}</b>
-            <button type="button" data-item="${it.id}" data-vote="-1" aria-pressed="${mine === -1}" aria-label="Vote down" ${canVote ? '' : 'disabled'}>▼</button>
-          </div>`;
-        return `<li class="item ${it.status}">${votes}<div><span class="status">${STATUS[it.status] ?? it.status}</span><b>${esc(it.title)}</b><p>${esc(it.text)}</p></div></li>`;
+    const all = roadmap.releases.flatMap((r) => r.items.map((it) => ({ ...it, theme: r.theme })));
+    const score = (id: string) => { const t = this.tally[id]; return t ? t.up - t.down : 0; };
+    const shipped = all.filter((it) => it.status === 'shipped').length;
+    const columns = COLUMNS.filter(([id]) => id !== 'shipped' || this.showShipped);
+    const lanes = AREAS.filter(([id]) => this.area === 'all' || this.area === id);
+    const card = (it: (typeof all)[number]): string => {
+      const t = this.tally[it.id] ?? { up: 0, down: 0 };
+      const mine = this.store.vote(it.id);
+      const votes = it.status === 'shipped' ? '' : `
+        <div class="votes" role="group" aria-label="Vote on ${esc(it.title)}">
+          <button type="button" data-item="${it.id}" data-vote="1" aria-pressed="${mine === 1}" aria-label="Vote up" ${canVote ? '' : 'disabled'}>▲</button>
+          <b title="${t.up} up, ${t.down} down">${t.up - t.down}</b>
+          <button type="button" data-item="${it.id}" data-vote="-1" aria-pressed="${mine === -1}" aria-label="Vote down" ${canVote ? '' : 'disabled'}>▼</button>
+        </div>`;
+      return `<li class="item card ${it.status} area-${it.area}">${votes}<div><b>${esc(it.title)}</b><p>${esc(it.text)}</p>${it.theme ? `<span class="theme">${esc(it.theme)}</span>` : ''}</div></li>`;
+    };
+    const head = `<div class="rm-corner"></div>${columns.map(([id, name]) => `<div class="rm-head ${id}">${name}<i>${all.filter((it) => it.status === id && (this.area === 'all' || it.area === this.area)).length}</i></div>`).join('')}`;
+    const rows = lanes.map(([area, name]) => {
+      const cells = columns.map(([status, colName]) => {
+        const items = all.filter((it) => it.area === area && it.status === status).sort((a, b) => score(b.id) - score(a.id));
+        return `<ul class="rm-cell ${items.length ? '' : 'empty'}" data-col="${colName}">${items.map(card).join('')}</ul>`;
       }).join('');
-      return `<section class="release"><header><h3>${esc(r.name)}</h3><span>${esc(r.when)}</span></header><p class="blurb">${esc(r.blurb)}</p><ul>${items}</ul></section>`;
+      return `<div class="rm-lane area-${area}"><span>${name}</span></div>${cells}`;
     }).join('');
+    const chips = [['all', 'Everything'] as [string, string], ...AREAS].map(([id, name]) => `<button type="button" class="chip area-${id}" data-area="${id}" aria-pressed="${this.area === id}">${name}</button>`).join('');
     const how = canVote
-      ? 'Vote for what you want most. One vote per item, and you can change it.'
+      ? 'Vote for what you want most. One vote per item, and you can change it. The most wanted rise to the top of each box.'
       : this.store.online
         ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
         : 'Voting works on the shared page when you are signed in.';
-    return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}${releases}`;
+    return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
+      <div class="rm-filter">${chips}<button type="button" class="chip shipped" data-act="shipped" aria-pressed="${this.showShipped}">Shipped · ${shipped}</button></div>
+      <div class="rm-scroll"><div class="rm-board" style="--cols:${columns.length}">${head}${rows}</div></div>`;
   }
 
   private feedback(): string {
@@ -281,7 +314,7 @@ export class Board {
     const active = document.activeElement as HTMLTextAreaElement | null;
     const caret = active?.id === 'board-text' ? active.selectionStart : null;
     this.el.innerHTML = `
-      <div class="board-frame" role="dialog" aria-label="Roadmap and feedback">
+      <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
           <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
