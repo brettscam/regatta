@@ -26,7 +26,7 @@ export class Lobby {
   /** Show a choice. Rebuilds the boat only when something about her or her place has changed. */
   show(choice: Choice, step: number): void {
     this.step = step;
-    const key = `${choice.spot}|${choice.boat}|${choice.colour}|${choice.name}`;
+    const key = `${choice.spot}|${choice.time}|${choice.boat}|${choice.colour}|${choice.name}`;
     if (this.boat?.key === key) return;
     const spec = this.boats[choice.boat];
     const spot = this.spots.find((s) => s.id === choice.spot) ?? this.spots[0];

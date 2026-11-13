@@ -217,3 +217,12 @@ body.lobby .hud, body.lobby .tag { display: none; }
 .coach-foot span { flex: 1; font-size: 12px; color: var(--amber); }
 .coach button { padding: 6px 12px; font-size: 12.5px; }
 @media (max-width: 760px) { .coach { left: 50%; width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 160px); } }
+
+/* ---- join: time of day ------------------------------------------------------------------------- */
+.join .when { display: flex; gap: 6px; }
+.join .chip {
+  flex: 1; display: grid; gap: 1px; padding: 7px 8px; font: inherit; font-size: 11.5px; color: var(--dim); text-align: left; cursor: pointer;
+  background: rgba(238, 243, 244, 0.045); border: 1px solid var(--edge); border-radius: 9px; white-space: nowrap;
+}
+.join .chip b { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.join .chip[aria-pressed="true"] { border-color: var(--amber); background: rgba(255, 196, 107, 0.1); }

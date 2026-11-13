@@ -1,22 +1,25 @@
 import type { SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
 import startsJson from '../../../courses/sf-bay/starts.json';
+import timesJson from '../../../courses/sf-bay/times.json';
 import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
 import { Session } from './session';
 import { Stage } from './stage';
-import { JoinFlow, type Choice, type StartSpot } from './ui/join';
+import { JoinFlow, type Choice, type StartSpot, type StartTime } from './ui/join';
 import { loadCourse } from './world/loadCourse';
 
 // Regatta. The world is a real past afternoon on San Francisco Bay, replayed: NOAA's model of the wind, tidal stream and tide.
 // For play testing, the join screen can be skipped: ?go=1 with any of &spot=gate &boat=perf45 &tutorial=1
-// &start=2.5 (hours into the season) &x=1300&y=250&hdg=293
+// &time=evening or &start=8.5 (hours into the season, which begins at 08:00) &x=1300&y=250&hdg=293
 const params = new URLSearchParams(location.search);
 const num = (key: string, fallback: number) => {
   const v = Number(params.get(key));
   return params.has(key) && Number.isFinite(v) ? v : fallback;
 };
 const spots = startsJson as StartSpot[];
+const times = timesJson as StartTime[];
+const DEFAULT_TIME = 'afternoon';
 const SAVED = 'regatta.join';
 
 function savedChoice(): Partial<Choice> {
@@ -32,6 +35,7 @@ function settle(c: Partial<Choice>): Choice {
   const boat = c.boat && BOATS[c.boat] && LINEUP.some((e) => e.id === c.boat && e.status === 'ready') ? c.boat : DEFAULT_BOAT;
   return {
     spot: spots.some((s) => s.id === c.spot) ? c.spot! : spots[0].id,
+    time: times.some((t) => t.id === c.time) ? c.time! : DEFAULT_TIME,
     boat,
     colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
     name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',
@@ -40,7 +44,13 @@ function settle(c: Partial<Choice>): Choice {
 }
 
 const data = await loadCourse();
-const world = new ReplayWorld(data, num('start', 2.5) * 3600);
+const world = new ReplayWorld(data, 0);
+/** Put the world's clock at the chosen time of day. ?start=hours overrides it for play testing. */
+function setClock(choice: Choice): void {
+  const t = times.find((k) => k.id === choice.time) ?? times[0];
+  world.startOffset = num('start', t.hours) * 3600;
+}
+setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
 
 let session: Session | null = null;
@@ -53,7 +63,8 @@ function castOff(choice: Choice, resume?: SimState): void {
     // Next time, the lesson is not offered by default: they have been aboard before.
     localStorage.setItem(SAVED, JSON.stringify({ ...choice, tutorial: false }));
   } catch { /* private window: nothing to remember */ }
-  // The afternoon moved on while the join screen was up.
+  setClock(choice);
+  // The day moved on while the join screen was up.
   if (lobby) {
     world.shiftTime(lobby.elapsed);
     lobby.dispose();
@@ -89,18 +100,22 @@ const resume = (saved: unknown): void => {
 function begin(): void {
   if (session) return;
   if (params.has('go')) {
-    castOff(settle({ spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, tutorial: params.get('tutorial') === '1' }));
+    castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, tutorial: params.get('tutorial') === '1' }));
     return;
   }
   document.body.classList.add('lobby');
   lobby = new Lobby(stage, spots, BOATS);
   new JoinFlow({
     spots,
+    times,
     lineup: LINEUP,
     boats: BOATS,
     world,
     initial: settle(savedChoice()),
-    onPreview: (choice, step) => lobby?.show(choice, step),
+    onPreview: (choice, step) => {
+      setClock(choice);
+      lobby?.show(choice, step);
+    },
     onCastOff: (choice) => castOff(choice),
   });
 }

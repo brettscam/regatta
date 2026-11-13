@@ -56,7 +56,7 @@ export class Session {
   private acc = 0;
   private readonly motion = { heave: 0, pitch: 0, roll: 0 };
   private readonly boatPos = new THREE.Vector3();
-  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>() };
+  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0 };
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
     const world = stage.world;
@@ -68,6 +68,8 @@ export class Session {
     if (opts.resume) this.sim.restore(opts.resume);
     this.before = grab(this.sim.state);
     this.after = this.before;
+    this.watch.crashGybes = this.sim.state.crashGybes;
+    this.watch.knockdowns = this.sim.state.knockdowns;
 
     this.boatView = new BoatView(opts.spec, opts.livery);
     stage.scene.add(this.boatView.root);
@@ -163,6 +165,11 @@ export class Session {
     const o = sim.out;
     if (o.aground && !watch.aground) this.alarm('Aground. Get her head round to deeper water');
     else if (!o.aground && o.underKeel !== null && o.underKeel < 2.5 && !watch.shallow) this.alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under the keel`);
+    // The boom came across on its own.
+    if (sim.state.knockdowns > watch.knockdowns) this.alarm(`Knocked down. Crash gybe in ${Math.round(o.tws / KT)} kt with the main let out. She will come up: ease the sheets`);
+    else if (sim.state.crashGybes > watch.crashGybes) this.alarm('Crash gybe. Haul the main in before the boom comes across, or press T and the crew tends it');
+    watch.crashGybes = sim.state.crashGybes;
+    watch.knockdowns = sim.state.knockdowns;
     watch.aground = o.aground;
     watch.shallow = o.underKeel !== null && o.underKeel < (watch.shallow ? 4 : 2.5);
     const reached = passage.nextIndex;

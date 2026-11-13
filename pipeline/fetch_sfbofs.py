@@ -22,9 +22,9 @@ import numpy as np
 BUCKET = "https://s3.amazonaws.com/noaa-nos-ofs-pds/sfbofs/netcdf"
 # Elements kept: generous box around the central Bay and the Golden Gate.
 BOX = dict(lon0=-122.68, lon1=-122.26, lat0=37.70, lat1=37.97)
-# The season: 30 hours from 14:00 PDT on 14 July 2024.
-FIRST_CYCLE = dt.datetime(2024, 7, 14, 21)
-TRUTH_HOURS = 30
+# The season: 36 hours from 08:00 PDT on 14 July 2024, so the morning calm and the afternoon build are both in it.
+FIRST_CYCLE = dt.datetime(2024, 7, 14, 15)
+TRUTH_HOURS = 36
 FORECAST_HOURS = 48
 
 

@@ -950,7 +950,7 @@ export class Chart {
     const drift = Math.hypot(c.x, c.y) / KT;
     const rate = world.tideRate(t, future ? 'forecast' : 'truth');
     const depth = world.chartDepth(boat.x, boat.y);
-    const issued = new Date(this.course.forecast.issued);
+    const issued = new Date(this.course.forecast.windIssued ?? this.course.forecast.issued);
     // The nearest few vessels, as an AIS list: range, bearing and how close they will pass.
     let traffic = '';
     const vessels = this.host.traffic?.();
@@ -983,6 +983,6 @@ export class Chart {
       </section>
       ${traffic}
       <p class="hint">Click water to add a waypoint. Drag one to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
-      <p class="source">Wind, stream and tide: NOAA SFBOFS, replayed from ${this.dayFmt.format(world.dateAt(0))} 2024. Forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
+      <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA SFBOFS. Both replayed from ${this.dayFmt.format(world.dateAt(0))} 2024. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }

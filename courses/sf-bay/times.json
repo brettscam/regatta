@@ -1,0 +1,5 @@
+[
+  { "id": "morning", "name": "Late morning", "hours": 2.5, "say": "Light airs before the sea breeze fills in" },
+  { "id": "afternoon", "name": "Early afternoon", "hours": 5.5, "say": "The breeze is in and building" },
+  { "id": "evening", "name": "Late afternoon", "hours": 8.5, "say": "Full breeze with gusts, low sun" }
+]

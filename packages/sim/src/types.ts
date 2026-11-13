@@ -139,6 +139,14 @@ export interface SimState {
   overpowered: number;
   /** How many times the pilot has given up and handed the wheel back. */
   pilotTrips: number;
+  /** Extra heel from a crash gybe, radians. It fades as she comes back up. */
+  knock: number;
+  /** Seconds she stays pinned before she starts to come up. */
+  knockHold: number;
+  /** How many times the boom has come across out of control hard enough to matter. */
+  crashGybes: number;
+  /** How many of those laid her flat. */
+  knockdowns: number;
   maneuver: Maneuver | null;
 }
 
@@ -192,6 +200,8 @@ export interface SimOutputs {
   roundingUp: boolean;
   /** True when the pilot is working to windward toward a mark it cannot point at. */
   pilotBeating: boolean;
+  /** True while she is laid over past 55 degrees. */
+  knockedDown: boolean;
   /** Water under the keel, metres. Null where the world gives no depth. */
   underKeel: number | null;
   aground: boolean;

@@ -19,7 +19,8 @@
     "src",
     "../../boats/*.json",
     "../../courses/*/course.json",
-    "../../courses/*/starts.json"
+    "../../courses/*/starts.json",
+    "../../courses/*/times.json"
   ],
   "references": [
     {

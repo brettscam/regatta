@@ -89,6 +89,10 @@ export function initialState(init: InitialConditions = {}): SimState {
     routeTurns: 0,
     overpowered: 0,
     pilotTrips: 0,
+    knock: 0,
+    knockHold: 0,
+    crashGybes: 0,
+    knockdowns: 0,
     maneuver: null,
   };
 }
@@ -354,8 +358,14 @@ export class Sim {
     const sailLoad = h.mainShare * reef.heel * heelTrim(o.main) + h.jibShare * Math.pow(s.furl, 1.3) * heelTrim(o.jib);
     const loadDeg = Math.min(h.maxDeg, windLoad * pointOfSail * Math.max(0, sailLoad));
     o.heelLoad = loadDeg * D2R;
-    const heelTarget = -windSide * o.heelLoad;
-    s.heel += (heelTarget - s.heel) * (1 - Math.exp(-dt / 1.2));
+    // A crash gybe throws her over further than the wind alone would. She hangs there, then comes back up.
+    if (s.knock > 0) {
+      if (s.knockHold > 0) s.knockHold -= dt;
+      else s.knock *= Math.exp(-dt / 2.5);
+      if (s.knock < 0.01) s.knock = 0;
+    }
+    const heelTarget = -windSide * Math.min(82 * D2R, o.heelLoad + s.knock);
+    s.heel += (heelTarget - s.heel) * (1 - Math.exp(-dt / (s.knock > 0 ? 0.55 : 1.2)));
     const heelDeg = Math.abs(s.heel) * R2D;
     o.heelPenalty = heelDeg > h.penaltyStartDeg
       ? Math.max(h.penaltyFloor, 1 - (heelDeg - h.penaltyStartDeg) * h.penaltyPerDeg)
@@ -363,11 +373,15 @@ export class Sim {
 
     // --- speed ---------------------------------------------------------------------------------
     const drive = mainShare * o.main.eff + jibShare * o.jib.eff;
-    const targetKt = polarSpeed(b.polar, twaDeg, twsEff) * headK * Math.max(0, drive) * o.heelPenalty;
+    // Laid over by a crash gybe, the sails spill their wind and she stops.
+    const spill = s.knock > 0 ? clamp(1 - (heelDeg - 40) / 30, 0.03, 1) : 1;
+    o.knockedDown = heelDeg > 55;
+    const targetKt = polarSpeed(b.polar, twaDeg, twsEff) * headK * Math.max(0, drive) * o.heelPenalty * spill;
     o.targetSpeed = targetKt * KT;
     o.polarSpeed = polarSpeed(b.polar, twaDeg, twsKt) * KT;
     // She gathers way slowly and carries it a long time: about four boat lengths shooting head to wind.
-    const tau = o.targetSpeed > s.speed ? 12 : 16;
+    // Laid flat, with the rig and half the deck in the water, she stops in a few lengths.
+    const tau = o.targetSpeed > s.speed ? 12 : spill < 0.5 ? 3 : 16;
     s.speed += (o.targetSpeed - s.speed) * (1 - Math.exp(-dt / tau));
     const sinR = Math.sin(s.rudder);
     s.speed -= b.helm.rudderDrag * sinR * sinR * s.speed * s.speed * dt;
@@ -501,7 +515,10 @@ export class Sim {
 
     // Main. The boom swings to leeward until the sheet stops it.
     // It stays put through small wind-angle wobbles dead ahead and dead astern.
-    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R) s.mainSide = -windSide;
+    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R && s.mainSide !== -windSide) {
+      if (slew && awaAbs > 100 * D2R) this.gybed();
+      s.mainSide = -windSide;
+    }
     const byTheLee = s.mainSide === windSide && awaAbs > Math.PI / 2;
     const mainWind = byTheLee ? Math.PI : awaAbs;
     const boomMag = Math.min(s.mainSheet, mainWind, b.sails.main.sheetMaxDeg * D2R);
@@ -548,6 +565,31 @@ export class Sim {
     jib.luff = jib.flogging ? 1 : clamp((jibErr - 3) / 15, 0, 1);
     jib.stall = jib.flogging ? 0 : clamp((-jibErr - 5) / 40, 0, 1);
     jib.loadKg = (q * b.sails.jib.areaM2 * s.furl * 0.9 * Math.max(0.05, heelTrim(jib))) / 9.81;
+  }
+
+  /**
+   * The boom has just come across with the wind aft. If nobody was tending the mainsheet, how hard it lands depends
+   * on how far it had to swing and how much wind is in it. Hauled in first, a gybe is gentle. Let run in a breeze,
+   * it rounds her up, and in enough wind it lays her flat.
+   */
+  private gybed(): void {
+    const s = this.state;
+    // The crew tends the sheet through a gybe they are making, and whenever they are trimming.
+    if (s.crewTrim || s.maneuver?.kind === 'gybe') return;
+    const swing = (2 * Math.min(s.mainSheet, this.boat.sails.main.sheetMaxDeg * D2R)) / (160 * D2R);
+    const twsKt = this.out.tws / KT;
+    const reef = this.boat.sails.main.reefs[s.reef];
+    const severity = swing * (twsKt / 19) ** 2 * reef.drive;
+    if (severity < 0.45) return;
+    s.crashGybes++;
+    if (severity >= 1) {
+      s.knockdowns++;
+      s.knock = Math.max(s.knock, 72 * D2R);
+      s.knockHold = Math.min(6, 2.5 + (severity - 1) * 3);
+    } else {
+      s.knock = Math.max(s.knock, (15 + (25 * (severity - 0.45)) / 0.55) * D2R);
+      s.knockHold = 0.6;
+    }
   }
 
   /** The crew eases or trims each sheet toward its best setting, a little at a time. */
@@ -625,7 +667,7 @@ export class Sim {
       tws: 0, twd: 0, twa: 0, aws: 0, awa: 0, sog: 0, cog: 0,
       main: emptySail(), jib: emptySail(),
       targetSpeed: 0, polarSpeed: 0, heelLoad: 0, heelPenalty: 1, weatherHelm: 0, rudderGrip: 1,
-      inIrons: false, roundingUp: false, pilotBeating: false, underKeel: null, aground: false,
+      inIrons: false, roundingUp: false, pilotBeating: false, knockedDown: false, underKeel: null, aground: false,
     };
   }
 }

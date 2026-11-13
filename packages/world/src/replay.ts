@@ -14,6 +14,8 @@ export interface WindStep {
   u: number[];
   /** Tenths of a metre per second blowing toward north. */
   v: number[];
+  /** Gust speed in tenths of a metre per second, where the source has it. */
+  g?: number[];
 }
 
 export interface CourseMark {
@@ -31,7 +33,7 @@ export interface CourseData {
   origin: { lat: number; lon: number };
   timeZone: string;
   season: { id: string; start: string; hours: number; stepSeconds: number; source: string };
-  forecast: { issued: string; hours: number; source: string };
+  forecast: { issued: string; hours: number; source: string; windIssued?: string };
   current: GridSpec & { scale: number; steps: number; file: string };
   depth: GridSpec & { scale: number; file: string };
   terrain: GridSpec & { max: number; file: string; source: string };
@@ -163,7 +165,30 @@ export class ReplayWorld implements Environment {
     const across = x * Math.cos(toward) - y * Math.sin(toward);
     const puff = 0.085 * Math.sin(along / 310 + across / 520) + 0.055 * Math.sin(along / 127 - across / 210 + 1.7) + 0.03 * Math.sin(s / 9.3 + along / 60);
     const shift = (4.5 * Math.sin(s / 173 + across / 900) + 2.5 * Math.sin(s / 61 + along / 400 + 0.6)) * (Math.PI / 180);
-    return { dir: (base.dir + shift + TAU) % TAU, speed: Math.max(0, base.speed * (1 + puff)) };
+    // How hard it puffs comes from the data: the model's gust speed over its mean wind for this hour and place.
+    // The pattern above peaks at 0.17, so a gust factor of 1.3 makes the strongest puffs reach the model's gust.
+    const factor = base.speed > 0.5 ? this.gust(x, y, t) / base.speed : 1;
+    const gustiness = Math.min(2.6, Math.max(0.5, (factor - 1) / 0.17));
+    return { dir: (base.dir + shift * Math.min(1.6, gustiness) + TAU) % TAU, speed: Math.max(0, base.speed * (1 + puff * gustiness)) };
+  }
+
+  /** The model's gust speed at a place and time, m/s. Falls back to 1.3 times the mean wind where the data has none. */
+  gust(x: number, y: number, t: number): number {
+    const w = this.course.wind;
+    const steps = w.truth;
+    const pos = Math.min(steps.length - 1, Math.max(0, (this.startOffset + t) / this.course.season.stepSeconds));
+    const k = Math.min(steps.length - 2, Math.floor(pos));
+    const a = steps[k].g;
+    const b = steps[k + 1].g;
+    if (!a || !b) return this.wind(x, y, t).speed * 1.3;
+    const ft = pos - k;
+    const { i, j, fx, fy } = bilinear(w, x, y);
+    const at = (g: number[]) => {
+      const r0 = j * w.nx + i;
+      const r1 = r0 + w.nx;
+      return (g[r0] * (1 - fx) + g[r0 + 1] * fx) * (1 - fy) + (g[r1] * (1 - fx) + g[r1 + 1] * fx) * fy;
+    };
+    return (at(a) * (1 - ft) + at(b) * ft) * w.scale;
   }
 
   /** Surface current in m/s east and north. Zero over land and outside the grid. */

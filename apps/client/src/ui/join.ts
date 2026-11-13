@@ -13,9 +13,18 @@ export interface StartSpot {
   route: Waypoint[];
 }
 
+/** A time of day to cast off, as hours into the replayed season. */
+export interface StartTime {
+  id: string;
+  name: string;
+  hours: number;
+  say: string;
+}
+
 /** What the player picked on the way in. */
 export interface Choice {
   spot: string;
+  time: string;
   boat: string;
   colour: string;
   name: string;
@@ -24,6 +33,7 @@ export interface Choice {
 
 export interface JoinOptions {
   spots: StartSpot[];
+  times: StartTime[];
   lineup: LineupEntry[];
   boats: Record<string, YardBoat>;
   world: ReplayWorld;
@@ -86,14 +96,16 @@ export class JoinFlow {
     if (d.act === 'back') return this.go(-1);
     if (d.step) { this.step = Number(d.step); }
     else if (d.spot) this.choice.spot = d.spot;
+    else if (d.time) this.choice.time = d.time;
     else if (d.tutorial) this.choice.tutorial = d.tutorial === '1';
     else if (d.boat) {
       this.choice.boat = d.boat;
       if (!this.named) this.choice.name = this.defaultName(d.boat);
     } else if (d.colour) this.choice.colour = d.colour;
     else return;
-    this.render();
+    // Show it first, so the conditions on the cards are for the time just picked.
     this.opts.onPreview(this.choice, this.step);
+    this.render();
   };
 
   private go(by: number): void {
@@ -128,7 +140,15 @@ export class JoinFlow {
         <span class="say">${esc(s.teaches)}</span>
         <span class="now">${(wind.speed / KT).toFixed(0)} kt from ${deg3(wind.dir)}° · ${stream}</span></button>`;
     }).join('');
-    return `<h2>Where do you want to sail?</h2><div class="cards">${cards}</div>
+    const clock = new Intl.DateTimeFormat('en-GB', { timeZone: w.course.timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
+    const start = Date.parse(w.course.season.start);
+    const when = this.opts.times.map((t) =>
+      `<button type="button" class="chip" data-time="${t.id}" aria-pressed="${t.id === this.choice.time}" title="${esc(t.say)}"><b>${clock.format(new Date(start + t.hours * 3600000))}</b>${esc(t.name)}</button>`).join('');
+    const picked = this.opts.times.find((t) => t.id === this.choice.time);
+    return `<h2>Where do you want to sail?</h2>
+      <div class="when" role="group" aria-label="Time to cast off">${when}</div>
+      <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
+      <div class="cards">${cards}</div>
       <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii, the San Juans and the BVI.</p>`;
   }
 

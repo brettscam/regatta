@@ -1,7 +1,7 @@
 """Bake the Central San Francisco Bay course package from NOAA SFBOFS output and elevation tiles.
 
-Run fetch_sfbofs.py and fetch_terrain.py first. Then:
-    python3 bake_sfbay.py <sfbofs work dir> <tile dir> <output dir>
+Run fetch_sfbofs.py, fetch_hrrr.py and fetch_terrain.py first. Then:
+    python3 bake_sfbay.py <sfbofs work dir> <tile dir> <output dir> <hrrr work dir>
 
 Writes course.json plus three small binaries:
     current.bin   surface current, int8 east and north per cell per hour
@@ -21,9 +21,10 @@ import contourpy
 import matplotlib.tri as mtri
 import numpy as np
 from PIL import Image
-from scipy.interpolate import NearestNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 from scipy.ndimage import map_coordinates
 
+import fetch_hrrr
 from fetch_sfbofs import FIRST_CYCLE, FORECAST_HOURS, TRUTH_HOURS, wanted
 from fetch_terrain import ZOOM
 
@@ -38,7 +39,7 @@ TERRAIN = (-17200.0, -12400.0, 13400.0, 13200.0)
 CURRENT_DX = 200.0
 DEPTH_DX = 100.0
 TERRAIN_DX = 80.0
-WIND_DX = 2460.0
+WIND_DX = 1230.0
 COAST_DX = 30.0
 CURRENT_SCALE = 0.03   # m/s per count
 TERRAIN_MAX = 820.0    # metres at count 255
@@ -155,7 +156,7 @@ def coast_rings(dem):
 
 # ---- main -----------------------------------------------------------------------------------------
 
-def main(work, tile_dir, out):
+def main(work, tile_dir, out, hrrr_dir):
     os.makedirs(out, exist_ok=True)
     geom = np.load(os.path.join(work, "geometry.npz"))
     keep = geom["keep"]
@@ -172,11 +173,24 @@ def main(work, tile_dir, out):
     inside = (elem >= 0) & keep[np.clip(elem, 0, None)]
     cell_elem = np.where(inside, full_to_kept[np.clip(elem, 0, None)], 0)
 
-    # Wind grid: mean of the model wind over the elements near each coarse cell, nearest where there are none.
+    # Wind grid, filled from NOAA's 3 km HRRR model: linear between its points, nearest beyond them.
     wxs, wys, wnx, wny = grid(CHART, WIND_DX)
-    ex, ey = to_xy(geom["latc"][keep], geom["lonc"][keep])
     wgx, wgy = np.meshgrid(wxs, wys)
-    wind_pick = NearestNDInterpolator(np.c_[ex, ey], np.arange(len(ex)))(wgx, wgy).astype(int)
+
+    def wind_of(path):
+        d = np.load(path)
+        px, py = to_xy(d["lat"], d["lon"])
+        pts = np.c_[px, py]
+        fields = []
+        for key in ("u", "v", "gust"):
+            lin = LinearNDInterpolator(pts, d[key])(wgx, wgy)
+            near = NearestNDInterpolator(pts, d[key])(wgx, wgy)
+            fields.append(np.where(np.isnan(lin), near, lin))
+        u, v, gust = fields
+        # A gust is never less than the mean wind.
+        gust = np.maximum(gust, np.hypot(u, v))
+        tenths = lambda a: [int(round(float(x) * 10)) for x in a.ravel()]
+        return {"u": tenths(u), "v": tenths(v), "g": tenths(gust)}
 
     # Tide station: nearest model node.
     sx, sy = to_xy(TIDE_STATION[1], TIDE_STATION[2])
@@ -184,12 +198,6 @@ def main(work, tile_dir, out):
 
     def load(cycle, fh):
         return np.load(os.path.join(work, f"{cycle:%Y%m%d}.t{cycle:%H}z.f{fh:03d}.npz"))
-
-    def wind_of(d):
-        # Smooth a little by averaging each cell's nearest element with its neighbours on the coarse grid.
-        u = d["uw"][wind_pick]
-        v = d["vw"][wind_pick]
-        return [int(round(float(a) * 10)) for a in u.ravel()], [int(round(float(a) * 10)) for a in v.ravel()]
 
     jobs = wanted()
     truth_jobs = jobs[:TRUTH_HOURS + 1]
@@ -204,15 +212,10 @@ def main(work, tile_dir, out):
         v = np.where(inside, d["v"][cell_elem], 0.0)
         current[i, ..., 0] = np.clip(np.round(u / CURRENT_SCALE), -127, 127)
         current[i, ..., 1] = np.clip(np.round(v / CURRENT_SCALE), -127, 127)
-        uu, vv = wind_of(d)
-        truth_wind.append({"u": uu, "v": vv})
+        truth_wind.append(wind_of(fetch_hrrr.truth_path(hrrr_dir, i)))
         truth_tide.append(round(float(d["zeta"][tide_node]), 3))
-    forecast_wind, forecast_tide = [], []
-    for fh in range(FORECAST_HOURS + 1):
-        d = load(FIRST_CYCLE, fh)
-        uu, vv = wind_of(d)
-        forecast_wind.append({"u": uu, "v": vv})
-        forecast_tide.append(round(float(d["zeta"][tide_node]), 3))
+    forecast_tide = [round(float(load(FIRST_CYCLE, fh)["zeta"][tide_node]), 3) for fh in range(FORECAST_HOURS + 1)]
+    forecast_wind = [wind_of(fetch_hrrr.forecast_path(hrrr_dir, h)) for h in range(fetch_hrrr.forecast_span() + 1)]
     current.tofile(os.path.join(out, "current.bin"))
 
     # Depth: the model's own bathymetry where it has water, the elevation tiles elsewhere.
@@ -252,19 +255,20 @@ def main(work, tile_dir, out):
             "start": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": TRUTH_HOURS,
             "stepSeconds": 3600,
-            "source": "NOAA SFBOFS (San Francisco Bay Operational Forecast System), NOAA Open Data on AWS. What happened is stitched from the first six hours of each six-hourly cycle.",
+            "source": "Tide and stream: NOAA SFBOFS (San Francisco Bay Operational Forecast System), stitched from the first six hours of each six-hourly cycle. Wind and gusts: NOAA HRRR 3 km analyses, one an hour. Both from NOAA Open Data on AWS.",
         },
         "forecast": {
             "issued": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": FORECAST_HOURS,
-            "source": f"SFBOFS {FIRST_CYCLE:%H}z cycle of {FIRST_CYCLE:%d %b %Y}, as issued.",
+            "source": f"Wind: HRRR {fetch_hrrr.FORECAST_CYCLE:%H}z cycle of {fetch_hrrr.FORECAST_CYCLE:%d %b %Y}. Tide: SFBOFS {FIRST_CYCLE:%H}z cycle. Both as issued.",
+            "windIssued": f"{fetch_hrrr.FORECAST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
         },
         "current": {"x0": CHART[0], "y0": CHART[1], "dx": CURRENT_DX, "nx": cnx, "ny": cny, "scale": CURRENT_SCALE, "steps": TRUTH_HOURS + 1, "file": "current.bin"},
         "depth": {"x0": CHART[0], "y0": CHART[1], "dx": DEPTH_DX, "nx": dnx, "ny": dny, "scale": 0.5, "file": "depth.bin"},
         "terrain": {"x0": TERRAIN[0], "y0": TERRAIN[1], "dx": TERRAIN_DX, "nx": tnx, "ny": tny, "max": TERRAIN_MAX, "file": "terrain.bin",
                     "source": "Terrarium elevation tiles (Mapzen, AWS Open Data)."},
         "wind": {"x0": CHART[0], "y0": CHART[1], "dx": WIND_DX, "nx": wnx, "ny": wny, "scale": 0.1, "truth": truth_wind, "forecast": forecast_wind,
-                 "note": "The wind SFBOFS was driven with, in tenths of a metre per second, blowing toward east (u) and north (v)."},
+                 "note": "HRRR 10 m wind in tenths of a metre per second, blowing toward east (u) and north (v), and surface gust speed (g)."},
         "tide": {"station": TIDE_STATION[0], "x": xy(TIDE_STATION[1:])[0], "y": xy(TIDE_STATION[1:])[1], "truth": truth_tide, "forecast": forecast_tide,
                  "note": "Water level in metres above the model datum, close to mean sea level."},
         "bridge": {"south": xy(BRIDGE["south"]), "north": xy(BRIDGE["north"])},
@@ -279,4 +283,4 @@ def main(work, tile_dir, out):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])
