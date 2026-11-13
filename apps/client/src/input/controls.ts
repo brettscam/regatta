@@ -28,6 +28,10 @@ export interface ControlHost {
   pilotTag(): string;
   /** The player moved a control, by any means. */
   controlUsed(control: ControlName): void;
+  /** Turn the coaching hints on or off. */
+  toggleHints(): void;
+  /** Open the box for hailing the other boats. */
+  openHail(): void;
 }
 
 /**
@@ -277,6 +281,8 @@ export class Controls {
 
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // Typing in a box is not sailing.
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement).tagName)) return;
     this.sound.start();
     this.held.add(e.code);
     if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); return; }
@@ -289,6 +295,8 @@ export class Controls {
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
       case 'Digit4': this.drone.flyTo(VIEWS.drone); break;
       case 'KeyH': this.host.toggleInstruments(); break;
+      case 'KeyC': this.host.toggleHints(); break;
+      case 'Enter': this.host.openHail(); e.preventDefault(); break;
       case 'KeyM': this.host.toggleChart(); break;
       case 'Escape': this.host.closeChart(); break;
       case 'Backquote': this.hud.toggleFps(); break;

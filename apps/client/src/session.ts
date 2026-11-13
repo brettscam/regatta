@@ -9,11 +9,22 @@ import { Pilot } from './input/pilot';
 import type { TrafficVessel } from './scene/traffic';
 import { Chart } from './ui/chart';
 import { Coach } from './ui/coach';
+import { Hints, pointOfSail } from './ui/hints';
+import type { Logbook } from './net/logbook';
 import { Hud, TIME_RATES } from './ui/hud';
 import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
 import { Fleet } from './net/fleet';
 import type { Stage } from './stage';
+
+/** Somewhere worth sailing to. */
+export interface Place {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  say: string;
+}
 
 export interface SessionOptions {
   spec: YardBoat;
@@ -29,6 +40,12 @@ export interface SessionOptions {
   boats: Record<string, YardBoat>;
   /** A saved sim state to carry on from, when the page was republished mid-sail. */
   resume?: SimState;
+  /** What the skipper is called. */
+  skipper: string;
+  logbook: Logbook;
+  places: Place[];
+  /** True while the roadmap and feedback screen is open. */
+  boardOpen(): boolean;
 }
 
 type Snapshot = Pick<SimState, 'x' | 'y' | 'heading' | 'heel' | 'rudder' | 'boomAngle' | 'jibAngle'>;
@@ -47,6 +64,11 @@ export class Session {
   readonly pilot: Pilot;
   readonly fleet: Fleet;
   readonly coach: Coach | null;
+  readonly hints: Hints;
+  private readonly hailBox = document.getElementById('hail') as HTMLElement;
+  private readonly hailLog = document.getElementById('hails') as HTMLElement;
+  private windSide = 0;
+  private readonly visited = new Set<string>();
   private readonly sound = new Sound();
   private readonly controls: Controls;
   private paused = false;
@@ -89,6 +111,7 @@ export class Session {
       now: () => this.sim.state.t,
       boat: () => ({ x: this.sim.state.x, y: this.sim.state.y, heading: this.sim.state.heading, cog: this.sim.out.cog, sog: this.sim.out.sog }),
       traffic: () => this.everyoneElse(),
+      places: opts.places,
     });
 
     this.pilot = new Pilot(this.sim, this.passage, {
@@ -97,8 +120,18 @@ export class Session {
     });
 
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
-    this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '' }, world, stage.scene);
+    this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
     void this.fleet.connect();
+    this.fleet.onHail = (from, text) => this.heard(from, text);
+    this.bindHail();
+    opts.logbook.identify(opts.skipper, opts.spec.id, opts.livery.name ?? '', opts.livery.topsides ?? '');
+
+    // Quiet coaching for anyone still learning: one line when something has been wrong for a while.
+    this.hints = new Hints({
+      sim: this.sim,
+      nextMark: () => this.passage.marks[this.passage.nextIndex] ?? null,
+      busy: () => (this.coach?.active ?? false) || this.chart.isOpen || opts.boardOpen() || this.paused,
+    });
 
     const togglePause = (): void => {
       if (this.sharing) this.hud.raiseAlarm('The clock is shared while other boats are here', 4);
@@ -133,6 +166,8 @@ export class Session {
       sheetsInHand: () => this.pilot.sheetsInHand(),
       pilotTag: () => this.pilot.tag(),
       controlUsed: (control) => this.coach?.used(control),
+      toggleHints: () => this.hud.raiseAlarm(this.hints.toggle(), 4),
+      openHail: () => this.openHail(),
     });
   }
 
@@ -143,6 +178,43 @@ export class Session {
   /** The whole state, enough to carry on from after a reload. */
   snapshot(): SimState {
     return this.sim.snapshot();
+  }
+
+  // ---- hailing the other boats -----------------------------------------------------------------
+
+  private bindHail(): void {
+    const input = this.hailBox.querySelector('input') as HTMLInputElement;
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Escape') this.hailBox.hidden = true;
+      if (e.key !== 'Enter') return;
+      const text = input.value.trim();
+      this.hailBox.hidden = true;
+      input.value = '';
+      this.stage.canvas.focus();
+      if (!text) return;
+      if (this.fleet.hail(text)) this.heard('You', text);
+      else this.hud.raiseAlarm('Nobody to hear that: hailing works when other boats are on the water with you', 5);
+    });
+    input.addEventListener('blur', () => { this.hailBox.hidden = true; });
+  }
+
+  private openHail(): void {
+    this.hailBox.hidden = false;
+    const input = this.hailBox.querySelector('input') as HTMLInputElement;
+    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : 'No other boats here yet. Enter to close';
+    input.focus();
+  }
+
+  /** Show a hail for a while. Names and words come from other people, so they go in as text, never as markup. */
+  private heard(from: string, text: string): void {
+    const line = document.createElement('div');
+    const who = document.createElement('b');
+    who.textContent = from;
+    line.append(who, ` ${text}`);
+    this.hailLog.appendChild(line);
+    while (this.hailLog.children.length > 5) this.hailLog.firstChild?.remove();
+    window.setTimeout(() => line.remove(), 45000);
   }
 
   /** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
@@ -168,12 +240,14 @@ export class Session {
     // The boom came across on its own.
     if (sim.state.knockdowns > watch.knockdowns) this.alarm(`Knocked down. Crash gybe in ${Math.round(o.tws / KT)} kt with the main let out. She will come up: ease the sheets`);
     else if (sim.state.crashGybes > watch.crashGybes) this.alarm('Crash gybe. Haul the main in before the boom comes across, or press T and the crew tends it');
+    if (sim.state.knockdowns > watch.knockdowns) this.opts.logbook.count('knockdowns', sim.state.knockdowns - watch.knockdowns);
     watch.crashGybes = sim.state.crashGybes;
     watch.knockdowns = sim.state.knockdowns;
     watch.aground = o.aground;
     watch.shallow = o.underKeel !== null && o.underKeel < (watch.shallow ? 4 : 2.5);
     const reached = passage.nextIndex;
     if (reached > watch.marksReached) {
+      this.opts.logbook.count('marks', reached - watch.marksReached);
       const done = passage.marks[reached - 1];
       const next = passage.marks[reached];
       if (next) {
@@ -186,6 +260,21 @@ export class Session {
       }
     }
     watch.marksReached = reached;
+
+    // Arriving somewhere: close in and slowed down. Said once per visit.
+    for (const place of this.opts.places) {
+      const d = Math.hypot(place.x - sim.state.x, place.y - sim.state.y);
+      if (d < 150 && !this.visited.has(place.id)) {
+        this.visited.add(place.id);
+        this.hud.raiseAlarm(`${place.name}. ${place.say}`, 8);
+      } else if (d > 500) this.visited.delete(place.id);
+    }
+    // A tack or a gybe for the logbook: the wind has changed sides.
+    const side = o.twa >= 0 ? 1 : -1;
+    if (this.windSide !== 0 && side !== this.windSide && Math.abs(o.twa) > 0.35 && Math.abs(o.twa) < 2.8) {
+      this.opts.logbook.count('tacks');
+      this.windSide = side;
+    } else if (this.windSide === 0) this.windSide = side;
 
     // Close quarters: a vessel that will pass close within the next two minutes. One warning per vessel per encounter.
     const near = this.stage.traffic.closest({ x: sim.state.x, y: sim.state.y, cog: o.cog, sog: o.sog });
@@ -220,6 +309,7 @@ export class Session {
         if (i % 30 === 0) passage.update(sim.state, sim.state.t);
       }
       if (steps > 0) {
+        this.opts.logbook.add(steps * SIM_DT, sim.out.sog * steps * SIM_DT, sim.out.sog / KT);
         this.after = grab(sim.state);
         passage.update(sim.state, sim.state.t);
         this.checkAlarms();
@@ -290,7 +380,10 @@ export class Session {
       rate: world.tideRate(sim.state.t),
       depth: sim.out.underKeel === null ? null : sim.out.underKeel + this.opts.spec.dimensions.draft,
     }, world.dateAt(sim.state.t), stage.course.timeZone, paused, rate, dtReal, fleet.boats.length);
+    hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`);
     hud.setPilot(pilot.line());
+    this.hints.update(paused ? 0 : dtReal);
+    this.opts.logbook.update(dtReal);
     boatView.setPilot({ engaged: pilot.engaged, mode: pilot.mode, label: pilot.label() });
     chart.update(dtReal);
     this.coach?.update(dtReal);

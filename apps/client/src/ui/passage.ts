@@ -58,9 +58,9 @@ export class Passage {
     return this.marks.slice(this.nextIndex);
   }
 
-  addMark(p: Point, boat: Point, t: number): void {
+  addMark(p: Point, boat: Point, t: number, name?: string): void {
     const n = this.marks.length + 1;
-    this.marks.push({ x: p.x, y: p.y, name: `WP ${n}`, reachedAt: null, plannedEta: null, leg: null });
+    this.marks.push({ x: p.x, y: p.y, name: name ?? `WP ${n}`, reachedAt: null, plannedEta: null, leg: null });
     this.replan(boat, t);
   }
 

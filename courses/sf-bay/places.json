@@ -1,0 +1,10 @@
+[
+  { "id": "mccovey", "name": "McCovey Cove", "x": 5532, "y": -5891, "say": "Off the ballpark. Bring a glove for the splash hits." },
+  { "id": "ayala", "name": "Ayala Cove", "x": 1300, "y": 4314, "say": "Angel Island's landing: moorings, a beach, and the walk up Mount Livermore." },
+  { "id": "sams", "name": "Sam's, Tiburon", "x": -509, "y": 4690, "say": "The deck at Sam's Anchor Cafe. Tie up for lunch." },
+  { "id": "sausalito", "name": "Sausalito", "x": -2359, "y": 2947, "say": "Houseboats, the yacht harbour, and coffee on Bridgeway." },
+  { "id": "aquatic", "name": "Aquatic Park", "x": 2415, "y": -2279, "say": "The cove under Ghirardelli Square, among the old ships." },
+  { "id": "pier39", "name": "Pier 39", "x": 3469, "y": -2168, "say": "Sea lions and tourists. Mind the ferries." },
+  { "id": "clipper", "name": "Clipper Cove", "x": 7333, "y": -1557, "say": "A quiet anchorage between Treasure Island and Yerba Buena." },
+  { "id": "horseshoe", "name": "Horseshoe Cove", "x": -2371, "y": 278, "say": "Under the north tower of the bridge. A sheltered spot to watch the Gate." }
+]

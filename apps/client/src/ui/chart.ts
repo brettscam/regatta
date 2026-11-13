@@ -37,6 +37,8 @@ export interface ChartHost {
   polar: PolarTable;
   /** Sim time now, seconds since the session started. */
   now(): number;
+  /** Places worth sailing to. */
+  places?: Array<{ id: string; name: string; x: number; y: number; say: string }>;
   boat(): ChartBoat;
   /** Other vessels on the water, shown like AIS targets. */
   traffic?: () => TrafficVessel[];
@@ -201,6 +203,18 @@ export class Chart {
       const p = this.pointer;
       this.pointer = null;
       if (!p || p.moved >= 4 || p.kind !== 'pan') return;
+      // A click on a place makes it the next destination, by name.
+      for (const place of this.host.places ?? []) {
+        const px = m.clientWidth / 2 + (place.x - this.view.cx) * this.view.scale;
+        const py = m.clientHeight / 2 - (place.y - this.view.cy) * this.view.scale;
+        if (Math.hypot(px - e.offsetX, py - e.offsetY) < 16) {
+          this.host.passage.addMark(place, this.host.boat(), this.host.now(), place.name);
+          this.notice = { text: `${place.name} added to the route`, ttl: 3 };
+          this.mapClock = 0;
+          this.sideClock = 0;
+          return;
+        }
+      }
       // A plain click on water drops a waypoint at the end of the route.
       const w = this.fromScreen(m, e.offsetX, e.offsetY);
       if (this.host.world.chartDepth(w.x, w.y) <= 0) {
@@ -715,6 +729,27 @@ export class Chart {
       }
     }
 
+    // Places to sail to: a green ring and a name. Click one to head there.
+    for (const place of this.host.places ?? []) {
+      const [sx, sy] = this.screen(w, h, v, place.x, place.y);
+      if (sx < -40 || sy < -20 || sx > w + 40 || sy > h + 20) continue;
+      ctx.strokeStyle = '#0f6b5a';
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#0f6b5a';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText(place.name, sx + 10, sy);
+    }
+
     this.drawRoute(ctx, w, h, v, true);
     this.drawTraffic(ctx, w, h, v, true);
     this.drawBoat(ctx, w, h, v, 11);
@@ -982,7 +1017,7 @@ export class Chart {
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
       ${traffic}
-      <p class="hint">Click water to add a waypoint. Drag one to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
+      <p class="hint">Click water to add a waypoint, or a green ring to head for that place. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
       <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA SFBOFS. Both replayed from ${this.dayFmt.format(world.dateAt(0))} 2024. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }

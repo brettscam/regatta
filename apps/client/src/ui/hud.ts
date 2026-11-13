@@ -45,6 +45,7 @@ export class Hud {
   private readonly needles: Record<string, SVGGElement> = {};
   private readonly tideLine: HTMLElement;
   private readonly pilotLine: HTMLElement;
+  private readonly sailLine: HTMLElement;
   private readonly clockTime: HTMLElement;
   private readonly clockSub: HTMLElement;
   private alarmTimer = 0;
@@ -67,6 +68,9 @@ export class Hud {
     const cells = document.createElement('div');
     cells.className = 'cells';
     this.readout.appendChild(cells);
+    this.sailLine = document.createElement('div');
+    this.sailLine.className = 'sailline';
+    this.readout.appendChild(this.sailLine);
     this.tideLine = document.createElement('div');
     this.tideLine.className = 'tideline';
     this.readout.appendChild(this.tideLine);
@@ -139,6 +143,14 @@ export class Hud {
   private set(key: string, text: string): void {
     const el = this.cells.get(key)!;
     if (el.textContent !== text) el.textContent = text;
+  }
+
+  /** The point of sail and the tack, in words. */
+  setSail(point: string, tack: string): void {
+    const html = `<b>${point}</b>${tack}`;
+    if (this.sailLine.dataset.html === html) return;
+    this.sailLine.innerHTML = html;
+    this.sailLine.dataset.html = html;
   }
 
   /** Who has the helm and the sheets, as a short line under the instruments. */

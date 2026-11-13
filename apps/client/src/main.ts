@@ -2,10 +2,12 @@ import { isSoundState, type SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
 import startsJson from '../../../courses/sf-bay/starts.json';
 import timesJson from '../../../courses/sf-bay/times.json';
+import placesJson from '../../../courses/sf-bay/places.json';
 import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
-import { Session } from './session';
+import { Session, type Place } from './session';
 import { Stage } from './stage';
+import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
 import { JoinFlow, type Choice, type StartSpot, type StartTime } from './ui/join';
 import { loadCourse } from './world/loadCourse';
@@ -21,6 +23,7 @@ const num = (key: string, fallback: number) => {
 const spots = startsJson as StartSpot[];
 const times = timesJson as StartTime[];
 const DEFAULT_TIME = 'afternoon';
+const places = placesJson as Place[];
 const SAVED = 'regatta.join';
 
 function savedChoice(): Partial<Choice> {
@@ -40,6 +43,7 @@ function settle(c: Partial<Choice>): Choice {
     boat,
     colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
     name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',
+    skipper: (c.skipper ?? '').slice(0, 16),
     tutorial: c.tutorial ?? true,
   };
 }
@@ -55,7 +59,8 @@ setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
 
 // The roadmap and the feedback form are there from the first screen.
-const board = new Board();
+const logbook = new Logbook();
+const board = new Board(logbook);
 window.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
   if (e.code === 'KeyB' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) board.toggle();
@@ -89,6 +94,10 @@ function castOff(choice: Choice, resume?: SimState): void {
     headingDeg: params.has('hdg') ? num('hdg', 0) : undefined,
     route: spot.route,
     tutorial: choice.tutorial && !resume,
+    skipper: choice.skipper,
+    logbook,
+    places,
+    boardOpen: () => board.isOpen,
     boats: BOATS,
     resume,
   });
@@ -111,7 +120,7 @@ const resume = (saved: unknown): void => {
 function begin(): void {
   if (session) return;
   if (params.has('go')) {
-    castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, tutorial: params.get('tutorial') === '1' }));
+    castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, skipper: params.get('skipper') ?? undefined, tutorial: params.get('tutorial') === '1' }));
     return;
   }
   document.body.classList.add('lobby');

@@ -1,4 +1,5 @@
 import roadmapJson from '../data/roadmap.json';
+import type { Logbook } from '../net/logbook';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
 interface RoadmapItem { id: string; status: string; title: string; text: string }
@@ -11,6 +12,7 @@ const KINDS: Array<[string, string, string]> = [
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
+type Tab = 'roadmap' | 'feedback' | 'logbook';
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
@@ -20,7 +22,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
   private readonly store = new Store();
-  private tab: 'roadmap' | 'feedback' = 'roadmap';
+  private tab: Tab = 'roadmap';
   private tally: Tally = {};
   private watching = false;
   private kind = 'feedback';
@@ -33,7 +35,8 @@ export class Board {
   /** Supplies what the boat is doing, to attach to feedback when the sender allows it. */
   context: () => Record<string, unknown> = () => ({});
 
-  constructor() {
+  constructor(private readonly logbook: Logbook) {
+    logbook.onFleet = () => { if (this.isOpen && this.tab === 'logbook') this.render(); };
     this.el.addEventListener('click', this.onClick);
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLTextAreaElement | HTMLInputElement;
@@ -45,7 +48,7 @@ export class Board {
       if (e.key === 'Escape') this.toggle(false);
       e.stopPropagation();
     });
-    for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as 'roadmap' | 'feedback'));
+    for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
   }
 
@@ -53,7 +56,7 @@ export class Board {
     return !this.el.hidden;
   }
 
-  toggle(open = !this.isOpen, tab?: 'roadmap' | 'feedback'): void {
+  toggle(open = !this.isOpen, tab?: Tab): void {
     if (tab) this.tab = tab;
     this.el.hidden = !open;
     if (open) {
@@ -82,7 +85,7 @@ export class Board {
     if (!b) return;
     const d = b.dataset;
     if (d.act === 'close') this.toggle(false);
-    else if (d.tab) { this.tab = d.tab as 'roadmap' | 'feedback'; this.note = ''; this.render(); }
+    else if (d.tab) { this.tab = d.tab as Tab; this.note = ''; this.render(); }
     else if (d.kind) { this.kind = d.kind; this.render(); }
     else if (d.vote && d.item) void this.castVote(d.item, Number(d.vote));
     else if (d.act === 'send') void this.send();
@@ -174,6 +177,21 @@ export class Board {
       ${earlier}`;
   }
 
+  private log(): string {
+    const t = this.logbook.totals;
+    const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+    const mine = `<div class="stats">
+      ${stat('Miles sailed', t.miles.toFixed(1))}${stat('Hours under way', t.hours.toFixed(1))}${stat('Sails', String(t.sails))}
+      ${stat('Marks rounded', String(t.marks))}${stat('Tacks and gybes', String(t.tacks))}${stat('Knockdowns', String(t.knockdowns))}${stat('Top speed', `${t.topKt.toFixed(1)} kt`)}
+    </div>`;
+    const fleet = this.logbook.fleet;
+    const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
+    const table = fleet.length
+      ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
+    return `<p class="lede">Your logbook adds up every sail on this device. On the shared page it is also kept with your sign-in, so it follows you. Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
+  }
+
   private render(): void {
     // Keep the caret where it was while votes arrive behind the form.
     const active = document.activeElement as HTMLTextAreaElement | null;
@@ -182,10 +200,10 @@ export class Board {
       <div class="board-frame" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.feedback()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
       </div>`;
     if (caret !== null) {
       const t = document.getElementById('board-text') as HTMLTextAreaElement | null;

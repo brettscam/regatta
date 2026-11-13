@@ -21,7 +21,8 @@
     "../../courses/*/course.json",
     "../../courses/*/starts.json",
     "../../courses/*/times.json",
-    "src/data/*.json"
+    "src/data/*.json",
+    "../../courses/*/places.json"
   ],
   "references": [
     {

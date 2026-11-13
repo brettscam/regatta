@@ -28,6 +28,8 @@ export interface Choice {
   boat: string;
   colour: string;
   name: string;
+  /** What the skipper is called, shown to the rest of the fleet. */
+  skipper: string;
   tutorial: boolean;
 }
 
@@ -82,6 +84,10 @@ export class JoinFlow {
 
   private onInput = (e: Event): void => {
     const t = e.target as HTMLInputElement;
+    if (t.id === 'join-skipper') {
+      this.choice.skipper = t.value.slice(0, 16);
+      return;
+    }
     if (t.id !== 'join-boat-name') return;
     this.choice.name = t.value.slice(0, 18);
     this.named = true;
@@ -111,7 +117,7 @@ export class JoinFlow {
   private go(by: number): void {
     if (this.step + by >= STEPS.length) {
       this.close();
-      this.opts.onCastOff({ ...this.choice, name: this.choice.name.trim() || this.defaultName(this.choice.boat) });
+      this.opts.onCastOff({ ...this.choice, skipper: this.choice.skipper.trim(), name: this.choice.name.trim() || this.defaultName(this.choice.boat) });
       return;
     }
     this.step = Math.max(0, this.step + by);
@@ -177,6 +183,8 @@ export class JoinFlow {
       `<button type="button" class="swatch" data-colour="${c.hex}" aria-pressed="${c.hex === this.choice.colour}" aria-label="${c.name} topsides" title="${c.name}" style="background:${c.hex}"></button>`).join('');
     return `<h2>Choose your boat</h2><div class="cards">${cards}</div>${coming}
       <div class="fit">
+        <label for="join-skipper">Skipper</label>
+        <input id="join-skipper" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="What the fleet calls you" value="${esc(this.choice.skipper)}">
         <label for="join-boat-name">Name on the transom</label>
         <input id="join-boat-name" type="text" maxlength="18" autocomplete="off" spellcheck="false" value="${esc(this.choice.name)}">
         <span class="lab">Topsides</span><div class="swatches">${swatches}</div>

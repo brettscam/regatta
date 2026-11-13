@@ -36,6 +36,11 @@ interface Wire {
   boat?: string;
   col?: string;
   nm?: string;
+  /** The skipper's own name for themselves. */
+  sk?: string;
+  /** The last thing she hailed, and when by her own clock. */
+  msg?: string;
+  mt?: number;
 }
 
 interface RoomPeer {
@@ -84,6 +89,7 @@ export interface Identity {
   boat: string;
   colour: string;
   name: string;
+  skipper?: string;
 }
 
 class Remote implements RemoteBoat {
@@ -93,6 +99,10 @@ class Remote implements RemoteBoat {
   private readonly holder: Sim;
   name = '';
   boatName = '';
+  /** True once the platform has supplied this person's name, which then wins over what the page says. */
+  platformName = false;
+  onHail: (text: string) => void = () => {};
+  private hailStamp = -1;
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -127,6 +137,14 @@ class Remote implements RemoteBoat {
     };
     this.heardAt = now;
     this.guest = p.guest;
+    if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
+    // A hail is new when its stamp changes. The first one seen on arrival is old news.
+    const mt = typeof v.mt === 'number' ? v.mt : 0;
+    if (mt !== this.hailStamp) {
+      const first = this.hailStamp === -1;
+      this.hailStamp = mt;
+      if (!first && mt && typeof v.msg === 'string' && v.msg.trim()) this.onHail(v.msg.slice(0, 160));
+    }
   }
 
   get userId(): string | undefined {
@@ -216,6 +234,18 @@ export class Fleet {
 
   constructor(private readonly yard: Record<string, YardBoat>, private readonly me: Identity, private readonly env: Environment, private readonly scene: THREE.Scene) {}
 
+  /** Called when another boat hails. */
+  onHail: (from: string, text: string) => void = () => {};
+  private hailed: { text: string; at: number } | null = null;
+
+  /** Hail every boat here. It rides along with this boat's position, so anyone who can see her can hear her. */
+  hail(text: string): boolean {
+    if (!this.room) return false;
+    this.hailed = { text: text.slice(0, 160), at: Date.now() };
+    this.sendClock = 0;
+    return true;
+  }
+
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
     try {
@@ -257,6 +287,8 @@ export class Fleet {
       if (!r) {
         if (this.remotes.size >= 8) continue;
         r = new Remote(p.peer, this.yard[who.boat], who, this.env, this.scene);
+        const made = r;
+        r.onHail = (text) => this.onHail(made.name || made.boatName || 'Another boat', text);
         this.remotes.set(p.peer, r);
         this.nameClock = 0;
       }
@@ -302,6 +334,11 @@ export class Fleet {
       wire.boat = this.me.boat;
       wire.col = this.me.colour;
       wire.nm = this.me.name;
+      if (this.me.skipper) wire.sk = this.me.skipper;
+      if (this.hailed) {
+        wire.msg = this.hailed.text;
+        wire.mt = this.hailed.at;
+      }
       this.room.presence(wire as unknown as Record<string, unknown>).catch(() => {});
     }
 
@@ -321,7 +358,10 @@ export class Fleet {
         this.user.profiles(ids).then((ps) => {
           for (const r of this.remotes.values()) {
             const n = r.userId ? ps[r.userId]?.name : '';
-            if (n) r.name = n.split(' ')[0];
+            if (n) {
+              r.name = n.split(' ')[0];
+              r.platformName = true;
+            }
           }
         }).catch(() => {});
       }

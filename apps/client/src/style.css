@@ -75,7 +75,7 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 }
 
 /* ---- instruments: the wind vane beside the numbers, tide underneath ------------------------- */
-.readout { grid-template-columns: auto auto; grid-template-areas: "dial cells" "tide tide" "pilot pilot"; gap: 6px 14px; align-items: center; }
+.readout { grid-template-columns: auto auto; grid-template-areas: "dial cells" "sail sail" "tide tide" "pilot pilot"; gap: 6px 14px; align-items: center; }
 .readout .dial { grid-area: dial; width: 104px; }
 .readout .dial svg { display: block; width: 104px; height: 104px; }
 .readout .dial .legend { display: flex; justify-content: center; gap: 7px; font-size: 8.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
@@ -90,7 +90,10 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
 .readout .pilotline { grid-area: pilot; font-size: 12px; color: var(--dim); white-space: nowrap; }
 .readout .pilotline b { color: var(--ink); font-weight: 600; }
 .readout .pilotline b.on { color: var(--amber); }
-.readout.hidden .dial, .readout.hidden .cells, .readout.hidden .tideline, .readout.hidden .pilotline { display: none; }
+.readout .sailline { grid-area: sail; font-size: 12px; color: var(--dim); letter-spacing: 0.04em; border-top: 1px solid var(--edge); padding-top: 6px; }
+.readout .sailline b { color: var(--ink); font-weight: 600; font-size: 15px; letter-spacing: 0; }
+.readout .tideline { border-top: 0; padding-top: 0; }
+.readout.hidden .dial, .readout.hidden .cells, .readout.hidden .tideline, .readout.hidden .pilotline, .readout.hidden .sailline { display: none; }
 
 /* ---- chart: corner preview and the full passage-planning view -------------------------------- */
 .mini { right: var(--edge-right); bottom: var(--edge-bottom); width: 236px; height: 196px; padding: 0; overflow: hidden; cursor: pointer; display: block; }
@@ -274,3 +277,30 @@ body.lobby .boardlink { display: block; left: auto; right: var(--edge-right); }
 .board .feedback h3 { margin: 8px 0 0; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 .board .sent li { font-size: 13px; line-height: 1.45; padding: 8px 0; border-top: 1px solid rgba(238, 243, 244, 0.09); white-space: pre-wrap; overflow-wrap: anywhere; }
 .board .sent span { display: block; font-size: 11px; color: var(--dim); }
+
+/* ---- coaching hints, and hails between boats --------------------------------------------------- */
+.hint[hidden], .hail[hidden] { display: none; }
+.hint {
+  position: fixed; z-index: 3; left: calc((100% - 252px) / 2); transform: translateX(-50%); bottom: calc(var(--edge-bottom) + 62px); width: min(520px, calc(100% - 300px));
+  display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px; background: rgba(9, 18, 24, 0.86); border: 1px solid rgba(127, 196, 238, 0.5); border-radius: 12px;
+}
+.hint p { margin: 0; flex: 1; font-size: 13.5px; line-height: 1.45; }
+.hint button { font: inherit; font-size: 11px; color: var(--dim); background: none; border: 1px solid var(--edge); border-radius: 7px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
+body.lobby .hint, body.lobby .hails { display: none; }
+.hails { position: fixed; z-index: 2; left: var(--edge-left); bottom: calc(var(--edge-bottom) + 46px); display: grid; gap: 4px; max-width: min(360px, 60%); pointer-events: none; }
+.hails div { padding: 5px 10px; border-radius: 9px; background: rgba(9, 18, 24, 0.72); border: 1px solid var(--edge); font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.hails b { color: var(--amber); font-weight: 600; }
+.hail { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--edge-bottom) + 120px); width: min(460px, calc(100% - 32px)); display: flex; gap: 10px; align-items: center; padding: 9px 12px; background: rgba(9, 18, 24, 0.9); border: 1px solid var(--amber); border-radius: 12px; }
+.hail label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); }
+.hail input { flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink); background: none; border: 0; outline: none; }
+@media (max-width: 760px) { .hint { left: 50%; width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 160px); } }
+
+.board .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.board .stat { padding: 12px; background: rgba(238, 243, 244, 0.04); border: 1px solid rgba(238, 243, 244, 0.09); border-radius: 10px; display: grid; gap: 2px; }
+.board .stat b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.board .stat span { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.board .logbook h3 { margin: 8px 0 0; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.board table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.board th { text-align: left; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding: 6px 6px; border-bottom: 1px solid var(--edge); font-weight: 600; }
+.board td { padding: 7px 6px; border-bottom: 1px solid rgba(238, 243, 244, 0.07); overflow-wrap: anywhere; }
+.board tr.me td { color: var(--amber); }
