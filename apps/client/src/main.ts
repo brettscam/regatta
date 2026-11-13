@@ -73,13 +73,15 @@ let session: Session | null = null;
 let lobby: Lobby | null = null;
 let chosen: Choice | null = null;
 
-function castOff(choice: Choice, resume?: SimState): void {
+function castOff(choice: Choice, resume?: SimState, clock?: number): void {
   chosen = choice;
   try {
     // Next time, the lesson is not offered by default: they have been aboard before.
     localStorage.setItem(SAVED, JSON.stringify({ ...choice, tutorial: false }));
   } catch { /* private window: nothing to remember */ }
   setClock(choice);
+  // Carrying on after a republish: the clock goes back to where it was, a night at anchor included.
+  if (resume && typeof clock === 'number' && Number.isFinite(clock)) world.startOffset = clock;
   // The day moved on while the join screen was up.
   if (lobby) {
     world.shiftTime(lobby.elapsed);
@@ -112,12 +114,12 @@ function castOff(choice: Choice, resume?: SimState): void {
 // When this page is republished while someone is sailing, hand the boat across so they carry on where they were.
 interface HotReload { snapshot?: (fn: () => unknown) => void; ready?: (fn: (data: unknown) => void) => void; data?: unknown }
 const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
-hot?.snapshot?.(() => (session && chosen ? { sim: session.snapshot(), choice: chosen } : {}));
+hot?.snapshot?.(() => (session && chosen ? { sim: session.snapshot(), choice: chosen, clock: world.startOffset } : {}));
 const resume = (saved: unknown): void => {
-  const s = saved as { sim?: SimState; choice?: Partial<Choice> } | undefined;
+  const s = saved as { sim?: SimState; choice?: Partial<Choice>; clock?: number } | undefined;
   // Only carry on from a state that is whole. Anything else starts again from the join screen.
   if (session || !isSoundState(s?.sim) || !s?.choice) return;
-  castOff(settle(s.choice), s.sim);
+  castOff(settle(s.choice), s.sim, s.clock);
 };
 
 let begun = false;

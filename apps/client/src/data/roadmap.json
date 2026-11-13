@@ -118,6 +118,13 @@
           "title": "Who is on the water",
           "text": "A list of every boat sailing with you, what she is doing, and her range and bearing.",
           "area": "multiplayer"
+        },
+        {
+          "id": "anchor1",
+          "status": "shipped",
+          "area": "world",
+          "title": "Anchoring, moorings and a night aboard",
+          "text": "Stop the boat on her anchor, a mooring buoy or a dock, with sails stowed, and sleep through to the morning."
         }
       ],
       "theme": ""
@@ -158,9 +165,9 @@
         },
         {
           "id": "ashore",
-          "status": "later",
-          "title": "Dock, anchor and go ashore",
-          "text": "Come alongside or drop the hook, take the dinghy or kayak in, and walk into the bar. Docking and anchoring done by hand.",
+          "status": "building",
+          "title": "Go ashore",
+          "text": "Launch the outrigger from your anchored boat and paddle in to the bars and beaches.",
           "area": "world"
         },
         {
@@ -179,7 +186,7 @@
         },
         {
           "id": "fishing",
-          "status": "later",
+          "status": "building",
           "title": "Crab pots and fishing",
           "text": "Anchor, drop a pot and come back to check it. Dungeness in the Bay, tuna offshore. A good catch lifts the crew's morale and stretches the provisions.",
           "area": "world"
@@ -225,7 +232,7 @@
           "id": "berths",
           "status": "later",
           "title": "Night in port",
-          "text": "Pick up a mooring or take a berth at each stop, sleep, and start the next leg in the morning.",
+          "text": "Marinas on a passage: a berth for the night, fuel, water and stores, and the harbour office in the morning.",
           "area": "world"
         },
         {
