@@ -3,6 +3,7 @@ import type { Waypoint } from '@slack-tide/nav';
 import type { ReplayWorld } from '@slack-tide/world';
 import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
 import { onWeb } from '../net/platform';
+import type { CourseAbout } from '../world/loadCourse';
 import { inText, nextEvent, whenText } from '../race/events';
 
 export interface StartSpot {
@@ -25,6 +26,8 @@ export interface StartTime {
 
 /** What the player picked on the way in. */
 export interface Choice {
+  /** Which water: a course id. */
+  water: string;
   spot: string;
   time: string;
   boat: string;
@@ -35,13 +38,22 @@ export interface Choice {
   tutorial: boolean;
 }
 
-export interface JoinOptions {
+/** What changes with the water: where to start, when, and the wind and tide on the cards. */
+export interface WaterView {
+  about: CourseAbout;
   spots: StartSpot[];
   times: StartTime[];
+  world: ReplayWorld;
+}
+
+export interface JoinOptions extends WaterView {
+  /** Every water on offer. */
+  waters: CourseAbout[];
   lineup: LineupEntry[];
   boats: Record<string, YardBoat>;
-  world: ReplayWorld;
   initial: Choice;
+  /** Another water was picked: load it, put it behind the panel, and say what starts and times it has. */
+  onWater(id: string): Promise<WaterView>;
   /** The choice changed, or the step did: show it behind the panel. */
   onPreview(choice: Choice, step: number): void;
   onCastOff(choice: Choice): void;
@@ -61,8 +73,13 @@ export class JoinFlow {
   private step = 0;
   /** True once the player has typed their own boat name, so changing boats leaves it alone. */
   private named: boolean;
+  /** The water showing. Starts as the one the page opened on. */
+  private water: WaterView;
+  /** A water being fetched: its id, until it is on the stage. */
+  private loading: string | null = null;
 
   constructor(private readonly opts: JoinOptions) {
+    this.water = opts;
     this.choice = { ...opts.initial };
     this.named = this.choice.name !== '' && this.choice.name !== this.defaultName(this.choice.boat);
     if (!this.choice.name) this.choice.name = this.defaultName(this.choice.boat);
@@ -102,6 +119,7 @@ export class JoinFlow {
     const d = b.dataset;
     if (d.act === 'next') return this.go(1);
     if (d.act === 'back') return this.go(-1);
+    if (d.water) return void this.changeWater(d.water);
     if (d.step) { this.step = Number(d.step); }
     else if (d.spot) this.choice.spot = d.spot;
     else if (d.time) this.choice.time = d.time;
@@ -116,7 +134,29 @@ export class JoinFlow {
     this.render();
   };
 
+  /** Swap the water: its starts, its times, the conditions on the cards and the scene behind the panel. */
+  private async changeWater(id: string): Promise<void> {
+    if (this.loading || id === this.choice.water) return;
+    this.loading = id;
+    this.render();
+    try {
+      const water = await this.opts.onWater(id);
+      this.water = water;
+      this.choice.water = id;
+      // The same time of day if this water offers it, and its first start.
+      if (!water.times.some((t) => t.id === this.choice.time)) this.choice.time = water.times[Math.min(1, water.times.length - 1)].id;
+      this.choice.spot = water.spots[0].id;
+    } catch {
+      // It could not be fetched: stay where we are.
+    }
+    this.loading = null;
+    if (this.el.hidden) return;
+    this.opts.onPreview(this.choice, this.step);
+    this.render();
+  }
+
   private go(by: number): void {
+    if (this.loading) return;
     if (this.step + by >= STEPS.length) {
       this.close();
       this.opts.onCastOff({ ...this.choice, skipper: this.choice.skipper.trim(), name: this.choice.name.trim() || this.defaultName(this.choice.boat) });
@@ -137,8 +177,12 @@ export class JoinFlow {
   // ---- the three steps --------------------------------------------------------------------------
 
   private where(): string {
-    const w = this.opts.world;
-    const cards = this.opts.spots.map((s) => {
+    const w = this.water.world;
+    const waters = this.opts.waters.length < 2 ? '' : `<div class="when waters" role="group" aria-label="Water to sail">${this.opts.waters.map((c) => {
+      const on = c.id === (this.loading ?? this.choice.water);
+      return `<button type="button" class="chip" data-water="${c.id}" aria-pressed="${on}" title="${esc(c.say)}"><b>${esc(c.name)}</b>${esc(this.loading === c.id ? 'Fetching the chart' : c.where)}</button>`;
+    }).join('')}</div>`;
+    const cards = this.water.spots.map((s) => {
       const wind = w.wind(s.x, s.y, 0);
       const c = w.current(s.x, s.y, 0);
       const drift = Math.hypot(c.x, c.y) / KT;
@@ -150,20 +194,21 @@ export class JoinFlow {
     }).join('');
     const clock = new Intl.DateTimeFormat('en-GB', { timeZone: w.course.timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
     const start = Date.parse(w.course.season.start);
-    const when = this.opts.times.map((t) =>
+    const when = this.water.times.map((t) =>
       `<button type="button" class="chip" data-time="${t.id}" aria-pressed="${t.id === this.choice.time}" title="${esc(t.say)}"><b>${clock.format(new Date(start + t.hours * 3600000))}</b>${esc(t.name)}</button>`).join('');
-    const picked = this.opts.times.find((t) => t.id === this.choice.time);
+    const picked = this.water.times.find((t) => t.id === this.choice.time);
     // A race fixed for later today: tell everyone on the way in where to start from.
-    const event = onWeb() ? null : nextEvent();
-    const from = event && this.opts.spots.find((sp) => sp.id === event.spot);
+    const event = onWeb() ? null : nextEvent(this.choice.water);
+    const from = event && this.water.spots.find((sp) => sp.id === event.spot);
     const race = event && from
       ? `<p class="racenight"><b>${esc(event.name)}</b> The gun goes at ${esc(whenText(event))}, ${esc(inText(event))}. To race, start from <b>${esc(from.name)}</b>. Once you are sailing, press R: the race opens for joining 25 minutes before the gun.</p>`
       : '';
     return `${race}<h2>Where do you want to sail?</h2>
+      ${waters}
       <div class="when" role="group" aria-label="Time to cast off">${when}</div>
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
       <div class="cards">${cards}</div>
-      <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii, the San Juans and the BVI.</p>`;
+      <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii and the BVI.</p>`;
   }
 
   private lesson(): string {
@@ -202,10 +247,10 @@ export class JoinFlow {
   private render(): void {
     const last = this.step === STEPS.length - 1;
     const body = this.step === 0 ? this.where() : this.step === 1 ? this.lesson() : this.boat();
-    const start = this.opts.world.dateAt(0);
-    const day = new Intl.DateTimeFormat('en-GB', { timeZone: this.opts.world.course.timeZone, day: 'numeric', month: 'long', year: 'numeric' }).format(start);
+    const start = this.water.world.dateAt(0);
+    const day = new Intl.DateTimeFormat('en-GB', { timeZone: this.water.world.course.timeZone, day: 'numeric', month: 'long', year: 'numeric' }).format(start);
     this.el.innerHTML = `
-      <header><h1>Regatta</h1><p>San Francisco Bay, as the wind and tide really were on ${day}</p></header>
+      <header><h1>Regatta</h1><p>${esc(this.water.about.name)}, as the wind and tide really were on ${day}</p></header>
       <ol class="join-steps">${STEPS.map((s, i) => `<li><button type="button" data-step="${i}" aria-current="${i === this.step ? 'step' : 'false'}"><i>${i + 1}</i>${s}</button></li>`).join('')}</ol>
       <div class="join-body">${body}</div>
       ${onWeb() ? '<p class="soon">On this website you sail single-handed for now. Sailing in company, votes, sending feedback and the shared logbook are not available here yet.</p>' : ''}

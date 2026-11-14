@@ -30,6 +30,7 @@
   "terrainMax": 820.0,
 
   "tideStation": ["Friday Harbor", 48.5453, -123.0125],
+  "streamAt": ["Pass", "Cattle Pass", 48.4535, -122.9551, 0],
   "marks": [
     ["friday", "Friday Harbor", 48.5350, -123.0170, "town"],
     ["roche", "Roche Harbor", 48.6085, -123.1530, "town"],

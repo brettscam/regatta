@@ -21,16 +21,17 @@ export class Lobby {
   private readonly motion = { heave: 0, pitch: 0 };
   private readonly look = new THREE.Vector3();
 
-  constructor(private readonly stage: Stage, private readonly spots: StartSpot[], private readonly boats: Record<string, YardBoat>) {}
+  /** @param spots the start spots of the water showing. Set again when the water changes. */
+  constructor(private readonly stage: Stage, public spots: StartSpot[], private readonly boats: Record<string, YardBoat>) {}
 
   /** Show a choice. Rebuilds the boat only when something about her or her place has changed. */
   show(choice: Choice, step: number): void {
     this.step = step;
-    const key = `${choice.spot}|${choice.time}|${choice.boat}|${choice.colour}|${choice.name}`;
+    const key = `${choice.water}/${choice.spot}|${choice.time}|${choice.boat}|${choice.colour}|${choice.name}`;
     if (this.boat?.key === key) return;
     const spec = this.boats[choice.boat];
     const spot = this.spots.find((s) => s.id === choice.spot) ?? this.spots[0];
-    const moved = !this.boat || !this.boat.key.startsWith(`${choice.spot}|`);
+    const moved = !this.boat || !this.boat.key.startsWith(`${choice.water}/${choice.spot}|`);
     // Keep her where she has got to unless the place itself changed.
     const at = moved || !this.boat ? { x: spot.x, y: spot.y, heading: NaN } : { x: this.boat.sim.state.x, y: this.boat.sim.state.y, heading: this.boat.sim.state.heading };
     this.clear();

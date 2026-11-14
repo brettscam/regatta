@@ -1,0 +1,45 @@
+[
+  {
+    "id": "griffin-bay",
+    "name": "Griffin Bay and back",
+    "blurb": "From Friday Harbor round Turn Rock, down San Juan Channel to Griffin Bay and home. 8 miles, and the tide decides it.",
+    "marks": [
+      { "name": "Friday Harbor", "x": 300, "y": -6000 },
+      { "name": "Turn Rock", "x": 2900, "y": -7000 },
+      { "name": "Griffin Bay", "x": 2700, "y": -11500 },
+      { "name": "Turn Rock", "x": 2900, "y": -7000 },
+      { "name": "Reid Rock", "x": 735, "y": -5782 },
+      { "name": "Friday Harbor", "x": 300, "y": -6000 }
+    ]
+  },
+  {
+    "id": "round-shaw",
+    "name": "Round Shaw Island",
+    "blurb": "Up San Juan Channel, through Wasp Passage and Harney Channel, and home by Upright Channel. 13 miles on the ferry lanes.",
+    "marks": [
+      { "name": "Reid Rock", "x": 735, "y": -5782 },
+      { "name": "Neck Point", "x": -1500, "y": -2300 },
+      { "name": "Yellow Island", "x": -1500, "y": -750 },
+      { "name": "Wasp Passage", "x": 600, "y": -830 },
+      { "name": "Bell Island", "x": 2100, "y": -450 },
+      { "name": "Orcas landing", "x": 4500, "y": -1000 },
+      { "name": "Harney Channel", "x": 7000, "y": -1500 },
+      { "name": "Hankin Point", "x": 7400, "y": -3300 },
+      { "name": "Upright Channel", "x": 6300, "y": -5000 },
+      { "name": "Turn Rock", "x": 2900, "y": -7000 },
+      { "name": "Reid Rock", "x": 735, "y": -5782 }
+    ]
+  },
+  {
+    "id": "spieden-lap",
+    "name": "Round Spieden Island",
+    "blurb": "From off Roche Harbor west along Spieden Channel, round Sentinel Island and back by New Channel. 8.8 miles in a stream that turns.",
+    "marks": [
+      { "name": "Roche Harbor", "x": -11600, "y": 2700 },
+      { "name": "Sentinel Island", "x": -14200, "y": 5400 },
+      { "name": "New Channel", "x": -10500, "y": 5900 },
+      { "name": "Green Point", "x": -7000, "y": 3800 },
+      { "name": "Roche Harbor", "x": -11600, "y": 2700 }
+    ]
+  }
+]

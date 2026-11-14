@@ -1,0 +1,5 @@
+[
+  { "id": "morning", "name": "Late morning", "hours": 2.5, "say": "A fresh southerly and the last of the ebb" },
+  { "id": "afternoon", "name": "Early afternoon", "hours": 5.5, "say": "The flood is making north through the passes" },
+  { "id": "evening", "name": "Late afternoon", "hours": 8.5, "say": "The flood at full strength, the breeze easing" }
+]

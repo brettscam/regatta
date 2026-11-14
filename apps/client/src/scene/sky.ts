@@ -165,6 +165,7 @@ export class SkySystem {
   private readonly cirrus: THREE.Mesh;
   private readonly cirrusMaterial: THREE.ShaderMaterial;
   private readonly fogMaterial: THREE.ShaderMaterial;
+  private readonly marineLayer: THREE.Group[] = [];
   private readonly lit = new THREE.Color();
   private readonly shade = new THREE.Color();
 
@@ -256,8 +257,14 @@ export class SkySystem {
       }
     }
     this.envScene.add(envBank);
+    this.marineLayer.push(bank, envBank);
 
     scene.add(this.sky, this.cirrus, bank, this.sunLight, this.sunLight.target, this.fill);
+  }
+
+  /** The fog bank offshore belongs to San Francisco Bay. Other waters do without it. */
+  setMarineLayer(on: boolean): void {
+    for (const g of this.marineLayer) g.visible = on;
   }
 
   /** Place the sun for a moment in time. Re-bakes the reflection maps only when the sun has moved enough to see. */

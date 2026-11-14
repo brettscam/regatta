@@ -1,0 +1,56 @@
+[
+  {
+    "id": "channel",
+    "name": "San Juan Channel",
+    "where": "Off Friday Harbor, in the middle of the islands",
+    "teaches": "Room to learn in, with a tide that matters. A beat down to Griffin Bay and a run home on the flood.",
+    "x": 600, "y": -5900,
+    "route": [
+      { "name": "Turn Rock", "x": 2900, "y": -7000 },
+      { "name": "Griffin Bay", "x": 2700, "y": -11500 },
+      { "name": "Turn Rock", "x": 2900, "y": -7000 },
+      { "name": "Reid Rock", "x": 735, "y": -5782 }
+    ]
+  },
+  {
+    "id": "cattle",
+    "name": "Cattle Pass",
+    "where": "Inside the south entrance, off Griffin Bay",
+    "teaches": "The strongest tide in the islands. Go out through the pass and come back with the stream, or against it.",
+    "x": 3000, "y": -13500,
+    "route": [
+      { "name": "Cattle Pass", "x": 3600, "y": -16300 },
+      { "name": "Salmon Bank", "x": 3300, "y": -19000 },
+      { "name": "Cattle Pass", "x": 3600, "y": -16300 },
+      { "name": "Griffin Bay", "x": 2700, "y": -11500 }
+    ]
+  },
+  {
+    "id": "spieden",
+    "name": "Spieden Channel",
+    "where": "Off Roche Harbor, bound round Spieden Island",
+    "teaches": "Pilotage. A channel that runs hard east or west, then round the island by New Channel and home.",
+    "x": -9000, "y": 3000,
+    "route": [
+      { "name": "Spieden Channel", "x": -12500, "y": 3400 },
+      { "name": "Sentinel Island", "x": -14200, "y": 5400 },
+      { "name": "New Channel", "x": -10500, "y": 5900 },
+      { "name": "Green Point", "x": -7000, "y": 3800 },
+      { "name": "Limestone Point", "x": -8400, "y": 2900 }
+    ]
+  },
+  {
+    "id": "harney",
+    "name": "Harney Channel",
+    "where": "Off the Orcas landing, on the ferry lane",
+    "teaches": "Narrow water between Orcas and Shaw with ferries about, then out by Thatcher Pass to Rosario Strait.",
+    "x": 4500, "y": -1000,
+    "route": [
+      { "name": "Harney Channel", "x": 7000, "y": -1500 },
+      { "name": "Upright Head", "x": 9300, "y": -2800 },
+      { "name": "Willow Island", "x": 12100, "y": -6600 },
+      { "name": "Thatcher Pass", "x": 14600, "y": -8000 },
+      { "name": "Rosario Strait", "x": 17300, "y": -8000 }
+    ]
+  }
+]

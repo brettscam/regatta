@@ -291,6 +291,9 @@ def main(name, work, tile_dir, out, hrrr_dir):
     }
     if course["bridge"] is None:
         del course["bridge"]
+    if "streamAt" in c.spec:
+        label, name, lat, lon, flood = c.spec["streamAt"]
+        course["stream"] = {"label": label, "name": name, "x": xy((lat, lon))[0], "y": xy((lat, lon))[1], "flood": flood}
     with open(os.path.join(out, "course.json"), "w") as f:
         json.dump(course, f, separators=(",", ":"))
     sizes = {n: os.path.getsize(os.path.join(out, n)) // 1024 for n in ["course.json", "current.bin", "depth.bin", "terrain.bin"]}

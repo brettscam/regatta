@@ -41,6 +41,8 @@ export interface CourseData {
   tide: { station: string; x: number; y: number; truth: number[]; forecast: number[]; note: string };
   /** The towers of a bridge over the course, where there is one. */
   bridge?: { south: [number, number]; north: [number, number] };
+  /** Where the forecast strip reads the tidal stream, if not at a mark called `gate`. The label is one short word. */
+  stream?: { label: string; name: string; x: number; y: number; /** Bearing the flood sets, degrees true. */ flood: number };
   marks: CourseMark[];
   bounds: { x0: number; y0: number; x1: number; y1: number };
   /** Land outlines as flat x, y lists in metres. */
