@@ -81,6 +81,8 @@ export interface RaceContext {
   say(text: string): void;
   alarm(text: string): void;
   invite(from: string, text: string): void;
+  /** The player has finished: show how everyone stands. */
+  finished(): void;
 }
 
 /**
@@ -235,6 +237,7 @@ export class Race {
         this.ctx.logbook.count('races');
         if (this.place === 1 && table.length > 1) this.ctx.logbook.count('wins');
         this.ctx.alarm(`Finished ${call.name} in ${clockText(this.finish)}. ${table.length > 1 ? `${ORDINAL[this.place - 1] ?? `${this.place}th`} of ${table.length}` : 'A time to beat'}`);
+        this.ctx.finished();
       }
     }
   }

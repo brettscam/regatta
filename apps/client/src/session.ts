@@ -147,6 +147,7 @@ export class Session {
       skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
       say: (text) => this.hud.raiseAlarm(text, 5),
       alarm: (text) => this.alarm(text),
+      finished: () => this.fleetPanel.toggle(true),
       invite: (from, text) => {
         this.heard(from, text);
         this.hud.raiseAlarm(`${from} ${text}`, 8);

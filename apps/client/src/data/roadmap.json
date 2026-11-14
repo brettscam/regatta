@@ -179,9 +179,9 @@
         },
         {
           "id": "ashore",
-          "status": "next",
+          "status": "building",
           "title": "Somewhere to go ashore",
-          "text": "Drawn docks and beaches at each landing, a walk up to the bar, a bar-hop card that stamps each one, and other crews you can see in their kayaks.",
+          "text": "A bar-hop card that stamps each place you land, stepping straight ashore at a dock, then drawn docks and beaches and other crews you can see in their kayaks.",
           "area": "world"
         },
         {

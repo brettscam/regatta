@@ -444,3 +444,12 @@ body.lobby .night { display: none; }
 /* ---- a race fixed for later, on the join screen -------------------------------------------------- */
 .join .racenight { margin: 0 0 12px; padding: 10px 13px; font-size: 13.5px; line-height: 1.5; border: 1px solid var(--amber); border-radius: 10px; background: rgba(255, 196, 107, 0.08); }
 .join .racenight b:first-child { display: block; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); margin-bottom: 2px; }
+
+/* ---- bar-hop card on the logbook ------------------------------------------------------------------ */
+.board .barhop { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.board .barhop li { display: grid; gap: 2px; padding: 10px 12px; border: 1px dashed rgba(238, 243, 244, 0.2); border-radius: 10px; }
+.board .barhop li b { font-size: 13.5px; }
+.board .barhop li span { font-size: 12px; color: var(--dim); line-height: 1.35; }
+.board .barhop li i { font-style: normal; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
+.board .barhop li.been { border-style: solid; border-color: var(--amber); background: rgba(255, 196, 107, 0.08); }
+.board .barhop li.been i { color: var(--amber); }

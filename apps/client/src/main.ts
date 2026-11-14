@@ -71,6 +71,7 @@ const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, da
 // The roadmap and the feedback form are there from the first screen.
 const logbook = new Logbook();
 const board = new Board(logbook);
+board.places = places;
 window.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
   if (e.code === 'KeyB' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) board.toggle();

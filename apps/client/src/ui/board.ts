@@ -1,5 +1,6 @@
 import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
+import { visited } from '../aboard/visited';
 import type { Logbook } from '../net/logbook';
 import { onWeb } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
@@ -66,7 +67,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   { title: 'Stop for a while', rows: [
     [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
     [['Z'], 'Sleep', 'Skip to the morning. Only while stopped, and only when you are alone on the water.'],
-    [['O'], 'Go ashore', 'While stopped, launches the kayak. Paddle with W A S D. Press O at a beach or a bar to land, and O beside your boat to climb back aboard.'],
+    [['O'], 'Go ashore', 'Tied up at a dock, O steps straight ashore. Anywhere else you have stopped, it launches the kayak: paddle with W A S D, press O at a beach or a bar to land, and O beside your boat to climb back aboard.'],
   ] },
   { title: 'Catch supper', rows: [
     [['K'], 'Crab pot', 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.'],
@@ -104,6 +105,9 @@ export class Board {
   private readonly flash = document.getElementById('newsflash');
   /** The newest release note this person has read. */
   private seen = '';
+
+  /** The places with somewhere to go ashore, for the bar-hop card. */
+  places: Array<{ id: string; name: string; ashore?: { name: string; say: string } }> = [];
 
   /** Supplies what the boat is doing, to attach to feedback when the sender allows it. */
   context: () => Record<string, unknown> = () => ({});
@@ -317,6 +321,16 @@ export class Board {
     return `<div class="keypage">${groups}</div>`;
   }
 
+  /** Every place there is to go ashore, stamped once the player has been. */
+  private barHop(): string {
+    const stops = this.places.filter((p) => p.ashore);
+    if (!stops.length) return '';
+    const been = visited();
+    const n = stops.filter((p) => been.has(p.id)).length;
+    const cards = stops.map((p) => `<li class="${been.has(p.id) ? 'been' : ''}"><b>${esc(p.name)}</b><span>${esc(p.ashore!.name)}</span><i>${been.has(p.id) ? 'Been' : 'Not yet'}</i></li>`).join('');
+    return `<h3>Bar hop · ${n} of ${stops.length}</h3><p class="lede">Stop the boat nearby with X, then O: step ashore at a dock, or take the kayak in. Each place is stamped the first time.</p><ul class="barhop">${cards}</ul>`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -333,7 +347,7 @@ export class Board {
     const kept = onWeb()
       ? 'On this website it is kept in this browser only: there are no accounts here yet, so it does not follow you to another device.'
       : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.barHop()}${table}`;
   }
 
   private render(): void {
