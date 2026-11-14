@@ -249,6 +249,9 @@ export class Fleet {
   /** More to tell the room with each position: what she is doing, and any race. Merged into what is sent. */
   extra: () => Record<string, unknown> = () => ({});
 
+  /** The course this boat is sailing, which the session also sends as `cs`. Boats on another water are not shown. */
+  water = 'sf-bay';
+
   /** Called when another boat hails. */
   onHail: (from: string, text: string) => void = () => {};
   private hailed: { text: string; at: number } | null = null;
@@ -264,7 +267,8 @@ export class Fleet {
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
     try {
-      const room = await askRoom();
+      // One room per water: on the website that is its own channel, on claude.ai boats of another water are filtered out below.
+      const room = await askRoom(this.water);
       if (!room) return;
       this.room = room;
       room.onPeers((change) => this.hear(change.peers), () => { this.room = null; this.clear(); });
@@ -286,6 +290,8 @@ export class Fleet {
       // This tab's own boat is already on screen. A second tab of the same person is a second boat.
       if (p.sameTab || p.kind !== 'viewer') continue;
       if (typeof p.presence?.x !== 'number') continue;
+      // A boat on another water is not in this one. A page that does not say is on San Francisco Bay.
+      if ((typeof p.presence.cs === 'string' ? p.presence.cs : 'sf-bay') !== this.water) continue;
       seen.add(p.peer);
       // What she says she is. All of it is another page's word, so check it before using it.
       const v = p.presence;
@@ -305,7 +311,8 @@ export class Fleet {
         this.remotes.set(p.peer, r);
         this.nameClock = 0;
       }
-      r.hear(p, now);
+      // Where the room stamps each report as it arrives, a report handed over again counts as heard when it was.
+      r.hear(p, this.room?.stamped ? p.updatedAt : now);
     }
     for (const [peer, r] of this.remotes) {
       if (!seen.has(peer)) {

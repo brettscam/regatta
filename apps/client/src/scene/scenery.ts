@@ -281,7 +281,7 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array): TH
   group.add(boxes(piers, 'piers'), boxes(sheds, 'pier_sheds'));
 
   // ---- Fort Point: the brick fort under the south end of the bridge -------------------------------
-  {
+  if (course.bridge) {
     const [sx, sy] = course.bridge.south;
     const [nx, ny] = course.bridge.north;
     const len = Math.hypot(nx - sx, ny - sy);

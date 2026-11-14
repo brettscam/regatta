@@ -315,6 +315,10 @@ body.lobby .hint, body.lobby .hails { display: none; }
 .board th { text-align: left; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding: 6px 6px; border-bottom: 1px solid var(--edge); font-weight: 600; }
 .board td { padding: 7px 6px; border-bottom: 1px solid rgba(238, 243, 244, 0.07); overflow-wrap: anywhere; }
 .board tr.me td { color: var(--amber); }
+.board .signin { display: grid; gap: 9px; padding: 14px; background: rgba(238, 243, 244, 0.04); border: 1px solid rgba(238, 243, 244, 0.09); border-radius: 10px; }
+.board .signin h3 { margin: 0; }
+.board .signin .lede b { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.board .signin input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 15px; color: var(--ink); background: rgba(238, 243, 244, 0.06); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 11px; }
 
 /* ---- fleet and racing ------------------------------------------------------------------------- */
 .racebar[hidden], .fleetpanel[hidden] { display: none; }
@@ -444,3 +448,22 @@ body.lobby .night { display: none; }
 /* ---- a race fixed for later, on the join screen -------------------------------------------------- */
 .join .racenight { margin: 0 0 12px; padding: 10px 13px; font-size: 13.5px; line-height: 1.5; border: 1px solid var(--amber); border-radius: 10px; background: rgba(255, 196, 107, 0.08); }
 .join .racenight b:first-child { display: block; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); margin-bottom: 2px; }
+
+/* ---- bar-hop card on the logbook ------------------------------------------------------------------ */
+.board .barhop { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.board .barhop li { display: grid; gap: 2px; padding: 10px 12px; border: 1px dashed rgba(238, 243, 244, 0.2); border-radius: 10px; }
+.board .barhop li b { font-size: 13.5px; }
+.board .barhop li span { font-size: 12px; color: var(--dim); line-height: 1.35; }
+.board .barhop li i { font-style: normal; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
+.board .barhop li.been { border-style: solid; border-color: var(--amber); background: rgba(255, 196, 107, 0.08); }
+.board .barhop li.been i { color: var(--amber); }
+
+/* ---- the main keys, across the top for the first minute ------------------------------------------- */
+.cheat[hidden] { display: none; }
+/* It sits in the clear water between the instruments on the left and the clock on the right, which is a little right of centre. */
+.cheat { left: calc(50% + 125px); top: var(--edge-top); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 8px 14px; width: max-content; max-width: calc(100% - 590px); font-size: 12.5px; color: rgba(238, 243, 244, 0.86); pointer-events: none; }
+.cheat span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.cheat kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink); background: rgba(238, 243, 244, 0.1); border: 1px solid rgba(238, 243, 244, 0.3); border-bottom-width: 2px; border-radius: 5px; }
+.cheat .more { color: var(--dim); }
+body.lobby .cheat { display: none; }
+@media (max-width: 1340px) { .cheat { left: 50%; top: auto; bottom: calc(var(--edge-bottom) + 210px); max-width: calc(100% - 32px); } }

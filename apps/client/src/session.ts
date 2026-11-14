@@ -18,7 +18,7 @@ import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
 import type { Feature } from './aboard/feature';
 import { Fleet } from './net/fleet';
-import { onWeb } from './net/platform';
+import { alone } from './net/platform';
 import { Race, type RaceCourse } from './race/race';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
@@ -139,14 +139,16 @@ export class Session {
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
     this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
     this.fleet.clockLimit = world.seasonLength;
+    this.fleet.water = stage.course.id;
     this.gusts = new GustWatch(world, this.sim);
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
     this.race = new Race({
       sim: this.sim, world, passage: this.passage, fleet: this.fleet, spec: opts.spec, scene: stage.scene, logbook: opts.logbook,
       skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
-      say: (text) => this.hud.raiseAlarm(text, 5),
+      say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       alarm: (text) => this.alarm(text),
+      finished: () => this.fleetPanel.toggle(true),
       invite: (from, text) => {
         this.heard(from, text);
         this.hud.raiseAlarm(`${from} ${text}`, 8);
@@ -155,7 +157,7 @@ export class Session {
     this.fleet.extra = () => {
       const out: Record<string, unknown> = {};
       for (const f of this.features) Object.assign(out, f.wire?.());
-      return { ...out, ...this.race.wire(), st: this.status() };
+      return { ...out, ...this.race.wire(), st: this.status(), cs: this.stage.course.id };
     };
     this.fleetPanel = new FleetPanel({
       race: this.race,
@@ -267,7 +269,7 @@ export class Session {
       this.stage.canvas.focus();
       if (!text) return;
       if (this.fleet.hail(text)) this.heard('You', text);
-      else this.hud.raiseAlarm(onWeb() ? 'Nobody to hear that: hailing other boats is not available on this website yet' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
+      else this.hud.raiseAlarm(alone() ? 'Nobody to hear that: hailing other boats is not available in this copy of the game' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
     });
     input.addEventListener('blur', () => { this.hailBox.hidden = true; });
   }
@@ -275,7 +277,7 @@ export class Session {
   private openHail(): void {
     this.hailBox.hidden = false;
     const input = this.hailBox.querySelector('input') as HTMLInputElement;
-    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : onWeb() ? 'No hailing on this website yet. Enter to close' : 'No other boats here yet. Enter to close';
+    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : alone() ? 'No hailing in this copy of the game. Enter to close' : 'No other boats here yet. Enter to close';
     input.focus();
   }
 
@@ -290,7 +292,7 @@ export class Session {
     window.setTimeout(() => line.remove(), 45000);
   }
 
-  /** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
+  /** Every other vessel on the water: the course's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
     const traffic = this.race.pacers.length ? [...this.stage.traffic.vessels, ...this.race.vessels()] : this.stage.traffic.vessels;
     if (!this.fleet.boats.length) return traffic;

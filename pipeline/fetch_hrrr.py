@@ -8,7 +8,7 @@ sits, so only the three fields needed are fetched, about 3 MB an hour.
 
 HRRR winds are stored relative to its map grid. They are turned to true east and north here.
 
-Usage: python3 fetch_hrrr.py <work dir>
+Usage: python3 fetch_hrrr.py <course> <work dir>
 """
 import concurrent.futures as cf
 import datetime as dt
@@ -21,12 +21,11 @@ import sys
 import eccodes as ec
 import numpy as np
 
-from fetch_sfbofs import FIRST_CYCLE, TRUTH_HOURS
+import course as courses
 
 BUCKET = "https://s3.amazonaws.com/noaa-hrrr-bdp-pds"
-BOX = dict(lon0=-122.75, lon1=-122.18, lat0=37.66, lat1=38.02)
-# The 12z cycle runs 48 hours and is out before anyone casts off.
-FORECAST_CYCLE = dt.datetime(2024, 7, 14, 12)
+# The forecast comes from one long cycle named in the course definition. The 00z, 06z, 12z and 18z cycles run 48 hours.
+# Pick the one that is out before anyone casts off.
 FORECAST_HOURS = 48
 # HRRR's Lambert conformal grid: cone constant for a 38.5 degree standard parallel, central meridian 97.5 W.
 CONE = math.sin(math.radians(38.5))
@@ -38,7 +37,7 @@ def curl(args):
     return subprocess.run(["curl", "-sS", "-f", "--retry", "4", "-m", "180", *args], check=True, capture_output=True)
 
 
-def fetch(cycle: dt.datetime, fh: int, dest: str) -> str:
+def fetch(box: dict, cycle: dt.datetime, fh: int, dest: str) -> str:
     if os.path.exists(dest):
         return f"have {os.path.basename(dest)}"
     url = f"{BUCKET}/hrrr.{cycle:%Y%m%d}/conus/hrrr.t{cycle:%H}z.wrfsfcf{fh:02d}.grib2"
@@ -57,7 +56,7 @@ def fetch(cycle: dt.datetime, fh: int, dest: str) -> str:
                 lat = ec.codes_get_array(g, "latitudes")
                 lon = ec.codes_get_array(g, "longitudes")
                 lon = np.where(lon > 180, lon - 360, lon)
-                out["keep"] = (lat > BOX["lat0"]) & (lat < BOX["lat1"]) & (lon > BOX["lon0"]) & (lon < BOX["lon1"])
+                out["keep"] = (lat > box["lat0"]) & (lat < box["lat1"]) & (lon > box["lon0"]) & (lon < box["lon1"])
                 out["lat"] = lat[out["keep"]]
                 out["lon"] = lon[out["keep"]]
             ec.codes_release(g)
@@ -71,6 +70,10 @@ def fetch(cycle: dt.datetime, fh: int, dest: str) -> str:
     return f"got  {os.path.basename(dest)}"
 
 
+def fetch_job(job) -> str:
+    return fetch(*job)
+
+
 def truth_path(work: str, h: int) -> str:
     return os.path.join(work, f"analysis.{h:03d}.npz")
 
@@ -79,26 +82,28 @@ def forecast_path(work: str, h: int) -> str:
     return os.path.join(work, f"forecast.{h:03d}.npz")
 
 
-def forecast_lead() -> int:
+def forecast_lead(c) -> int:
     """Hours between the forecast cycle and the start of the season."""
-    return int((FIRST_CYCLE - FORECAST_CYCLE).total_seconds() // 3600)
+    return int((c.first_cycle - c.hrrr_forecast_cycle).total_seconds() // 3600)
 
 
-def forecast_span() -> int:
+def forecast_span(c) -> int:
     """Season hours the forecast covers."""
-    return FORECAST_HOURS - forecast_lead()
+    return FORECAST_HOURS - forecast_lead(c)
 
 
 if __name__ == "__main__":
-    work = sys.argv[1]
+    c = courses.load(sys.argv[1])
+    work = sys.argv[2]
     os.makedirs(work, exist_ok=True)
     jobs = []
-    for h in range(TRUTH_HOURS + 1):
-        valid = FIRST_CYCLE + dt.timedelta(hours=h)
+    for h in range(c.truth_hours + 1):
+        valid = c.first_cycle + dt.timedelta(hours=h)
         jobs.append((valid, 0, truth_path(work, h)))
-    for h in range(forecast_span() + 1):
-        jobs.append((FORECAST_CYCLE, forecast_lead() + h, forecast_path(work, h)))
-    with cf.ThreadPoolExecutor(8) as pool:
-        for msg in pool.map(lambda j: fetch(*j), jobs):
+    for h in range(forecast_span(c) + 1):
+        jobs.append((c.hrrr_forecast_cycle, forecast_lead(c) + h, forecast_path(work, h)))
+    # GRIB decoding is not safe from several threads at once, so the hours are fetched one process each.
+    with cf.ProcessPoolExecutor(6) as pool:
+        for msg in pool.map(fetch_job, [(c.spec["hrrrBox"], *j) for j in jobs]):
             print(msg, flush=True)
     print(f"{len(jobs)} hours ready in {work}")

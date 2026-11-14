@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { CourseData, ReplayWorld } from '@slack-tide/world';
+import type { ReplayWorld } from '@slack-tide/world';
 import { waveHeight, type Wave } from './waves';
 
 const KT = 0.514444;
@@ -34,69 +34,20 @@ export interface TrafficRoute {
   dwell?: number;
   /** A vessel that leaves the chart is not shown while it is stopped at the far ends. */
   hideAtEnds?: boolean;
-  /** Seconds into its cycle at the default session start, 16:30 local. */
+  /** Seconds into its cycle at the traffic file's reference time. */
   phase: number;
-  /** Hull or stripe colour. */
-  color: number;
+  /** Hull or stripe colour: "#1f5fa8". */
+  color: string | number;
   /** Way points in metres east and north of the course origin. Depth along each line is checked when the fleet is built. */
   points: Array<[number, number]>;
 }
 
-/**
- * The cast. Every route stays in water deep enough for the vessel: over 6 m for ferries, 15 m for the ship, 4 m for yachts.
- * Names are made up.
- */
-export const ROUTES: TrafficRoute[] = [
-  {
-    id: 'ferry-sausalito', name: 'Sausalito ferry', kind: 'ferry', model: 'catamaran', length: 40, beam: 11, speedKt: 20, mode: 'shuttle', dwell: 300, phase: 150, color: 0x1f5fa8,
-    // The chart shoals to under 6 m off Sausalito, so this run stops in the fairway short of the landing.
-    points: [[-1880, 2840], [-1300, 2000], [500, -300], [2300, -1500], [4300, -1950], [5450, -2800], [5600, -3700]],
-  },
-  {
-    id: 'ferry-alcatraz', name: 'Alcatraz ferry', kind: 'ferry', model: 'ferry', length: 30, beam: 9, speedKt: 12, mode: 'shuttle', dwell: 420, phase: 60, color: 0x2b7a4b,
-    points: [[4250, -2300], [3800, -1500], [3050, -550], [2800, -330]],
-  },
-  {
-    id: 'ferry-tiburon', name: 'Tiburon ferry', kind: 'ferry', model: 'ferry', length: 34, beam: 10, speedKt: 16, mode: 'shuttle', dwell: 360, phase: 700, color: 0xc8962b,
-    // Out of Tiburon through Raccoon Strait, then down past Alcatraz to the city.
-    points: [[-250, 4500], [120, 4220], [-150, 3700], [-300, 3000], [300, 2200], [1700, 900], [3300, -900], [4800, -2100], [5450, -2900], [5600, -3600]],
-  },
-  {
-    id: 'ship-inbound', name: 'Pacific Meridian', kind: 'ship', model: 'container', length: 280, beam: 40, speedKt: 12, mode: 'shuttle', dwell: 1500, hideAtEnds: true, phase: 1150, color: 0x14181c,
-    // In over the bar from the south-west, through the Gate, south of Alcatraz and on under the Bay Bridge.
-    points: [[-13000, -4400], [-11000, -3800], [-8500, -2700], [-6000, -2200], [-4200, -1500], [-2512, -1145], [-500, -1050], [1800, -1500], [4500, -1750], [6000, -2900], [6600, -4300], [7000, -6000], [7300, -7300]],
-  },
-  {
-    id: 'sail-kestrel', name: 'Kestrel', kind: 'sail', model: 'sloop', length: 11, beam: 3.5, speedKt: 5.6, mode: 'loop', phase: 380, color: 0xf2f0ea,
-    points: [[1700, -1800], [1050, 0], [500, 1800], [1200, 2150], [1750, 800], [1850, -900]],
-  },
-  {
-    id: 'sail-zephyr', name: 'Zephyr', kind: 'sail', model: 'sloop', length: 9, beam: 3.0, speedKt: 4.8, mode: 'loop', phase: 900, color: 0xb23a2e,
-    points: [[3600, -1650], [3500, 300], [3900, 1800], [4600, 1900], [4500, 0], [4300, -1650]],
-  },
-  {
-    id: 'sail-windrose', name: 'Windrose', kind: 'sail', model: 'sloop', length: 13, beam: 4.0, speedKt: 6.2, mode: 'loop', phase: 120, color: 0x1d2f4f,
-    points: [[-1800, -900], [-1200, 800], [-1500, 2300], [-900, 2400], [-500, 600], [-1100, -1000]],
-  },
-  {
-    id: 'sail-secondwind', name: 'Second Wind', kind: 'sail', model: 'sloop', length: 10, beam: 3.3, speedKt: 5.0, mode: 'loop', phase: 1500, color: 0xf2f0ea,
-    points: [[300, 2700], [1500, 1700], [3300, 1500], [3400, 900], [1500, 1100], [200, 2100]],
-  },
-  {
-    id: 'sail-osprey', name: 'Osprey', kind: 'sail', model: 'sloop', length: 12, beam: 3.8, speedKt: 5.8, mode: 'loop', phase: 600, color: 0x2d6e63,
-    points: [[5600, -1500], [5300, 300], [4900, 2200], [5600, 2300], [5900, 400], [6000, -1400]],
-  },
-  {
-    id: 'sail-halcyon', name: 'Halcyon', kind: 'sail', model: 'sloop', length: 10, beam: 3.3, speedKt: 5.2, mode: 'loop', phase: 200, color: 0xf2f0ea,
-    points: [[-3700, -1750], [-4500, -1500], [-5600, -1700], [-5700, -2100], [-4600, -2000], [-3700, -2100]],
-  },
-];
-
-/** How far the tide drops below the chart's datum over the season, metres. */
-const LOWEST_TIDE = 0.4;
-
-/** The session's default start, in seconds into the season. Phases above are read at this moment. */
-const REFERENCE_SEASON_TIME = 2.5 * 3600;
+/** A course's traffic, from its `traffic.json`. */
+export interface TrafficSpec {
+  /** Hours into the season at which each route's `phase` is read. */
+  referenceHours: number;
+  routes: TrafficRoute[];
+}
 
 /** A route turned into a smooth line that can be asked where a vessel is at any time. */
 export class Track {
@@ -109,7 +60,8 @@ export class Track {
   private readonly speed: number;
   private readonly ramp: number;
 
-  constructor(readonly route: TrafficRoute) {
+  /** @param reference season time, seconds, at which the route's phase is read */
+  constructor(readonly route: TrafficRoute, private readonly reference = 0) {
     const pts = route.points;
     const n = pts.length;
     const closed = route.mode === 'loop';
@@ -183,7 +135,7 @@ export class Track {
   /** Where the vessel is at a moment in the season. A pure function of time. */
   state(seasonTime: number, out: { x: number; y: number; heading: number; sog: number; active: boolean }): void {
     const r = this.route;
-    const tau = (((seasonTime - REFERENCE_SEASON_TIME + r.phase) % this.cycle) + this.cycle) % this.cycle;
+    const tau = (((seasonTime - this.reference + r.phase) % this.cycle) + this.cycle) % this.cycle;
     out.active = true;
     if (r.mode === 'loop') {
       const s = this.speed * tau;
@@ -223,7 +175,7 @@ export class Track {
 // ---- models, built in code -----------------------------------------------------------------------
 // Vessel frame, the same as the player's boat: +X starboard, +Y up, -Z forward, origin on the waterline amidships.
 
-const mat = (color: number, roughness = 0.7, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+const mat = (color: string | number, roughness = 0.7, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
 const WHITE = mat(0xeeece6, 0.6);
 const GLASS = mat(0x15202a, 0.25, 0.4);
 const DARK = mat(0x22262b, 0.8);
@@ -447,9 +399,11 @@ export class Traffic {
   private readonly actors: Actor[] = [];
   private readonly scratch = { x: 0, y: 0, heading: 0, sog: 0, active: true };
 
-  constructor(_course: CourseData, private readonly world: ReplayWorld) {
+  constructor(spec: TrafficSpec, private readonly world: ReplayWorld) {
     this.group.name = 'traffic';
-    for (const r of ROUTES) {
+    // How far the tide drops below the chart's datum over the season, metres.
+    const lowestTide = Math.max(0, -Math.min(...world.course.tide.truth));
+    for (const r of spec.routes) {
       let group: THREE.Group;
       let sails: SloopParts | null = null;
       if (r.model === 'catamaran') group = buildCatamaran(r);
@@ -459,13 +413,13 @@ export class Traffic {
       group.name = r.id;
       group.rotation.order = 'YXZ';
       this.group.add(group);
-      const track = new Track(r);
+      const track = new Track(r, spec.referenceHours * 3600);
       // Every route must keep its vessel afloat at the lowest water of the season. Say so loudly if one does not.
       const need = r.kind === 'ship' ? 15 : r.kind === 'ferry' ? 6 : 4;
       const p = { x: 0, y: 0 };
       for (let s = 0; s <= track.length; s += 50) {
         track.point(s, p);
-        const depth = world.chartDepth(p.x, p.y) - LOWEST_TIDE;
+        const depth = world.chartDepth(p.x, p.y) - lowestTide;
         if (depth < need) {
           console.warn(`Traffic route ${r.id} runs into ${depth.toFixed(1)} m of water at ${Math.round(p.x)}, ${Math.round(p.y)}`);
           break;

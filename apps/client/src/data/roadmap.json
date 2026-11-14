@@ -139,6 +139,27 @@
           "area": "world",
           "title": "Ashore by kayak",
           "text": "Launch the kayak from the anchored boat, paddle in on the tide, land at the Bay's bars and beaches, and paddle home."
+        },
+        {
+          "id": "sanjuans1",
+          "status": "shipped",
+          "area": "world",
+          "title": "San Juan Islands, first cut",
+          "text": "A second water to choose on the way in, baked from NOAA's wind and Salish Sea tide model for a real summer day."
+        },
+        {
+          "id": "web1",
+          "status": "shipped",
+          "area": "platform",
+          "title": "bajaregatta.com",
+          "text": "The game on its own website, with other boats, hails and races, no Claude account needed."
+        },
+        {
+          "id": "muster",
+          "status": "shipped",
+          "area": "multiplayer",
+          "title": "A common start",
+          "text": "Everyone who enters a race is towed to a berth in the start area."
         }
       ],
       "theme": ""
@@ -179,9 +200,9 @@
         },
         {
           "id": "ashore",
-          "status": "next",
+          "status": "building",
           "title": "Somewhere to go ashore",
-          "text": "Drawn docks and beaches at each landing, a walk up to the bar, a bar-hop card that stamps each one, and other crews you can see in their kayaks.",
+          "text": "A bar-hop card that stamps each place you land, stepping straight ashore at a dock, then drawn docks and beaches and other crews you can see in their kayaks.",
           "area": "world"
         },
         {
@@ -194,8 +215,8 @@
         {
           "id": "server",
           "status": "building",
-          "title": "Its own home on the web",
-          "text": "Regatta on its own website, with accounts, shared water and races there too. The site builds on Vercel and the backend is going onto Supabase.",
+          "title": "Accounts on the website",
+          "text": "Shared water and races already work on bajaregatta.com. Next: sign-in by email for everyone, so logbooks, votes and feedback follow you.",
           "area": "platform"
         },
         {
@@ -283,8 +304,8 @@
           "id": "sanjuans",
           "status": "building",
           "area": "world",
-          "title": "San Juan Islands",
-          "text": "A second place to sail: Friday Harbor, Roche Harbor, Sucia and the passes between, with NOAA's wind and the Salish Sea's strong tides replayed from a real day."
+          "title": "San Juan Islands, finished",
+          "text": "The first cut is sailable. Still to come: races that go with the tide, ferries, trees and towns on the islands, and the fish that live there."
         },
         {
           "id": "cat",
@@ -415,6 +436,48 @@
           "area": "experience",
           "title": "Controls that explain themselves",
           "text": "Make it plain what can be grabbed and what each key does, without reading a list first."
+        },
+        {
+          "id": "city",
+          "status": "next",
+          "area": "world",
+          "title": "A city that looks like the city",
+          "text": "The skyline, the piers, Alcatraz and the bridges drawn closer to the real thing."
+        },
+        {
+          "id": "dinghy",
+          "status": "next",
+          "area": "experience",
+          "title": "A dinghy to mash around in",
+          "text": "A fast little tender with an outboard, beside the kayak."
+        },
+        {
+          "id": "radio",
+          "status": "next",
+          "area": "experience",
+          "title": "The boat's radio",
+          "text": "Yacht rock and eighties stations to put on while you sail or lie at anchor."
+        },
+        {
+          "id": "dive",
+          "status": "later",
+          "area": "world",
+          "title": "Snorkel and spearfish",
+          "text": "Over the side at anchor: an underwater view, kelp and reef, and a speargun for supper."
+        },
+        {
+          "id": "moreboats",
+          "status": "later",
+          "area": "experience",
+          "title": "More boats",
+          "text": "The 42 ft catamaran, the 50 ft blue-water cruiser, and something small and quick."
+        },
+        {
+          "id": "chill",
+          "status": "later",
+          "area": "experience",
+          "title": "Life at anchor",
+          "text": "A swim off the stern, the grill on the rail, sundowners, a hammock on the foredeck."
         }
       ],
       "theme": "Seamanship"

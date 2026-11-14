@@ -1,0 +1,63 @@
+{
+  "id": "san-juans",
+  "name": "San Juan Islands",
+  "origin": { "lat": 48.60, "lon": -123.00 },
+  "timeZone": "America/Los_Angeles",
+
+  "model": {
+    "name": "sscofs",
+    "title": "NOAA SSCOFS (Salish Sea and Columbia River Operational Forecast System)",
+    "archive": "nowcast",
+    "fieldsKey": "sscofs/netcdf/{cycle:%Y/%m/%d}/sscofs.t{cycle:%H}z.{cycle:%Y%m%d}.fields.{kind}{n:03d}.nc",
+    "stationsKey": "sscofs/netcdf/{cycle:%Y/%m/%d}/sscofs.t{cycle:%H}z.{cycle:%Y%m%d}.stations.forecast.nc",
+    "box": { "lon0": -123.33, "lon1": -122.65, "lat0": 48.37, "lat1": 48.85 }
+  },
+  "season": {
+    "start": "2025-06-25T15:00",
+    "hours": 36,
+    "forecastHours": 48,
+    "hrrrForecastCycle": "2025-06-25T12:00"
+  },
+  "hrrrBox": { "lon0": -123.40, "lon1": -122.58, "lat0": 48.33, "lat1": 48.89 },
+  "tileBox": { "lon0": -123.33, "lon1": -122.65, "lat0": 48.37, "lat1": 48.85 },
+
+  "chart": [-19200.0, -20000.0, 20400.0, 22000.0],
+  "terrain": [-23200.0, -24000.0, 24400.0, 26000.0],
+  "dx": { "current": 300.0, "depth": 100.0, "terrain": 100.0, "wind": 2000.0, "coast": 30.0 },
+  "coast": { "tolerance": 18.0, "minArea": 6000 },
+  "currentReach": 1,
+  "landFrom": "model",
+  "terrainMax": 820.0,
+
+  "tideStation": ["Friday Harbor", 48.5453, -123.0125],
+  "streamAt": ["Pass", "Cattle Pass", 48.4535, -122.9551, 0],
+  "marks": [
+    ["friday", "Friday Harbor", 48.5350, -123.0170, "town"],
+    ["roche", "Roche Harbor", 48.6085, -123.1530, "town"],
+    ["eastsound", "Eastsound", 48.6960, -122.9060, "town"],
+    ["lopez", "Lopez Village", 48.5230, -122.9140, "town"],
+    ["deer", "Deer Harbor", 48.6230, -123.0010, "town"],
+    ["orcas", "Orcas Island", 48.6550, -122.9500, "island"],
+    ["sanjuan", "San Juan Island", 48.5300, -123.0900, "island"],
+    ["lopezisland", "Lopez Island", 48.4800, -122.8900, "island"],
+    ["shaw", "Shaw Island", 48.5750, -122.9500, "island"],
+    ["blakely", "Blakely Island", 48.5600, -122.8100, "island"],
+    ["stuart", "Stuart Island", 48.6780, -123.2000, "island"],
+    ["spieden", "Spieden Island", 48.6370, -123.1300, "island"],
+    ["waldron", "Waldron Island", 48.7000, -123.0300, "island"],
+    ["sucia", "Sucia Island", 48.7570, -122.9100, "island"],
+    ["matia", "Matia Island", 48.7480, -122.8420, "island"],
+    ["jones", "Jones Island", 48.6170, -123.0460, "island"],
+    ["decatur", "Decatur Island", 48.5080, -122.8150, "island"],
+    ["cattle", "Cattle Point", 48.4510, -122.9630, "point"],
+    ["turnpoint", "Turn Point", 48.6890, -123.2370, "point"],
+    ["limestone", "Limestone Point", 48.6220, -123.1080, "point"],
+    ["upright", "Upright Head", 48.5720, -122.8830, "point"],
+    ["doughty", "Point Doughty", 48.7120, -122.9490, "point"],
+    ["lawrence", "Point Lawrence", 48.6610, -122.7420, "point"],
+    ["reidrock", "Reid Rock", 48.5480, -122.9900, "buoy"],
+    ["turnrock", "Turn Rock", 48.5350, -122.9640, "buoy"],
+    ["lawson", "Lawson Rock", 48.5310, -122.7880, "buoy"],
+    ["parker", "Parker Reef", 48.7260, -122.8930, "buoy"]
+  ]
+}

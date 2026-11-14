@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { VIEWS, type ViewPreset } from '../camera/drone';
 import type { Place } from '../session';
 import type { AboardContext, Feature } from './feature';
+import { stamp } from './visited';
 import { KAYAK_HALF_BEAM, KAYAK_LENGTH, KayakModel } from './kayakModel';
 import { call, fendOff, groundHeight, launchSpot, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
 
@@ -39,7 +40,6 @@ export class Kayak implements Feature {
   private at: Place | null = null;
   /** Where she floated before she was hauled up the beach, to go back to on shoving off. */
   private afloatAt: { x: number; y: number } | null = null;
-  private readonly landed = new Set<string>();
   /** Places and the yacht, once each has been pointed out on this approach. */
   private told: string | null = null;
   private toldBoat = true;
@@ -143,10 +143,8 @@ export class Kayak implements Feature {
     this.model.setManned(false);
     this.haulUp();
     if (place?.ashore) {
-      if (!this.landed.has(place.id)) {
-        this.landed.add(place.id);
-        ctx.logbook.count('ashore');
-      }
+      // The first time ever at this place, on this device: a stamp on the bar-hop card and one more in the logbook.
+      if (stamp(place.id)) ctx.logbook.count('ashore');
       ctx.say(`Ashore at ${place.ashore.name}. ${place.ashore.say}`, 9);
     } else ctx.say('Ashore on the beach. O shoves off', 6);
   }

@@ -52,10 +52,22 @@ export function landUse(x: number, y: number, z: number): LandUse {
 }
 
 /**
+ * Ground cover for wooded northern islands: fir and cedar nearly everywhere, with pasture in the low flat valleys
+ * and dry grass on slopes that face the sun. `north` is the rise of the ground toward north per metre.
+ */
+function evergreenUse(x: number, y: number, z: number, slope: number, north: number): LandUse {
+  if (z < 95 && slope < 0.07 && smoothNoise(x / 760, y / 760) > 0.52) return 'open';
+  if (north > 0.1 && z < 260 && smoothNoise(x / 340, y / 340) > 0.5) return 'open';
+  return 'forest';
+}
+
+/**
  * The land around the course, from real elevation data.
  * Sim coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
+ * @param cover which built-in ground cover to colour it with: `sf-bay` (the default) or `evergreen`
  */
-export function buildTerrain(course: CourseData, heights: Uint8Array): THREE.Mesh {
+export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Mesh {
+  const bay = cover !== 'evergreen';
   const g = course.terrain;
   const { nx, ny, dx } = g;
   const pos = new Float32Array(nx * ny * 3);
@@ -104,9 +116,9 @@ export function buildTerrain(course: CourseData, heights: Uint8Array): THREE.Mes
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
       const sheltered = THREE.MathUtils.clamp(0.5 - (e + n) * 2.2, 0, 1);
       // Near the open ocean the fog keeps the hills green-grey. Inland they dry to gold by July.
-      const oceanward = 1 - THREE.MathUtils.smoothstep(x, -9500, -3200);
+      const oceanward = bay ? 1 - THREE.MathUtils.smoothstep(x, -9500, -3200) : 0.5;
 
-      const use = landUse(x, y, z);
+      const use = bay ? landUse(x, y, z) : evergreenUse(x, y, z, slope, n);
       if (use === 'forest') {
         c.copy(forest).lerp(scrub, patch * 0.55).lerp(gold, Math.max(0, patch - 0.72) * 1.2);
       } else {
@@ -125,7 +137,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array): THREE.Mes
           c.offsetHSL(0, 0, (hash(bi + 17, bj - 5) - 0.5) * 0.07);
         } else if (use === 'town') {
           c.lerp(scrub, 0.35).lerp(town, 0.22 + 0.2 * hash(Math.floor(x / 110), Math.floor(y / 110)));
-        } else if (z < 12 && slope < 0.05 && y < -2250) {
+        } else if (bay && z < 12 && slope < 0.05 && y < -2250) {
           c.lerp(lawn, 0.5);
         }
       }
@@ -176,9 +188,9 @@ export function buildTerrain(course: CourseData, heights: Uint8Array): THREE.Mes
 }
 
 /** The Golden Gate Bridge, to scale from its published dimensions. Tower positions come from the course file. */
-export function buildBridge(course: CourseData): THREE.Group {
-  const [sx, sy] = course.bridge.south;
-  const [nx, ny] = course.bridge.north;
+export function buildBridge(bridge: NonNullable<CourseData['bridge']>): THREE.Group {
+  const [sx, sy] = bridge.south;
+  const [nx, ny] = bridge.north;
   const span = Math.hypot(nx - sx, ny - sy);
   const TOWER = 227;
   const DECK = 67;

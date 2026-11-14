@@ -10,10 +10,11 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@slack-tide/nav": "*",
     "@slack-tide/sim": "*",
     "@slack-tide/world": "*",
-    "three": "^0.170.0",
-    "@slack-tide/nav": "*"
+    "@supabase/supabase-js": "^2.119.0",
+    "three": "^0.170.0"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",

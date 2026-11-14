@@ -1,0 +1,11 @@
+{
+  "id": "san-juans",
+  "name": "San Juan Islands",
+  "where": "Washington State",
+  "say": "Wooded islands, narrow passes and a tide that runs four knots through them",
+  "order": 2,
+  "scenery": {
+    "landCover": "evergreen",
+    "pieces": []
+  }
+}

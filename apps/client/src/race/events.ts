@@ -8,6 +8,8 @@ import eventsJson from '../data/events.json';
 export interface RaceEvent {
   id: string;
   name: string;
+  /** The water it is sailed on: a course id from `courses/`. San Francisco Bay when left out. */
+  water?: string;
   /** A race course id. */
   course: string;
   /** The start spot to choose on the way in, to be near the first mark. */
@@ -25,10 +27,23 @@ export const CLOSES_AFTER = 15;
 /** The gun, in milliseconds on the real clock. */
 export const gunTime = (e: RaceEvent): number => Date.parse(e.at);
 
-/** The next event worth telling people about: within a day ahead, or only just started. */
-export function nextEvent(now = Date.now()): RaceEvent | null {
+/** The water an event is on. */
+export const eventWater = (e: RaceEvent): string => e.water ?? 'sf-bay';
+
+/** The water this page is sailing on, so an event only shows on its own. Set once a course is chosen. */
+let here = 'sf-bay';
+export function setEventWater(id: string): void {
+  here = id;
+}
+
+/**
+ * The next event worth telling people about: within a day ahead, or only just started.
+ * @param water only events on this water. The water being sailed unless given; `null` for any water
+ */
+export function nextEvent(water: string | null = here, now = Date.now()): RaceEvent | null {
   let best: RaceEvent | null = null;
   for (const e of events) {
+    if (water !== null && eventWater(e) !== water) continue;
     const t = gunTime(e);
     if (!Number.isFinite(t) || t - now > 24 * 3600e3 || now - t > CLOSES_AFTER * 60e3) continue;
     if (!best || t < gunTime(best)) best = e;

@@ -6,8 +6,8 @@ import type { TrafficVessel } from '../scene/traffic';
 
 const D2R = Math.PI / 180;
 const NM = 1852;
-/** The flood sets about east-north-east through the Gate. Current along this bearing is flood, against it is ebb. */
-const FLOOD_AXIS = 65 * D2R;
+/** The flood sets about east-north-east through the Golden Gate. A course with another tidal gate gives its own bearing. */
+const GATE_FLOOD_DEG = 65;
 
 // A paper chart in daylight: buff land, white deep water, blue shoals, magenta for anything navigational.
 const INK = '#1c2b36';
@@ -347,9 +347,14 @@ export class Chart {
     ctx.strokeStyle = LAND_EDGE;
     ctx.lineWidth = 1.1 / v.scale;
     ctx.stroke(this.coast);
-    // The bridge.
-    const [sx, sy] = this.course.bridge.south;
-    const [nx, ny] = this.course.bridge.north;
+    // The bridge, on a course that has one.
+    const bridge = this.course.bridge;
+    if (!bridge) {
+      ctx.restore();
+      return;
+    }
+    const [sx, sy] = bridge.south;
+    const [nx, ny] = bridge.north;
     const len = Math.hypot(nx - sx, ny - sy);
     const ux = (nx - sx) / len;
     const uy = (ny - sy) / len;
@@ -798,7 +803,10 @@ export class Chart {
     const now = this.host.now();
     const r = this.stripRange();
     const b = this.host.boat();
-    const gate = this.course.marks.find((m) => m.id === 'gate') ?? { x: 0, y: 0 };
+    // The stream lane shows the course's own tidal gate: the Golden Gate unless the course names another.
+    const gate = this.course.stream ?? this.course.marks.find((m) => m.id === 'gate') ?? { x: 0, y: 0 };
+    // Current along this bearing is flood, against it is ebb.
+    const FLOOD_AXIS = (this.course.stream?.flood ?? GATE_FLOOD_DEG) * D2R;
     const X = (t: number) => r.left + ((t - r.t0) / (r.t1 - r.t0)) * r.width;
     ctx.fillStyle = '#0d1820';
     ctx.fillRect(0, 0, w, h);
@@ -806,7 +814,7 @@ export class Chart {
     const lanes = [
       { label: 'Wind', y0: 20, y1: h * 0.4 },
       { label: 'Tide', y0: h * 0.4 + 6, y1: h * 0.68 },
-      { label: 'Gate', y0: h * 0.68 + 6, y1: h - 6 },
+      { label: this.course.stream?.label ?? 'Gate', y0: h * 0.68 + 6, y1: h - 6 },
     ];
     ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
     ctx.textBaseline = 'middle';
@@ -1018,6 +1026,6 @@ export class Chart {
       </section>
       ${traffic}
       <p class="hint">Click water to add a waypoint, or a green ring to head for that place. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
-      <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA SFBOFS. Both replayed from ${this.dayFmt.format(world.dateAt(0))} 2024. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
+      <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA ${/NOAA (\w+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }
