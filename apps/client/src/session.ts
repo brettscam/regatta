@@ -18,7 +18,7 @@ import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
 import type { Feature } from './aboard/feature';
 import { Fleet } from './net/fleet';
-import { onWeb } from './net/platform';
+import { alone } from './net/platform';
 import { Race, type RaceCourse } from './race/race';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
@@ -267,7 +267,7 @@ export class Session {
       this.stage.canvas.focus();
       if (!text) return;
       if (this.fleet.hail(text)) this.heard('You', text);
-      else this.hud.raiseAlarm(onWeb() ? 'Nobody to hear that: hailing other boats is not available on this website yet' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
+      else this.hud.raiseAlarm(alone() ? 'Nobody to hear that: hailing other boats is not available in this copy of the game' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
     });
     input.addEventListener('blur', () => { this.hailBox.hidden = true; });
   }
@@ -275,7 +275,7 @@ export class Session {
   private openHail(): void {
     this.hailBox.hidden = false;
     const input = this.hailBox.querySelector('input') as HTMLInputElement;
-    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : onWeb() ? 'No hailing on this website yet. Enter to close' : 'No other boats here yet. Enter to close';
+    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : alone() ? 'No hailing in this copy of the game. Enter to close' : 'No other boats here yet. Enter to close';
     input.focus();
   }
 

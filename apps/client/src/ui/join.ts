@@ -2,7 +2,7 @@ import { KT, R2D, polarSpeed } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import type { ReplayWorld } from '@slack-tide/world';
 import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
-import { onWeb } from '../net/platform';
+import { alone, onWeb } from '../net/platform';
 import { inText, nextEvent, whenText } from '../race/events';
 
 export interface StartSpot {
@@ -154,7 +154,7 @@ export class JoinFlow {
       `<button type="button" class="chip" data-time="${t.id}" aria-pressed="${t.id === this.choice.time}" title="${esc(t.say)}"><b>${clock.format(new Date(start + t.hours * 3600000))}</b>${esc(t.name)}</button>`).join('');
     const picked = this.opts.times.find((t) => t.id === this.choice.time);
     // A race fixed for later today: tell everyone on the way in where to start from.
-    const event = onWeb() ? null : nextEvent();
+    const event = alone() ? null : nextEvent();
     const from = event && this.opts.spots.find((sp) => sp.id === event.spot);
     const race = event && from
       ? `<p class="racenight"><b>${esc(event.name)}</b> The gun goes at ${esc(whenText(event))}, ${esc(inText(event))}. To race, start from <b>${esc(from.name)}</b>. Once you are sailing, press R: the race opens for joining 25 minutes before the gun.</p>`
@@ -208,7 +208,8 @@ export class JoinFlow {
       <header><h1>Regatta</h1><p>San Francisco Bay, as the wind and tide really were on ${day}</p></header>
       <ol class="join-steps">${STEPS.map((s, i) => `<li><button type="button" data-step="${i}" aria-current="${i === this.step ? 'step' : 'false'}"><i>${i + 1}</i>${s}</button></li>`).join('')}</ol>
       <div class="join-body">${body}</div>
-      ${onWeb() ? '<p class="soon">On this website you sail single-handed for now. Sailing in company, votes, sending feedback and the shared logbook are not available here yet.</p>' : ''}
+      ${onWeb() ? '<p class="soon">Anyone else sailing here now shares the water with you: you see their boats, hear their hails and can race them. To vote on the roadmap, send feedback or keep your logbook on any device, sign in with your email address: press B and choose Logbook.</p>'
+        : alone() ? '<p class="soon">This copy of the game is on its own, so you sail single-handed. Sailing in company, votes, sending feedback and the shared logbook are on the website and on the shared page.</p>' : ''}
       <footer>${this.step > 0 ? '<button type="button" data-act="back">Back</button>' : '<span></span>'}
         <button type="button" class="primary" data-act="next">${last ? 'Cast off' : 'Next'}</button></footer>`;
   }
