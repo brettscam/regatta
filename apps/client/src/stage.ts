@@ -55,7 +55,8 @@ export class Stage {
     this.sky = new SkySystem(this.renderer, this.scene);
     this.ocean = new Ocean(this.sky.reflection.texture);
     this.scene.add(this.ocean.mesh);
-    this.scene.add(buildTerrain(this.course, data.terrain), buildBridge(this.course), buildScenery(this.course, data.terrain));
+    this.scene.add(buildTerrain(this.course, data.terrain), buildScenery(this.course, data.terrain));
+    if (this.course.bridge) this.scene.add(buildBridge(this.course.bridge));
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
     for (const b of this.buoys) this.scene.add(b.group);
     // Other vessels on the Bay. Where each one is depends only on the time, so everyone sees the same traffic.

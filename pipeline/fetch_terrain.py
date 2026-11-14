@@ -1,14 +1,15 @@
 """Download elevation tiles (Terrarium format, Mapzen/AWS open data) covering the course region.
 
-Usage: python3 fetch_terrain.py <tile dir>
+Usage: python3 fetch_terrain.py <course> <tile dir>
 """
 import math
 import os
 import subprocess
 import sys
 
+import course as courses
+
 ZOOM = 12
-BOX = dict(lon0=-122.68, lon1=-122.26, lat0=37.69, lat1=37.97)
 
 
 def tile_xy(lat: float, lon: float, z: int):
@@ -19,10 +20,11 @@ def tile_xy(lat: float, lon: float, z: int):
 
 
 if __name__ == "__main__":
-    out = sys.argv[1]
+    box = courses.load(sys.argv[1]).spec["tileBox"]
+    out = sys.argv[2]
     os.makedirs(out, exist_ok=True)
-    x0, y0 = tile_xy(BOX["lat1"], BOX["lon0"], ZOOM)
-    x1, y1 = tile_xy(BOX["lat0"], BOX["lon1"], ZOOM)
+    x0, y0 = tile_xy(box["lat1"], box["lon0"], ZOOM)
+    x1, y1 = tile_xy(box["lat0"], box["lon1"], ZOOM)
     for x in range(x0, x1 + 1):
         for y in range(y0, y1 + 1):
             dest = os.path.join(out, f"{ZOOM}_{x}_{y}.png")

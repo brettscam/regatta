@@ -1,0 +1,45 @@
+{
+  "id": "sf-bay",
+  "name": "Central San Francisco Bay",
+  "origin": { "lat": 37.83, "lon": -122.45 },
+  "timeZone": "America/Los_Angeles",
+
+  "model": {
+    "name": "sfbofs",
+    "title": "NOAA SFBOFS (San Francisco Bay Operational Forecast System)",
+    "archive": "forecast",
+    "fieldsKey": "sfbofs/netcdf/{cycle:%Y%m}/nos.sfbofs.fields.{kind}{n:03d}.{cycle:%Y%m%d}.t{cycle:%H}z.nc",
+    "box": { "lon0": -122.68, "lon1": -122.26, "lat0": 37.70, "lat1": 37.97 }
+  },
+  "season": {
+    "start": "2024-07-14T15:00",
+    "hours": 36,
+    "forecastHours": 48,
+    "hrrrForecastCycle": "2024-07-14T12:00"
+  },
+  "hrrrBox": { "lon0": -122.75, "lon1": -122.18, "lat0": 37.66, "lat1": 38.02 },
+  "tileBox": { "lon0": -122.68, "lon1": -122.26, "lat0": 37.69, "lat1": 37.97 },
+
+  "chart": [-13600.0, -7600.0, 11000.0, 9600.0],
+  "terrain": [-17200.0, -12400.0, 13400.0, 13200.0],
+  "dx": { "current": 200.0, "depth": 100.0, "terrain": 80.0, "wind": 1230.0, "coast": 30.0 },
+  "coast": { "tolerance": 14.0, "minArea": 4000 },
+  "terrainMax": 820.0,
+
+  "tideStation": ["San Francisco (Presidio)", 37.8063, -122.4659],
+  "bridge": { "south": [37.8140, -122.4778], "north": [37.8254, -122.4794] },
+  "marks": [
+    ["gate", "Golden Gate", 37.8197, -122.4786, "bridge"],
+    ["alcatraz", "Alcatraz", 37.8267, -122.4230, "island"],
+    ["blunt", "Point Blunt", 37.8530, -122.4190, "point"],
+    ["angel", "Angel Island", 37.8609, -122.4326, "island"],
+    ["harding", "Harding Rock", 37.8383, -122.4467, "buoy"],
+    ["blossom", "Blossom Rock", 37.8183, -122.4033, "buoy"],
+    ["bonita", "Point Bonita", 37.8155, -122.5297, "point"],
+    ["fortpoint", "Fort Point", 37.8106, -122.4771, "point"],
+    ["sausalito", "Sausalito", 37.8590, -122.4800, "town"],
+    ["cityfront", "City Front", 37.8090, -122.4300, "town"],
+    ["treasure", "Treasure Island", 37.8235, -122.3707, "island"],
+    ["tiburon", "Tiburon", 37.8735, -122.4560, "town"]
+  ]
+}

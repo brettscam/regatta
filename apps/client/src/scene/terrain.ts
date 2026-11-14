@@ -176,9 +176,9 @@ export function buildTerrain(course: CourseData, heights: Uint8Array): THREE.Mes
 }
 
 /** The Golden Gate Bridge, to scale from its published dimensions. Tower positions come from the course file. */
-export function buildBridge(course: CourseData): THREE.Group {
-  const [sx, sy] = course.bridge.south;
-  const [nx, ny] = course.bridge.north;
+export function buildBridge(bridge: NonNullable<CourseData['bridge']>): THREE.Group {
+  const [sx, sy] = bridge.south;
+  const [nx, ny] = bridge.north;
   const span = Math.hypot(nx - sx, ny - sy);
   const TOWER = 227;
   const DECK = 67;

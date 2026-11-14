@@ -347,9 +347,14 @@ export class Chart {
     ctx.strokeStyle = LAND_EDGE;
     ctx.lineWidth = 1.1 / v.scale;
     ctx.stroke(this.coast);
-    // The bridge.
-    const [sx, sy] = this.course.bridge.south;
-    const [nx, ny] = this.course.bridge.north;
+    // The bridge, on a course that has one.
+    const bridge = this.course.bridge;
+    if (!bridge) {
+      ctx.restore();
+      return;
+    }
+    const [sx, sy] = bridge.south;
+    const [nx, ny] = bridge.north;
     const len = Math.hypot(nx - sx, ny - sy);
     const ux = (nx - sx) / len;
     const uy = (ny - sy) / len;

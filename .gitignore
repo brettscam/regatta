@@ -5,3 +5,4 @@ dist/
 .vite/
 dist-single/
 .claude/worktrees/
+__pycache__/
