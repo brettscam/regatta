@@ -225,6 +225,13 @@
           "title": "A catch worth cooking",
           "text": "Pots and lines shown on the chart, tides and seasons that matter, and a catch the galley can turn into supper and morale.",
           "area": "world"
+        },
+        {
+          "id": "visit",
+          "status": "next",
+          "area": "multiplayer",
+          "title": "Come aboard",
+          "text": "Paddle over to a friend's boat, go aboard for a drink, and hand over a fish you caught."
         }
       ],
       "theme": "Bay together"
@@ -384,8 +391,8 @@
         {
           "id": "reef",
           "status": "next",
-          "title": "Reefing and furling by hand",
-          "text": "The physics is done. It needs a mast and a furler you can work.",
+          "title": "Jib alone, main alone, or both",
+          "text": "Roll the jib away or drop the main by hand and sail under either sail. The physics already reefs and furls; it needs the controls, and a main that can come right down.",
           "area": "experience"
         },
         {
@@ -478,6 +485,20 @@
           "area": "experience",
           "title": "Life at anchor",
           "text": "A swim off the stern, the grill on the rail, sundowners, a hammock on the foredeck."
+        },
+        {
+          "id": "engine",
+          "status": "later",
+          "area": "experience",
+          "title": "The engine",
+          "text": "Motor in and out of harbour and through a calm, with a fuel gauge and a battery to keep an eye on."
+        },
+        {
+          "id": "kayakfish",
+          "status": "next",
+          "area": "world",
+          "title": "Fishing from the kayak",
+          "text": "A hand line or a short rod from the kayak, where the fish and the tide decide how it goes."
         }
       ],
       "theme": "Seamanship"
