@@ -56,7 +56,7 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - The platform seam is `apps/client/src/net/platform.ts`: the only place that asks for `room`, `db` and `user`. On claude.ai it returns the artifact capabilities; on the website (Vercel) it returns null and the UI says what is not available there yet
 - Vercel builds from `apps/client` using `apps/client/vercel.json`, which installs from the workspace root. Production deploys from `main`
 - The wind tunnel view (key F) is `aboard/flow.ts`. Its smoke lines are drawn from the sim's trim state (luff, stall, backed), not from a fluid solver
-- `scripts/legs.ts` checks marks and legs against the depth chart before a course or place goes into the data
+- `scripts/legs.ts` checks marks and legs against the depth chart before a course or place goes into the data. That is not enough on its own: a straight leg can be clear and the pilot still put a boat ashore beside it. `npx vite-node scripts/sailcourse.ts <race id> [hours] [boat]` sails a course on the route pilot and must finish for every boat before a course ships. `scripts/depthmap.ts` prints the depth grid for an area
 - The recorded weather is 36 hours. `world.wrapSeason` moves a session back a day when it reaches the end. Boats whose clock is past the end are not followed
 
 ## Status
