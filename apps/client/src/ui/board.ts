@@ -247,6 +247,7 @@ export class Board {
     else if (d.act === 'send') void this.send();
     else if (d.act === 'copy') void this.copy();
     else if (d.act === 'signin') void this.signIn();
+    else if (d.act === 'google') void this.account?.withGoogle().then((r) => { if (!r.ok) { this.signNote = r.reason ?? 'That did not work.'; this.render(); } });
     else if (d.act === 'verify') void this.verify();
     else if (d.act === 'again') { this.signing = 'idle'; this.signNote = ''; this.code = ''; this.render(); }
     else if (d.act === 'signout') void this.account?.signOut();
@@ -455,9 +456,10 @@ export class Board {
     }
     const sending = this.signing === 'sending';
     return `<section class="signin"><h3>Sign in</h3>
-      <p class="lede">Sign in with your email address to keep your logbook on any device, vote on the roadmap and send feedback. There is no password: you are sent an email with a link. You can sail, and see the other boats, without signing in.</p>
+      <p class="lede">Sign in with your email address to keep your logbook on any device, vote on the roadmap and send feedback. There is no password to remember. You can sail, and see the other boats, without signing in.</p>
+      ${a.google() ? '<div class="row"><button type="button" class="primary" data-act="google">Continue with Google</button></div><p class="lede">Or use any email address:</p>' : ''}
       <label for="board-email">Email address</label>
-      <div class="row"><input id="board-email" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="${esc(this.email)}"><button type="button" class="primary" data-act="signin" ${sending ? 'disabled' : ''}>${sending ? 'Sending' : 'Email me a sign-in link'}</button></div>
+      <div class="row"><input id="board-email" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="${esc(this.email)}"><button type="button" class="${a.google() ? '' : 'primary'}" data-act="signin" ${sending ? 'disabled' : ''}>${sending ? 'Sending' : 'Email me a sign-in link'}</button></div>
       ${note}</section>`;
   }
 

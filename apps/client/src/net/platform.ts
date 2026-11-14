@@ -78,6 +78,10 @@ export interface Account {
   email(): string | null;
   /** Email a sign-in link to this address. Opening it on this device signs them in. */
   send(email: string): Promise<AccountResult>;
+  /** True once it is known that this site offers sign-in with a Google account. False until then, and where it does not. */
+  google(): boolean;
+  /** Go to Google to sign in. The page leaves and comes back signed in. */
+  withGoogle(): Promise<AccountResult>;
   /** True where the email also carries a code that can be typed in instead of opening the link. */
   readonly codes: boolean;
   /** Sign in with the code from the email. */
