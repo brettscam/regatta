@@ -195,7 +195,7 @@
           "id": "server",
           "status": "building",
           "title": "Its own home on the web",
-          "text": "Regatta on its own website, with a server behind it for shared water, races and accounts. The build is going onto Vercel now.",
+          "text": "Regatta on its own website, with accounts, shared water and races there too. The site builds on Vercel and the backend is going onto Supabase.",
           "area": "platform"
         },
         {
@@ -262,6 +262,13 @@
           "title": "Feeding the crew",
           "text": "What you catch and what you stowed decide what is for dinner, and a fed crew stands a better watch.",
           "area": "world"
+        },
+        {
+          "id": "horn",
+          "status": "idea",
+          "area": "world",
+          "title": "Round the Horn",
+          "text": "The Roaring Forties: down the 40th parallel and round Cape Horn. Days at sea, big wind and sea, watches, sail changes and weather routing."
         }
       ],
       "theme": "Passages"
@@ -273,6 +280,13 @@
       "blurb": "Warm water, short hops and a catamaran.",
       "items": [
         {
+          "id": "sanjuans",
+          "status": "building",
+          "area": "world",
+          "title": "San Juan Islands",
+          "text": "A second place to sail: Friday Harbor, Roche Harbor, Sucia and the passes between, with NOAA's wind and the Salish Sea's strong tides replayed from a real day."
+        },
+        {
           "id": "cat",
           "status": "later",
           "title": "The 42 ft catamaran",
@@ -281,9 +295,9 @@
         },
         {
           "id": "bvi",
-          "status": "idea",
+          "status": "later",
           "title": "British Virgin Islands",
-          "text": "Line-of-sight island hopping, anchoring and mooring balls.",
+          "text": "Trade winds, short hops and a mooring ball every night: Tortola, Virgin Gorda, Jost Van Dyke and Anegada.",
           "area": "world"
         },
         {
@@ -295,9 +309,9 @@
         },
         {
           "id": "croatia",
-          "status": "idea",
+          "status": "later",
           "title": "Croatia",
-          "text": "The Dalmatian islands, with the bora and the maestral.",
+          "text": "The Dalmatian coast: Split, Hvar, Vis and Korcula, with the afternoon maestral and the bora to watch for.",
           "area": "world"
         }
       ],
