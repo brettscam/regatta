@@ -1,11 +1,11 @@
 /**
  * The page's small shared database, for votes on the roadmap and for feedback.
- * It comes from `platform.ts`. Today it exists only on the published claude.ai page, and only people the page is
- * shared with as contributors can write. Everywhere else every call here quietly does nothing, and the screens that
- * use it say so.
+ * It comes from `platform.ts`. On the published claude.ai page only people the page is shared with as contributors
+ * can write. On the website anyone can read the votes, and writing needs a sign-in. Anywhere else every call here
+ * quietly does nothing, and the screens that use it say so.
  */
 
-import { db as askDb, user as askUser, type Db } from './platform';
+import { account as askAccount, db as askDb, onWeb, user as askUser, type Db } from './platform';
 
 export interface FeedbackEntry {
   /** feedback, problem or idea */
@@ -28,9 +28,13 @@ export class Store {
   private mine: FeedbackEntry[] = [];
   private writing: Promise<unknown> = Promise.resolve();
   readonly ready: Promise<void>;
+  /** Called on the website after this person has signed in or out and the store has caught up. */
+  onAccount: () => void = () => {};
 
   constructor() {
     this.ready = this.connect();
+    // On the website a person can sign in or out while the page is open. Then everything is asked for again.
+    void askAccount().then((a) => a?.onChange(() => { void this.connect().then(() => this.onAccount()); })).catch(() => {});
   }
 
   private async connect(): Promise<void> {
@@ -38,10 +42,18 @@ export class Store {
       const [db, u] = await Promise.all([askDb(), askUser()]);
       this.uid = (await u?.id()) ?? null;
       this.mayWrite = (await u?.can('data.write')) ?? null;
-      if (db && this.uid) this.db = db;
+      this.myVotes = {};
+      this.mine = [];
+      // On the website the votes can be read by anyone. Everywhere else the database is for people who are signed in.
+      this.db = db && (this.uid || onWeb()) ? db : null;
     } catch {
       this.db = null;
     }
+  }
+
+  /** This person is known to the platform: signed in, on the website. */
+  get signedIn(): boolean {
+    return this.uid !== null;
   }
 
   /** There is a database to read. */

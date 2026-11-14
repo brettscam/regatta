@@ -267,7 +267,8 @@ export class Fleet {
   /** Join the room if this page is somewhere that has one. Resolves either way. */
   async connect(): Promise<void> {
     try {
-      const room = await askRoom();
+      // One room per water: on the website that is its own channel, on claude.ai boats of another water are filtered out below.
+      const room = await askRoom(this.water);
       if (!room) return;
       this.room = room;
       room.onPeers((change) => this.hear(change.peers), () => { this.room = null; this.clear(); });
@@ -310,7 +311,8 @@ export class Fleet {
         this.remotes.set(p.peer, r);
         this.nameClock = 0;
       }
-      r.hear(p, now);
+      // Where the room stamps each report as it arrives, a report handed over again counts as heard when it was.
+      r.hear(p, this.room?.stamped ? p.updatedAt : now);
     }
     for (const [peer, r] of this.remotes) {
       if (!seen.has(peer)) {

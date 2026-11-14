@@ -2,7 +2,7 @@ import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
 import { visited } from '../aboard/visited';
 import type { Logbook } from '../net/logbook';
-import { onWeb } from '../net/platform';
+import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
 interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
@@ -84,8 +84,9 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
- * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the page's
- * shared database, which only the published claude.ai page has. On the website there is none yet, and each tab says so.
+ * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the shared
+ * database: the published claude.ai page's, or on the website the site's own, once the person has signed in with their
+ * email address. The sign-in form is on the Logbook tab, on the website only. Where there is neither, each tab says so.
  */
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
@@ -106,6 +107,13 @@ export class Board {
   private readonly flash = document.getElementById('newsflash');
   /** The newest release note this person has read. */
   private seen = '';
+  /** Signing in, on the website. Null on the shared page, which knows who is looking, and where there is no backend. */
+  private account: Account | null = null;
+  private email = '';
+  private code = '';
+  private signing: 'idle' | 'sending' | 'sent' | 'checking' = 'idle';
+  private signNote = '';
+  private unwatch: () => void = () => {};
 
   /** The places with somewhere to go ashore, for the bar-hop card. */
   places: Array<{ id: string; name: string; ashore?: { name: string; say: string } }> = [];
@@ -120,12 +128,44 @@ export class Board {
       const t = e.target as HTMLTextAreaElement | HTMLInputElement;
       if (t.id === 'board-text') this.draft = t.value;
       if (t.id === 'board-context') this.withContext = (t as HTMLInputElement).checked;
+      if (t.id === 'board-email') this.email = t.value;
+      if (t.id === 'board-code') this.code = t.value;
     });
     // Keys typed into the form are not sailing commands.
     this.el.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.toggle(false);
+      const id = (e.target as HTMLElement).id;
+      if (e.key === 'Enter' && id === 'board-email') void this.signIn();
+      if (e.key === 'Enter' && id === 'board-code') void this.verify();
       e.stopPropagation();
     });
+    // Signing in or out on the website changes whose votes and notes these are.
+    this.store.onAccount = () => {
+      this.unwatch();
+      this.unwatch = () => {};
+      this.watching = false;
+      this.sent = [];
+      this.note = '';
+      if (this.isOpen) {
+        this.start();
+        this.render();
+      }
+    };
+    void askAccount().then((a) => {
+      this.account = a;
+      if (!a) return;
+      a.onChange(() => {
+        this.signing = 'idle';
+        this.code = '';
+        this.signNote = a.email() ? '' : 'You are signed out.';
+        if (this.isOpen) this.render();
+      });
+      // Arriving from the link in the sign-in email: say how it went.
+      if (a.arrival) {
+        this.signNote = a.arrival === 'expired' ? 'That sign-in link had run out or had already been used. Ask for a new one here.' : 'You are signed in.';
+        this.toggle(true, 'logbook');
+      } else if (this.isOpen) this.render();
+    }).catch(() => {});
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
     this.announce();
@@ -183,7 +223,7 @@ export class Board {
   private start(): void {
     if (this.watching || !this.store.online) return;
     this.watching = true;
-    this.store.watchVotes((tally) => {
+    this.unwatch = this.store.watchVotes((tally) => {
       this.tally = tally;
       if (this.isOpen && this.tab === 'roadmap') this.render();
     });
@@ -206,14 +246,45 @@ export class Board {
     else if (d.act === 'shipped') { this.showShipped = !this.showShipped; this.render(); }
     else if (d.act === 'send') void this.send();
     else if (d.act === 'copy') void this.copy();
+    else if (d.act === 'signin') void this.signIn();
+    else if (d.act === 'verify') void this.verify();
+    else if (d.act === 'again') { this.signing = 'idle'; this.signNote = ''; this.code = ''; this.render(); }
+    else if (d.act === 'signout') void this.account?.signOut();
     else if (d.suggest) { this.tab = 'feedback'; this.kind = 'idea'; this.render(); }
   };
 
   private async castVote(item: string, value: number): Promise<void> {
     const next = this.store.vote(item) === value ? 0 : value;
     const ok = await this.store.setVote(item, next);
-    if (!ok) this.note = 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
+    if (!ok) this.note = onWeb() ? 'Your vote could not be saved. Check your connection, and on the Logbook tab that you are still signed in.' : 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
     this.render();
+  }
+
+  /** Ask for the sign-in email. */
+  private async signIn(): Promise<void> {
+    if (!this.account || this.signing === 'sending') return;
+    this.signing = 'sending';
+    this.signNote = '';
+    this.render();
+    const r = await this.account.send(this.email);
+    this.signing = r.ok ? 'sent' : 'idle';
+    this.signNote = r.ok ? '' : r.reason ?? 'The email could not be sent.';
+    this.render();
+  }
+
+  /** Sign in with the code from the email, where the email carries one. */
+  private async verify(): Promise<void> {
+    if (!this.account || this.signing !== 'sent' || !this.code.trim()) return;
+    this.signing = 'checking';
+    this.signNote = '';
+    this.render();
+    const r = await this.account.verify(this.email, this.code);
+    // When it works, the account says so itself and the form is drawn again signed in.
+    if (!r.ok) {
+      this.signing = 'sent';
+      this.signNote = r.reason ?? 'That did not work.';
+      this.render();
+    }
   }
 
   private async send(): Promise<void> {
@@ -230,7 +301,7 @@ export class Board {
       this.draft = '';
       this.note = 'Sent. Thank you: it goes straight to the people building Regatta.';
     } else {
-      this.note = 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
+      this.note = onWeb() ? 'This could not be sent. Check your connection, and on the Logbook tab that you are still signed in. Or copy it and pass it on.' : 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
     }
     this.render();
   }
@@ -277,11 +348,15 @@ export class Board {
     const chips = [['all', 'Everything'] as [string, string], ...AREAS].map(([id, name]) => `<button type="button" class="chip area-${id}" data-area="${id}" aria-pressed="${this.area === id}">${name}</button>`).join('');
     const how = canVote
       ? 'Vote for what you want most. One vote per item, and you can change it. The most wanted rise to the top of each box.'
-      : this.store.online
-        ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
-        : onWeb()
-          ? 'Voting is not available on this website yet. It needs accounts, which have not been built here.'
-          : 'Voting works on the shared page when you are signed in.';
+      : onWeb()
+        ? this.store.signedIn
+          ? 'Your votes cannot be saved just now. Check your connection.'
+          : `${this.store.online ? 'You can read the votes. ' : ''}To cast one, sign in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.`
+        : this.store.online
+          ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
+          : alone()
+            ? 'Voting is not available in this copy of the game. It works on the website and on the shared page.'
+            : 'Voting works on the shared page when you are signed in.';
     return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       <div class="rm-filter">${chips}<button type="button" class="chip shipped" data-act="shipped" aria-pressed="${this.showShipped}">Shipped · ${shipped}</button></div>
       <div class="rm-scroll"><div class="rm-board" style="--cols:${columns.length}">${head}${rows}</div></div>`;
@@ -303,7 +378,9 @@ export class Board {
         ${canSend ? `<button type="button" class="primary" data-act="send" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Sending' : 'Send'}</button>` : ''}
         <button type="button" data-act="copy">Copy it instead</button>
       </div>
-      ${canSend ? '' : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : onWeb() ? 'Feedback cannot be sent from this website yet.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on${onWeb() ? ' to whoever gave you the link' : ''}.</p>`}
+      ${canSend ? '' : onWeb()
+        ? `<p class="note">${this.store.signedIn ? 'Sending is not working just now. Check your connection.' : 'Sending from here needs a sign-in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.'} Or copy your note and pass it on.</p>`
+        : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : alone() ? 'Feedback cannot be sent from this copy of the game.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on.</p>`}
       ${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       ${earlier}`;
   }
@@ -344,17 +421,51 @@ export class Board {
     const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
     const table = fleet.length
       ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
-      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : onWeb() ? 'The fleet\'s logbooks are not available on this website yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
+      : `<p class="lede">${this.store.online ? (onWeb() ? 'Nobody has logged a sail here yet. Sign in and yours is the first.' : 'Nobody else has logged a sail yet.') : onWeb() ? 'The fleet\'s logbooks could not be fetched just now.' : alone() ? 'The fleet\'s logbooks are not available in this copy of the game.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
     const kept = onWeb()
-      ? 'On this website it is kept in this browser only: there are no accounts here yet, so it does not follow you to another device.'
-      : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.barHop()}${table}`;
+      ? this.account?.email()
+        ? 'It is also kept with your sign-in, so it follows you to any device, and the fleet can see it below.'
+        : 'Sign in below and it is kept with your email address too, so it follows you to any device.'
+      : alone()
+        ? 'In this copy of the game it is kept in this browser only.'
+        : 'On the shared page it is also kept with your sign-in, so it follows you.';
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${table}`;
+  }
+
+  /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */
+  private signInForm(): string {
+    const a = this.account;
+    if (!a) return '';
+    const note = this.signNote ? `<p class="note" role="status">${esc(this.signNote)}</p>` : '';
+    const address = a.email();
+    if (address) {
+      return `<section class="signin"><h3>Your account</h3>
+        <p class="lede">Signed in as <b>${esc(address)}</b>. Your logbook, your votes and the feedback you send go with this address. Other people are shown only your skipper name, your boat and your logbook.</p>${note}
+        <div class="row"><button type="button" data-act="signout">Sign out</button></div></section>`;
+    }
+    if (this.signing === 'sent' || this.signing === 'checking') {
+      const code = a.codes
+        ? `<label for="board-code">Or type the code from the email</label>
+          <div class="row"><input id="board-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="12" value="${esc(this.code)}"><button type="button" class="primary" data-act="verify" ${this.signing === 'checking' ? 'disabled' : ''}>${this.signing === 'checking' ? 'Checking' : 'Sign in'}</button></div>`
+        : '';
+      return `<section class="signin"><h3>Sign in</h3>
+        <p class="lede">An email with a sign-in link is on its way to <b>${esc(this.email.trim())}</b>. Open the link on this device and you are signed in. It can take a minute, and it may land in the junk folder.</p>
+        ${code}${note}
+        <div class="row"><button type="button" data-act="again">Use a different address</button></div></section>`;
+    }
+    const sending = this.signing === 'sending';
+    return `<section class="signin"><h3>Sign in</h3>
+      <p class="lede">Sign in with your email address to keep your logbook on any device, vote on the roadmap and send feedback. There is no password: you are sent an email with a link. You can sail, and see the other boats, without signing in.</p>
+      <label for="board-email">Email address</label>
+      <div class="row"><input id="board-email" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" value="${esc(this.email)}"><button type="button" class="primary" data-act="signin" ${sending ? 'disabled' : ''}>${sending ? 'Sending' : 'Email me a sign-in link'}</button></div>
+      ${note}</section>`;
   }
 
   private render(): void {
     // Keep the caret where it was while votes arrive behind the form.
-    const active = document.activeElement as HTMLTextAreaElement | null;
-    const caret = active?.id === 'board-text' ? active.selectionStart : null;
+    const active = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
+    const typing = active && ['board-text', 'board-email', 'board-code'].includes(active.id) ? active.id : null;
+    const caret = typing ? active!.selectionStart : null;
     this.el.innerHTML = `
       <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
         <header>
@@ -366,8 +477,8 @@ export class Board {
       </div>`;
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();
-    if (caret !== null) {
-      const t = document.getElementById('board-text') as HTMLTextAreaElement | null;
+    if (typing && caret !== null) {
+      const t = document.getElementById(typing) as HTMLTextAreaElement | HTMLInputElement | null;
       t?.focus();
       t?.setSelectionRange(caret, caret);
     }
