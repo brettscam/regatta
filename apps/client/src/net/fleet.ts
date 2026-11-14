@@ -305,7 +305,8 @@ export class Fleet {
         this.remotes.set(p.peer, r);
         this.nameClock = 0;
       }
-      r.hear(p, now);
+      // Where the room stamps each report as it arrives, a report handed over again counts as heard when it was.
+      r.hear(p, this.room?.stamped ? p.updatedAt : now);
     }
     for (const [peer, r] of this.remotes) {
       if (!seen.has(peer)) {
