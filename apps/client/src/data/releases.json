@@ -1,11 +1,21 @@
 {
   "notes": [
     {
+      "id": "v11",
+      "date": "2026-11-14",
+      "title": "The tender is a kayak, and race nights hold their clock",
+      "items": [
+        "The boat you take ashore is now a kayak with a double-bladed paddle, in place of the outrigger canoe. Everything else is the same: anchor or moor, O launches her, W A S D paddle, O lands you at the bars and beaches, O alongside comes back aboard.",
+        "Joining friends who are already out, you now take up their time of day, whatever you chose on the way in. A race that has been called keeps its countdown when someone new arrives.",
+        "The gun can be set 3 to 20 minutes ahead, so there is time for everyone to get to the start."
+      ]
+    },
+    {
       "id": "v10",
       "date": "2026-11-13",
-      "title": "Ashore in the outrigger, and a tow off the mud",
+      "title": "Ashore by kayak, and a tow off the mud",
       "items": [
-        "The outrigger. With the boat at anchor or on a mooring, O launches the canoe alongside. Paddle with W A S D. The tide carries her, so think before crossing a strong stream.",
+        "The kayak. With the boat at anchor or on a mooring, O launches the kayak alongside. Paddle with W A S D. The tide carries her, so think before crossing a strong stream.",
         "Go ashore. Run her up on any beach, or come in at Sam's in Tiburon, Ayala Cove, Sausalito, Aquatic Park, Pier 39, Clipper Cove, Horseshoe Cove or McCovey Cove, ease up and press O. Each place you land at goes in your logbook.",
         "O again shoves off. Back alongside the boat, O brings you aboard.",
         "Aground and stuck? U calls for a tow to the nearest deep water.",

@@ -71,7 +71,7 @@ function layBetween(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3): void 
   mesh.quaternion.setFromUnitVectors(Y, dir.multiplyScalar(1 / len));
 }
 
-/** One person. Also used for the paddler in the outrigger (`aboard/canoeModel.ts`). */
+/** One person. Also used for the paddler in the kayak (`aboard/kayakModel.ts`). */
 export class Figure {
   readonly group = new THREE.Group();
 

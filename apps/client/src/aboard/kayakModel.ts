@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { Figure } from '../boat/crew';
 
-// A one-person outrigger canoe: a long slim hull, a float (the ama) out to port on two curved arms (the iako),
+// The yacht's tender: a one-person sit-on kayak with a double-bladed paddle,
 // and a paddler built from the same limbs as the yacht's crew.
 // Model frame as for the yacht: +X starboard, +Y up, -Z forward, origin on the waterline amidships.
 
 /** Length of the main hull, metres. */
-export const CANOE_LENGTH = 6.2;
-/** How far out to port the float rides. */
-export const AMA_OFFSET = 1.45;
+export const KAYAK_LENGTH = 4.3;
+/** Half her beam, for how she rolls to a sea on the beam. */
+export const KAYAK_HALF_BEAM = 0.34;
 
 const PADDLE = 1.34;
-const SEAT_Z = 0.35;
+const SEAT_Z = 0.3;
 const Y = new THREE.Vector3(0, 1, 0);
 const DOWN = new THREE.Vector3(0, -1, 0);
 const lerp = THREE.MathUtils.lerp;
@@ -74,22 +74,13 @@ function loft(length: number, section: (t: number) => Section, camber: number): 
 const hullSection = (t: number): Section => {
   const u = Math.abs(t);
   return {
-    half: 0.215 * Math.max(0, 1 - u ** 2.3) ** 0.8,
+    half: 0.34 * Math.max(0, 1 - u ** 2.4) ** 0.75,
     keel: -0.13 + 0.12 * u ** 2.5,
     sheer: 0.19 + 0.1 * Math.max(0, t) ** 2 + 0.035 * Math.max(0, -t) ** 2,
   };
 };
 
-const amaSection = (t: number): Section => {
-  const u = Math.abs(t);
-  return {
-    half: 0.088 * Math.max(0, 1 - u ** 2.2) ** 0.7,
-    keel: -0.075 + 0.11 * u * u,
-    sheer: 0.075 + 0.08 * u * u,
-  };
-};
-
-export class CanoeModel {
+export class KayakModel {
   readonly root = new THREE.Group();
   private readonly figure: Figure;
   private readonly paddle = new THREE.Group();
@@ -102,7 +93,7 @@ export class CanoeModel {
   private side = 1;
   private sideWanted = 1;
   private strokes = 0;
-  private switchAt = 9;
+  private switchAt = 1;
   /** 0 a straight pull, 1 a wide sweep to turn her. */
   private sweep = 0;
   private manned = true;
@@ -114,9 +105,9 @@ export class CanoeModel {
   private readonly dir = new THREE.Vector3();
   private readonly low = new THREE.Vector3();
 
-  /** @param accent the yacht's topsides colour, for the deck and the float */
+  /** @param accent the yacht's topsides colour, for the deck */
   constructor(accent: string | undefined) {
-    this.root.name = 'outrigger';
+    this.root.name = 'kayak';
     this.root.rotation.order = 'YXZ';
     const mat = (color: THREE.ColorRepresentation, roughness = 0.6): THREE.MeshStandardMaterial => {
       const m = new THREE.MeshStandardMaterial({ color, roughness });
@@ -138,8 +129,8 @@ export class CanoeModel {
     const pale = mat(0xe2d3ae, 0.6);
 
     // Main hull.
-    const hull = loft(CANOE_LENGTH, hullSection, 0.035);
-    add(hull.skin, shell).name = 'outrigger_hull';
+    const hull = loft(KAYAK_LENGTH, hullSection, 0.035);
+    add(hull.skin, shell).name = 'kayak_hull';
     add(hull.deck, colour);
     // The seat with a low back, and the well the feet sit in.
     add(new THREE.BoxGeometry(0.33, 0.045, 0.34), dark).position.set(0, 0.243, SEAT_Z + 0.02);
@@ -148,46 +139,25 @@ export class CanoeModel {
     back.rotation.x = -0.25;
     add(new THREE.BoxGeometry(0.25, 0.012, 0.62), dark).position.set(0, 0.226, SEAT_Z - 0.62);
     // A small rudder under the stern.
-    add(new THREE.BoxGeometry(0.012, 0.3, 0.14), dark).position.set(0, -0.18, CANOE_LENGTH / 2 - 0.62);
+    add(new THREE.BoxGeometry(0.012, 0.3, 0.14), dark).position.set(0, -0.18, KAYAK_LENGTH / 2 - 0.62);
 
-    // The float, a little ahead of amidships.
-    const amaZ = -0.2;
-    const ama = loft(2.9, amaSection, 0.03);
-    const amaGroup = new THREE.Group();
-    amaGroup.position.set(-AMA_OFFSET, 0, amaZ);
-    this.root.add(amaGroup);
-    add(ama.skin, colour, amaGroup);
-    add(ama.deck, shell, amaGroup);
-
-    // Two arms, arched up over the water between hull and float so a sea passes under them.
-    for (const z of [-0.78, 0.86]) {
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0.14, 0.215, z),
-        new THREE.Vector3(-0.16, 0.25, z),
-        new THREE.Vector3(-0.62, 0.43, z - 0.03),
-        new THREE.Vector3(-1.1, 0.4, z - 0.06),
-        new THREE.Vector3(-AMA_OFFSET + 0.04, 0.2, z - 0.08),
-        new THREE.Vector3(-AMA_OFFSET, 0.07, z - 0.08),
-      ]);
-      add(new THREE.TubeGeometry(curve, 22, 0.024, 6), wood);
-      // Lashings where the arm crosses the deck.
-      add(new THREE.BoxGeometry(0.34, 0.03, 0.07), dark).position.set(0, 0.228, z);
-    }
-
-    // The paddle: grip at the group's origin, blade away down -Y.
+    // The paddle: the upper hand at the group's origin, one blade away down -Y and the other up beyond the hand.
     const shaftLen = PADDLE - 0.44;
     add(new THREE.CylinderGeometry(0.015, 0.016, shaftLen, 6).translate(0, -shaftLen / 2, 0), wood, this.paddle);
-    add(new THREE.BoxGeometry(0.09, 0.028, 0.03), wood, this.paddle);
     const blade = new THREE.Shape();
     blade.moveTo(-0.022, 0);
     blade.bezierCurveTo(-0.1, -0.1, -0.1, -0.34, -0.06, -0.44);
     blade.lineTo(0.06, -0.44);
     blade.bezierCurveTo(0.1, -0.34, 0.1, -0.1, 0.022, 0);
     add(new THREE.ExtrudeGeometry(blade, { depth: 0.012, bevelEnabled: false }).translate(0, -shaftLen, -0.006), pale, this.paddle);
+    // The other half of a kayak paddle: a shorter length of shaft above the hand, and its blade, feathered a quarter turn.
+    const upperLen = 0.34;
+    add(new THREE.CylinderGeometry(0.016, 0.015, upperLen, 6).translate(0, upperLen / 2, 0), wood, this.paddle);
+    add(new THREE.ExtrudeGeometry(blade, { depth: 0.012, bevelEnabled: false }).translate(0, -upperLen, -0.006).rotateZ(Math.PI).rotateY(Math.PI / 2), pale, this.paddle);
     this.root.add(this.paddle);
 
     // The paddler is whoever was at the wheel: same jacket, same cap.
-    this.figure = new Figure('outrigger_paddler', { jacket: 0xc2281d, vest: 0x2a2d33, trousers: 0x1f2630, skin: 0xc99a7a, cap: 0x1b2a4a });
+    this.figure = new Figure('kayak_paddler', { jacket: 0xc2281d, vest: 0x2a2d33, trousers: 0x1f2630, skin: 0xc99a7a, cap: 0x1b2a4a });
     this.root.add(this.figure.group);
     this.setManned(false);
   }
@@ -221,7 +191,7 @@ export class CanoeModel {
     this.effort += clamp((busy ? 1 : 0) - this.effort, -dt * 2.6, dt * 3.5);
     this.sweep += clamp((steer !== 0 && work === 0 ? 1 : steer !== 0 ? 0.45 : 0) - this.sweep, -dt * 3, dt * 3);
 
-    // A turn is made by paddling on the outside of it. Otherwise she changes sides every so often, as paddlers do.
+    // A turn is made by paddling on the outside of it. Otherwise it is a stroke a side, as a kayak is paddled.
     if (steer !== 0) this.sideWanted = -Math.sign(steer);
     if (busy) {
       this.phase += dt * (work < 0 ? -0.8 : 0.95);
@@ -231,7 +201,6 @@ export class CanoeModel {
         if (steer === 0 && this.strokes >= this.switchAt) {
           this.sideWanted = -this.sideWanted;
           this.strokes = 0;
-          this.switchAt = this.switchAt === 9 ? 12 : this.switchAt === 12 ? 7 : 9;
         }
       } else if (this.phase < 0) this.phase += 1;
     }

@@ -137,8 +137,8 @@
           "id": "ashore1",
           "status": "shipped",
           "area": "world",
-          "title": "The outrigger",
-          "text": "Launch from the anchored boat, paddle in on the tide, land at the Bay's bars and beaches, and paddle home."
+          "title": "Ashore by kayak",
+          "text": "Launch the kayak from the anchored boat, paddle in on the tide, land at the Bay's bars and beaches, and paddle home."
         }
       ],
       "theme": ""
@@ -181,7 +181,7 @@
           "id": "ashore",
           "status": "next",
           "title": "Somewhere to go ashore",
-          "text": "Drawn docks and beaches at each landing, a walk up to the bar, and other crews you can see in their canoes.",
+          "text": "Drawn docks and beaches at each landing, a walk up to the bar, a bar-hop card that stamps each one, and other crews you can see in their kayaks.",
           "area": "world"
         },
         {

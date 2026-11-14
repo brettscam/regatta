@@ -42,7 +42,7 @@ export interface AboardContext {
 }
 
 /**
- * Something to do aboard besides sailing: anchoring, fishing, taking the outrigger ashore.
+ * Something to do aboard besides sailing: anchoring, fishing, taking the kayak ashore.
  * Each one is a class in this folder that implements this, listed in `index.ts`. The session calls the hooks.
  * Rule from the PRD: no on-screen button for an action on the boat. Keys, and words on the screen that say what happened.
  */
@@ -61,7 +61,7 @@ export interface Feature {
   status?(): string;
   /**
    * When this returns a point, the camera follows it instead of the boat and the sailing controls are switched off.
-   * For when the player has left the boat, in the outrigger for instance. Sim coordinates: x east, y north, heading compass radians.
+   * For when the player has left the boat, in the kayak for instance. Sim coordinates: x east, y north, heading compass radians.
    */
   focus?(): { x: number; y: number; heading: number; height: number } | null;
   /** A few short fields to tell the other boats along with this boat's position. Keys of two or three letters. */

@@ -23,8 +23,9 @@ export class FleetPanel {
   private readonly el = document.getElementById('fleetpanel') as HTMLElement;
   private readonly bar = document.getElementById('racebar') as HTMLElement;
   private course = '';
-  private minutes = 3;
-  private pace = 2;
+  private minutes = 10;
+  /** Pace boats asked for. Until the player chooses: two when alone, none with friends, since each player's pace boats sail a little differently. */
+  private pace: number | null = null;
   private clock = 0;
   private drawn = '';
 
@@ -59,7 +60,7 @@ export class FleetPanel {
     } else if (d.act === 'leave') race.leave();
     else if (d.act === 'call') {
       const course = this.course === 'chart' ? { name: 'The route on the chart', marks: this.ctx.chartRoute() } : this.ctx.courses.find((c) => c.id === this.course);
-      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.pace);
+      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.paceNow());
     }
     this.render();
   };
@@ -75,6 +76,10 @@ export class FleetPanel {
       this.clock = 1;
       this.render();
     }
+  }
+
+  private paceNow(): number {
+    return this.pace ?? (this.ctx.boats().length ? 0 : 2);
   }
 
   private roster(): string {
@@ -102,9 +107,9 @@ export class FleetPanel {
     return `${offers}
       <h3>Call a race</h3>
       <div class="courses">${courses}</div>
-      ${chips('Gun in', 'minutes', [2, 3, 5, 10], this.minutes, ' min')}
-      ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.pace, '')}
-      <p class="lede">${onWeb() ? 'On this website other people cannot join a race yet, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours. The first mark is the start: be there at the gun and pass it after.</p>
+      ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
+      ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
+      <p class="lede">${onWeb() ? 'On this website other people cannot join a race yet, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
       <button type="button" class="primary" data-act="call">Call the race</button>`;
   }
 

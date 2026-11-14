@@ -92,6 +92,8 @@ class Remote implements RemoteBoat {
   onHail: (text: string) => void = () => {};
   private hailStamp = -1;
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
+  /** True while she has only just arrived and has not yet taken up the fleet's clock. */
+  fresh = false;
   status = ''; raceCall: unknown = null; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -129,6 +131,7 @@ class Remote implements RemoteBoat {
     this.heardAt = now;
     this.guest = p.guest;
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
+    this.fresh = v.nw === 1;
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.raceCall = v.rc ?? null;
@@ -232,6 +235,14 @@ export class Fleet {
   private nameClock = 0;
   /** Season time past which another boat's clock is not followed: there is no weather out there. */
   clockLimit = Infinity;
+  /**
+   * A boat that has just arrived takes up the clock of the boats already out, earlier or later than her own,
+   * so a race that has been called keeps its countdown when someone joins. While she is settling in she tells
+   * the others so, and they do not follow her clock. Seconds left of that spell:
+   */
+  private settle = 6;
+  /** The fleet's season time for this boat to take up, set once on arrival. The session reads it and clears it. */
+  adoptClock: number | null = null;
 
   constructor(private readonly yard: Record<string, YardBoat>, private readonly me: Identity, private readonly env: Environment, private readonly scene: THREE.Scene) {}
 
@@ -332,6 +343,7 @@ export class Fleet {
         ml: Math.round(o.main.luff * 100), jl: Math.round(o.jib.luff * 100), mf: o.main.flogging ? 1 : 0, jf: o.jib.flogging ? 1 : 0,
         furl: Math.round(s.furl * 100) / 100, reef: s.reef, t: Math.round(seasonTime * 10) / 10,
       };
+      (wire as unknown as Record<string, unknown>).nw = this.settle > 0 ? 1 : 0;
       if (this.myId) wire.id = this.myId;
       wire.boat = this.me.boat;
       wire.col = this.me.colour;
@@ -348,7 +360,20 @@ export class Fleet {
     for (const r of this.remotes.values()) {
       r.update(now, seaTime, waves, dt, camera, width, height);
       // A boat that has gone quiet (a hidden tab) does not hold the clock.
-      if (r.silence(now) < 5 && r.seasonTime < this.clockLimit) ahead = Math.max(ahead, r.seasonTime - seasonTime);
+      if (r.silence(now) < 5 && r.seasonTime < this.clockLimit && !r.fresh) ahead = Math.max(ahead, r.seasonTime - seasonTime);
+    }
+    if (this.settle > 0) {
+      this.settle -= dt;
+      let fleetClock = -Infinity;
+      for (const r of this.remotes.values()) {
+        if (!r.fresh && r.silence(now) < 5 && r.seasonTime < this.clockLimit) fleetClock = Math.max(fleetClock, r.seasonTime);
+      }
+      if (fleetClock > -Infinity) {
+        this.adoptClock = fleetClock;
+        this.settle = 0;
+      }
+      // Until she has settled she follows nobody: two boats arriving together sort it out when the spell ends.
+      ahead = 0;
     }
 
     // Names come from the platform, as this viewer is allowed to see them.

@@ -59,7 +59,7 @@ const KEYS: Array<[string, Array<[string, string]>]> = [
   ['Stopping', [
     ['X', 'Anchor, pick up a mooring or come alongside. X again to get under way'],
     ['Z', 'At anchor or moored: turn in for the night'],
-    ['O', 'At anchor or moored: launch the outrigger. Paddle with W A S D, O lands her on a shore, O alongside the boat comes back aboard'],
+    ['O', 'At anchor or moored: launch the kayak. Paddle with W A S D, O lands her on a shore, O alongside the boat comes back aboard'],
     ['U', 'Aground: a tow to the nearest deep water'],
   ]],
   ['Catching supper', [

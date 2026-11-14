@@ -235,7 +235,7 @@ export class Session {
     return '';
   }
 
-  /** Where the player is when not at the helm, in the outrigger for instance. */
+  /** Where the player is when not at the helm, in the kayak for instance. */
   private focus(): { x: number; y: number; heading: number; height: number } | null {
     for (const f of this.features) {
       const p = f.focus?.();
@@ -442,6 +442,13 @@ export class Session {
     const clockBehind = fleet.update(sim, world.seasonTime(sim.state.t), seaTime, stage.waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
     this.race.draw(seaTime, stage.waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
     this.fleetPanel.update(dtReal);
+    // Just arrived among boats already out: take up their clock, whichever way it differs, and say so.
+    if (fleet.adoptClock !== null) {
+      world.startOffset += fleet.adoptClock - world.seasonTime(sim.state.t);
+      fleet.adoptClock = null;
+      const time = world.dateAt(sim.state.t).toLocaleTimeString('en-GB', { timeZone: stage.course.timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
+      hud.raiseAlarm(`Other boats are out. You have joined their time of day: ${time}`, 7);
+    }
     if (this.sharing) {
       this.paused = false;
       if (this.rateIndex !== 0) { this.rateIndex = 0; hud.setRate(0); }

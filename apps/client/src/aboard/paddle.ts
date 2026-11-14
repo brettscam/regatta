@@ -1,5 +1,5 @@
-// The outrigger's paddling and the question of where she can land, as plain arithmetic.
-// No DOM and no Three.js in here, so it can be tested on its own. The drawing and the keys are in `outrigger.ts`.
+// The kayak's paddling and the question of where she can land, as plain arithmetic.
+// No DOM and no Three.js in here, so it can be tested on its own. The drawing and the keys are in `kayak.ts`.
 // Sim conventions: x east, y north, metres. Heading is compass radians, clockwise from north. Speeds in m/s.
 
 const KT = 0.514444;
@@ -17,7 +17,7 @@ export const LANDING_SPEED = 0.8;
 /** Farther from the yacht than this, the way back is worth saying. */
 export const FAR_OFF = 300;
 
-/** Push from the paddle going ahead, m/s² on the canoe and paddler. */
+/** Push from the paddle going ahead, m/s² on the kayak and paddler. */
 const DRIVE = 0.62;
 /** Backing is weaker: half a stroke, the wrong way round. */
 const BACK = 0.36;
@@ -35,7 +35,7 @@ const WINDAGE = 0.022;
 /** Longest step taken in one go, seconds. Longer frames are cut up. */
 const MAX_STEP = 0.05;
 
-export interface Canoe {
+export interface Craft {
   x: number;
   y: number;
   heading: number;
@@ -63,7 +63,7 @@ export interface Water {
   land(x: number, y: number): boolean;
 }
 
-/** A yacht lying to her anchor, as the canoe sees her: something to fend off and to come back to. */
+/** A yacht lying to her anchor, as the kayak sees her: something to fend off and to come back to. */
 export interface Hulk {
   x: number;
   y: number;
@@ -72,12 +72,12 @@ export interface Hulk {
   beam: number;
 }
 
-export function newCanoe(x: number, y: number, heading: number): Canoe {
+export function newCraft(x: number, y: number, heading: number): Craft {
   return { x, y, heading, speed: 0, turn: 0, beached: false };
 }
 
-/** Move the canoe on by `dt` seconds. Changes `c` in place. */
-export function stepCanoe(c: Canoe, input: Paddling, dt: number, water: Water, yacht?: Hulk): void {
+/** Move the kayak on by `dt` seconds. Changes `c` in place. */
+export function stepCraft(c: Craft, input: Paddling, dt: number, water: Water, yacht?: Hulk): void {
   let left = Math.min(dt, 2);
   while (left > 1e-6) {
     const h = Math.min(left, MAX_STEP);
@@ -86,7 +86,7 @@ export function stepCanoe(c: Canoe, input: Paddling, dt: number, water: Water, y
   }
 }
 
-function stepOnce(c: Canoe, input: Paddling, h: number, water: Water, yacht?: Hulk): void {
+function stepOnce(c: Craft, input: Paddling, h: number, water: Water, yacht?: Hulk): void {
   const ahead = Math.sign(input.ahead);
   const steer = Math.sign(input.steer);
 
@@ -131,8 +131,8 @@ function stepOnce(c: Canoe, input: Paddling, h: number, water: Water, yacht?: Hu
   if (yacht) fendOff(c, yacht);
 }
 
-/** Keep the canoe out of the yacht's hull: treated as a rounded slab along her centreline. */
-export function fendOff(c: Canoe, yacht: Hulk): void {
+/** Keep the kayak out of the yacht's hull: treated as a rounded slab along her centreline. */
+export function fendOff(c: Craft, yacht: Hulk): void {
   const fx = Math.sin(yacht.heading);
   const fy = Math.cos(yacht.heading);
   const dx = c.x - yacht.x;
@@ -151,7 +151,7 @@ export function fendOff(c: Canoe, yacht: Hulk): void {
   c.y = yacht.y + fy * along + uy * keep;
 }
 
-/** Where the canoe goes in the water when she is launched: alongside to port, her float outboard, pointing the way the yacht points. */
+/** Where the kayak goes in the water when she is launched: alongside to port, her float outboard, pointing the way the yacht points. */
 export function launchSpot(yacht: Hulk, land: (x: number, y: number) => boolean): { x: number; y: number; heading: number } {
   const fx = Math.sin(yacht.heading);
   const fy = Math.cos(yacht.heading);
@@ -199,7 +199,7 @@ export type Landing<P extends Shore> =
  * A named place takes her from the water within DOCK_RANGE of its point, or from anywhere she has run up on the shore
  * within WALK_RANGE. Any other shore is just a beach.
  */
-export function landing<P extends Shore>(c: Canoe, places: readonly P[], land: (x: number, y: number) => boolean): Landing<P> {
+export function landing<P extends Shore>(c: Craft, places: readonly P[], land: (x: number, y: number) => boolean): Landing<P> {
   const onShore = c.beached || touchingShore(c.x, c.y, land);
   const best = placeInReach(c, places, onShore);
   if (!best && !onShore) return { kind: 'none' };
@@ -229,7 +229,7 @@ export function rangeAndBearing(fromX: number, fromY: number, toX: number, toY: 
   return { range, bearing };
 }
 
-/** What the O key does from the canoe, afloat. */
+/** What the O key does from the kayak, afloat. */
 export type Call<P extends Shore> =
   | { do: 'board' }
   | { do: 'land'; place: P | null }
@@ -237,7 +237,7 @@ export type Call<P extends Shore> =
   | { do: 'nothing'; range: number; bearing: number; far: boolean };
 
 /** Decide what pressing O means from where she is: back aboard if the yacht is close, else ashore if there is a shore, else nothing. */
-export function call<P extends Shore>(c: Canoe, yacht: { x: number; y: number }, places: readonly P[], land: (x: number, y: number) => boolean): Call<P> {
+export function call<P extends Shore>(c: Craft, yacht: { x: number; y: number }, places: readonly P[], land: (x: number, y: number) => boolean): Call<P> {
   const back = rangeAndBearing(c.x, c.y, yacht.x, yacht.y);
   if (back.range <= BOARD_RANGE) return { do: 'board' };
   const l = landing(c, places, land);

@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { VIEWS, type ViewPreset } from '../camera/drone';
 import type { Place } from '../session';
 import type { AboardContext, Feature } from './feature';
-import { AMA_OFFSET, CANOE_LENGTH, CanoeModel } from './canoeModel';
-import { call, fendOff, groundHeight, launchSpot, newCanoe, placeInReach, rangeAndBearing, stepCanoe, touchingShore, BOARD_RANGE, type Canoe, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
+import { KAYAK_HALF_BEAM, KAYAK_LENGTH, KayakModel } from './kayakModel';
+import { call, fendOff, groundHeight, launchSpot, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
 
 const KT = 0.514444;
-/** The drone's place over the canoe: lower and much closer than over the yacht, off her port quarter so the yacht shows beyond her. */
-const CANOE_VIEW: ViewPreset = { target: [0, 0.9, -0.3], yaw: -0.58, pitch: 0.27, dist: 9.5 };
+/** The drone's place over the kayak: lower and much closer than over the yacht, off her port quarter so the yacht shows beyond her. */
+const KAYAK_VIEW: ViewPreset = { target: [0, 0.9, -0.3], yaw: -0.58, pitch: 0.27, dist: 9.5 };
 /** Ground this far under the still sea is where she takes the bottom. */
 const SHOAL = -0.22;
 /** Length of the painter she lies to astern of the yacht. */
@@ -18,20 +18,20 @@ const three = (deg: number): string => `${String(deg).padStart(3, '0')}°`;
 const tens = (m: number): number => Math.max(10, Math.round(m / 10) * 10);
 
 /**
- * The outrigger canoe. With the yacht at anchor or on a mooring, O launches her, the paddling keys drive her,
+ * The kayak kayak. With the yacht at anchor or on a mooring, O launches her, the paddling keys drive her,
  * O lands her at a shore or a dock, and O alongside the yacht brings the player back aboard.
- * The paddling itself and the rules for landing are in `paddle.ts`. The canoe and her paddler are drawn by `canoeModel.ts`.
+ * The paddling itself and the rules for landing are in `paddle.ts`. The kayak and her paddler are drawn by `kayakModel.ts`.
  */
-export class Outrigger implements Feature {
-  readonly id = 'outrigger';
+export class Kayak implements Feature {
+  readonly id = 'kayak';
   /** Stowed: nobody in her, lying astern of the yacht or lashed down. Afloat: the player is paddling. Ashore: drawn up, the player gone for a drink. */
   mode: Mode = 'stowed';
   /** Where she is. The numbers only mean something when she is not stowed. */
-  readonly canoe: Canoe = newCanoe(0, 0, 0);
-  /** Paddle without the keys, for play testing from the console: `regatta.features.find(f => f.id === 'outrigger').drive = { ahead: 1, steer: 0 }`. */
+  readonly kayak: Craft = newCraft(0, 0, 0);
+  /** Paddle without the keys, for play testing from the console: `regatta.features.find(f => f.id === 'kayak').drive = { ahead: 1, steer: 0 }`. */
   drive: Paddling | null = null;
 
-  private readonly model: CanoeModel;
+  private readonly model: KayakModel;
   private readonly painter: THREE.Mesh;
   private readonly ground: HeightGrid | null;
   private readonly water: Water;
@@ -53,7 +53,7 @@ export class Outrigger implements Feature {
   private readonly b = new THREE.Vector3();
 
   constructor(private readonly ctx: AboardContext) {
-    this.model = new CanoeModel(ctx.livery.topsides);
+    this.model = new KayakModel(ctx.livery.topsides);
     this.model.root.visible = false;
     ctx.stage.scene.add(this.model.root);
     this.painter = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 5), new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.9 }));
@@ -61,7 +61,7 @@ export class Outrigger implements Feature {
     ctx.stage.scene.add(this.painter);
 
     // The shore she stops at is the one that is drawn. The land is drawn from its own, finer grid of heights, and the depth chart's
-    // shoreline can be most of a cell away from it, so the canoe reads the land's shape and falls back on the chart only without it.
+    // shoreline can be most of a cell away from it, so the kayak reads the land's shape and falls back on the chart only without it.
     this.ground = readGround(ctx);
     const world = ctx.world;
     this.water = {
@@ -94,7 +94,7 @@ export class Outrigger implements Feature {
 
     if (this.mode === 'stowed') {
       if (ctx.sim.state.hold === 'none') {
-        ctx.say('The outrigger stays lashed down under way. Anchor or pick up a mooring first, then O launches her', 6);
+        ctx.say('The kayak stays lashed down under way. Anchor or pick up a mooring first, then O launches her', 6);
         return true;
       }
       this.launch();
@@ -106,9 +106,9 @@ export class Outrigger implements Feature {
       return true;
     }
 
-    const c = this.canoe;
+    const c = this.kayak;
     const what = call(c, ctx.sim.state, ctx.places, this.water.land);
-    if (what.do === 'board') this.comeAboard('Back aboard. The outrigger is made fast astern');
+    if (what.do === 'board') this.comeAboard('Back aboard. The kayak is made fast astern');
     else if (what.do === 'land') this.goAshore(what.place);
     else if (what.do === 'slow') ctx.say(`Too much way on to land: ${(what.speed / KT).toFixed(1)} kt. Let her run off first`);
     else if (what.far) ctx.say(`Nothing to land on here. The boat is ${tens(what.range)} m off, bearing ${three(what.bearing)}`, 6);
@@ -119,7 +119,7 @@ export class Outrigger implements Feature {
   private launch(): void {
     const { ctx } = this;
     const spot = launchSpot(this.yacht(), this.water.land);
-    Object.assign(this.canoe, newCanoe(spot.x, spot.y, spot.heading));
+    Object.assign(this.kayak, newCraft(spot.x, spot.y, spot.heading));
     this.mode = 'afloat';
     this.at = null;
     this.told = null;
@@ -128,18 +128,18 @@ export class Outrigger implements Feature {
     this.model.setManned(true);
     this.model.root.visible = true;
     this.painter.visible = false;
-    // Whoever was at the wheel is in the canoe now.
+    // Whoever was at the wheel is in the kayak now.
     this.helm(false);
-    ctx.drone.flyTo(CANOE_VIEW, 1.6);
-    ctx.say('Outrigger away. W paddles, S backs, A and D steer. O lands her or brings you back aboard', 8);
+    ctx.drone.flyTo(KAYAK_VIEW, 1.6);
+    ctx.say('Kayak away. W paddles, S backs, A and D steer. O lands her or brings you back aboard', 8);
   }
 
   private goAshore(place: Place | null): void {
     const { ctx } = this;
     this.mode = 'ashore';
     this.at = place;
-    this.canoe.speed = 0;
-    this.canoe.turn = 0;
+    this.kayak.speed = 0;
+    this.kayak.turn = 0;
     this.model.setManned(false);
     this.haulUp();
     if (place?.ashore) {
@@ -156,34 +156,34 @@ export class Outrigger implements Feature {
     const from = this.at?.ashore?.name;
     this.mode = 'afloat';
     this.at = null;
-    if (this.afloatAt) Object.assign(this.canoe, this.afloatAt);
+    if (this.afloatAt) Object.assign(this.kayak, this.afloatAt);
     this.afloatAt = null;
     // The place she has just left needs no pointing out.
-    this.told = placeInReach(this.canoe, ctx.places, true)?.id ?? null;
+    this.told = placeInReach(this.kayak, ctx.places, true)?.id ?? null;
     this.model.setManned(true);
-    const back = rangeAndBearing(this.canoe.x, this.canoe.y, ctx.sim.state.x, ctx.sim.state.y);
+    const back = rangeAndBearing(this.kayak.x, this.kayak.y, ctx.sim.state.x, ctx.sim.state.y);
     ctx.say(`Shoved off${from ? ` from ${from}` : ''}. The boat is ${tens(back.range)} m off, bearing ${three(back.bearing)}`, 6);
   }
 
   /** If she came in bow first onto a beach, pull her a couple of metres up it so she is not left to the swell. */
   private haulUp(): void {
-    const { canoe, ground } = this;
+    const { kayak, ground } = this;
     this.afloatAt = null;
     if (!ground) return;
-    const fx = Math.sin(canoe.heading);
-    const fy = Math.cos(canoe.heading);
-    const bow = CANOE_LENGTH * 0.5;
-    if (!this.land(canoe.x + fx * (bow + 0.4), canoe.y + fy * (bow + 0.4))) return;
+    const fx = Math.sin(kayak.heading);
+    const fy = Math.cos(kayak.heading);
+    const bow = KAYAK_LENGTH * 0.5;
+    if (!this.land(kayak.x + fx * (bow + 0.4), kayak.y + fy * (bow + 0.4))) return;
     let pull = 0;
     for (let d = 0.25; d <= 2.5; d += 0.25) {
       // Not up a bank or a sea wall.
-      if (groundHeight(ground, canoe.x + fx * (bow + d), canoe.y + fy * (bow + d)) > 1.1) break;
+      if (groundHeight(ground, kayak.x + fx * (bow + d), kayak.y + fy * (bow + d)) > 1.1) break;
       pull = d;
     }
     if (pull === 0) return;
-    this.afloatAt = { x: canoe.x, y: canoe.y };
-    canoe.x += fx * pull;
-    canoe.y += fy * pull;
+    this.afloatAt = { x: kayak.x, y: kayak.y };
+    kayak.x += fx * pull;
+    kayak.y += fy * pull;
   }
 
   private comeAboard(words: string, urgent = false): void {
@@ -208,7 +208,7 @@ export class Outrigger implements Feature {
   // ---- every frame ------------------------------------------------------------------------------
 
   update(dt: number, seaTime: number): void {
-    const { ctx, canoe } = this;
+    const { ctx, kayak } = this;
     const sim = ctx.sim;
     this.clock += dt;
     // The session does not say when it is paused, but a paused sim takes no steps.
@@ -220,7 +220,7 @@ export class Outrigger implements Feature {
     const held = sim.state.hold !== 'none';
 
     // If the yacht gets under way with the player off her, the player is put back at the wheel rather than left behind.
-    if (this.mode !== 'stowed' && !held) this.comeAboard('The boat is under way. You are back aboard and the outrigger is stowed', true);
+    if (this.mode !== 'stowed' && !held) this.comeAboard('The boat is under way. You are back aboard and the kayak is stowed', true);
 
     if (this.mode === 'stowed') {
       this.model.root.visible = held;
@@ -238,14 +238,14 @@ export class Outrigger implements Feature {
     let input: Paddling = { ahead: 0, steer: 0 };
     if (this.mode === 'afloat' && !frozen) {
       input = this.drive ?? this.keys();
-      stepCanoe(canoe, input, dt, this.water, this.yacht());
+      stepCraft(kayak, input, dt, this.water, this.yacht());
       this.think -= dt;
       if (this.think <= 0) {
         this.think = 0.5;
         this.pointOut();
       }
     }
-    this.float(canoe.x, canoe.y, canoe.heading, dt, seaTime);
+    this.float(kayak.x, kayak.y, kayak.heading, dt, seaTime);
     this.model.animate(frozen ? 0 : dt, input.ahead, input.steer, this.clock);
   }
 
@@ -258,17 +258,17 @@ export class Outrigger implements Feature {
   /** Paddle for a while without the keys or the frame clock. For play testing from the console. */
   paddle(input: Paddling, seconds: number): void {
     if (this.mode !== 'afloat') return;
-    for (let t = 0; t < seconds; t += 0.1) stepCanoe(this.canoe, input, 0.1, this.water, this.yacht());
+    for (let t = 0; t < seconds; t += 0.1) stepCraft(this.kayak, input, 0.1, this.water, this.yacht());
   }
 
   /** A word when a landing or the yacht comes within reach, once per approach. */
   private pointOut(): void {
-    const { ctx, canoe } = this;
-    const place = placeInReach(canoe, ctx.places, canoe.beached || touchingShore(canoe.x, canoe.y, this.water.land));
+    const { ctx, kayak } = this;
+    const place = placeInReach(kayak, ctx.places, kayak.beached || touchingShore(kayak.x, kayak.y, this.water.land));
     if (place?.ashore && place.id !== this.told) ctx.say(`${capital(place.ashore.name)} is close by. Ease up and press O to go ashore`, 6);
     this.told = place?.id ?? null;
 
-    const off = Math.hypot(canoe.x - ctx.sim.state.x, canoe.y - ctx.sim.state.y);
+    const off = Math.hypot(kayak.x - ctx.sim.state.x, kayak.y - ctx.sim.state.y);
     if (off > 40) this.toldBoat = false;
     else if (off <= BOARD_RANGE && !this.toldBoat) {
       this.toldBoat = true;
@@ -276,7 +276,7 @@ export class Outrigger implements Feature {
     }
   }
 
-  /** The empty canoe lies to her painter astern of the yacht, streaming with the tide and the wind as the yacht does. */
+  /** The empty kayak lies to her painter astern of the yacht, streaming with the tide and the wind as the yacht does. */
   private trail(dt: number): void {
     const { tow } = this;
     const yacht = this.yacht();
@@ -284,7 +284,7 @@ export class Outrigger implements Feature {
     const fy = Math.cos(yacht.heading);
     const sx = yacht.x - fx * (yacht.loa * 0.5 - 0.2);
     const sy = yacht.y - fy * (yacht.loa * 0.5 - 0.2);
-    const reach = PAINTER + CANOE_LENGTH * 0.5;
+    const reach = PAINTER + KAYAK_LENGTH * 0.5;
     if (!tow.out) {
       tow.out = true;
       tow.x = sx - fx * reach;
@@ -317,7 +317,7 @@ export class Outrigger implements Feature {
     tow.heading += Math.atan2(Math.sin(want - tow.heading), Math.cos(want - tow.heading)) * Math.min(1, dt * 1.5);
   }
 
-  /** Draw the painter from the yacht's stern to the canoe's bow. */
+  /** Draw the painter from the yacht's stern to the kayak's bow. */
   private rig(): void {
     const { ctx, a, b } = this;
     const d = ctx.spec.dimensions;
@@ -325,7 +325,7 @@ export class Outrigger implements Feature {
     this.model.root.updateMatrixWorld(true);
     a.set(0, d.freeboard * 0.85, d.loa * 0.5 - 0.25);
     ctx.boatView.root.localToWorld(a);
-    b.set(0, 0.3, -CANOE_LENGTH * 0.5 + 0.12);
+    b.set(0, 0.3, -KAYAK_LENGTH * 0.5 + 0.12);
     this.model.root.localToWorld(b);
     const len = a.distanceTo(b) || 1e-3;
     this.painter.position.copy(a).lerp(b, 0.5);
@@ -343,14 +343,14 @@ export class Outrigger implements Feature {
       const sea = ctx.stage.seaLevel(px, pz, seaTime, 6);
       return ground ? Math.max(sea, groundHeight(ground, px, -pz) + 0.1) : sea;
     };
-    const half = CANOE_LENGTH * 0.36;
+    const half = KAYAK_LENGTH * 0.36;
     const bow = under(x + fx * half, z + fz * half);
     const stern = under(x - fx * half, z - fz * half);
     const mid = under(x, z);
-    const ama = under(x + fz * AMA_OFFSET, z - fx * AMA_OFFSET);
+    const port = under(x + fz * KAYAK_HALF_BEAM * 2, z - fx * KAYAK_HALF_BEAM * 2);
     const heave = (bow + stern + 2 * mid) / 4;
     const pitch = Math.atan2(bow - stern, half * 2) * 0.9;
-    const heel = Math.atan2(ama - mid, AMA_OFFSET) * 0.85;
+    const heel = Math.atan2(port - mid, KAYAK_HALF_BEAM * 2) * 0.6;
     const ease = motion.set ? Math.min(1, dt * 7) : 1;
     motion.set = true;
     motion.heave += (heave - motion.heave) * ease;
@@ -362,20 +362,20 @@ export class Outrigger implements Feature {
   // ---- what the session asks -------------------------------------------------------------------
 
   status(): string {
-    if (this.mode === 'afloat') return 'In the outrigger';
+    if (this.mode === 'afloat') return 'In the kayak';
     if (this.mode === 'ashore') return this.at?.ashore ? `Ashore at ${this.at.ashore.name}` : 'Ashore on the beach';
     return '';
   }
 
   focus(): { x: number; y: number; heading: number; height: number } | null {
     if (this.mode === 'stowed') return null;
-    return { x: this.canoe.x, y: this.canoe.y, heading: this.canoe.heading, height: this.motion.heave };
+    return { x: this.kayak.x, y: this.kayak.y, heading: this.kayak.heading, height: this.motion.heave };
   }
 
-  /** `oc` is the canoe when she is away from the yacht: metres east, metres north, heading in thousandths of a radian. Null when she is not. */
+  /** `oc` is the kayak when she is away from the yacht: metres east, metres north, heading in thousandths of a radian. Null when she is not. */
   wire(): Record<string, unknown> {
     if (this.mode === 'stowed') return { oc: null };
-    return { oc: [Math.round(this.canoe.x), Math.round(this.canoe.y), Math.round(this.canoe.heading * 1000)] };
+    return { oc: [Math.round(this.kayak.x), Math.round(this.kayak.y), Math.round(this.kayak.heading * 1000)] };
   }
 
   dispose(): void {
@@ -389,7 +389,7 @@ export class Outrigger implements Feature {
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The heights the land is drawn from, read back off the terrain's own mesh, so the canoe grounds exactly where the picture says. */
+/** The heights the land is drawn from, read back off the terrain's own mesh, so the kayak grounds exactly where the picture says. */
 function readGround(ctx: AboardContext): HeightGrid | null {
   const mesh = ctx.stage.scene.getObjectByName('terrain') as THREE.Mesh | undefined;
   const position = mesh?.geometry?.getAttribute('position');
