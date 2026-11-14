@@ -93,6 +93,10 @@ export function initialState(init: InitialConditions = {}): SimState {
     knockHold: 0,
     crashGybes: 0,
     knockdowns: 0,
+    hold: 'none',
+    holdX: 0,
+    holdY: 0,
+    holdScope: 0,
     maneuver: null,
   };
 }
@@ -320,6 +324,7 @@ export class Sim {
     const o = this.out;
 
     this.computeWind();
+    if (s.hold !== 'none') return this.stepHeld();
     const windSide = o.awa >= 0 ? 1 : -1;
     const awaAbs = Math.abs(o.awa);
     const awsKt = o.aws / KT;
@@ -478,6 +483,100 @@ export class Sim {
       }
     }
 
+    s.tick += 1;
+    s.t = s.tick * dt;
+  }
+
+  // ---- at anchor or on a mooring --------------------------------------------------------------
+
+  /**
+   * Let go the anchor here, or make fast to a mooring at a given point. The sails come down and she lies back
+   * from that point to the wind and the stream.
+   * @param scope metres of rode or mooring line
+   */
+  holdAt(kind: 'anchor' | 'mooring', x: number, y: number, scope: number): void {
+    const s = this.state;
+    s.hold = kind;
+    s.holdX = x;
+    s.holdY = y;
+    s.holdScope = Math.max(2, scope);
+    s.helmMode = 'hand';
+    s.crewTrim = false;
+    s.maneuver = null;
+    s.rudderCmd = 0;
+    s.knock = 0;
+    s.knockHold = 0;
+  }
+
+  /** Weigh anchor or slip the mooring. The crew sets the sails and she bears away onto a close reach. */
+  release(): void {
+    const s = this.state;
+    if (s.hold === 'none') return;
+    s.hold = 'none';
+    // Hauled up to the anchor she has a little way on, enough for the rudder to bite.
+    s.speed = 1.3;
+    s.lateral = 0;
+    this.computeWind();
+    this.setHelm('wind', (this.out.twa >= 0 ? 1 : -1) * 55 * D2R);
+    s.crewTrim = true;
+    this.trimForWind();
+  }
+
+  /** A step while held: no sailing, just lying to the wind and stream on the end of the rode. */
+  private stepHeld(): void {
+    const s = this.state;
+    const o = this.out;
+    const dt = this.dt;
+    const env = this.env.sample(s.x, s.y, s.t);
+    // Wind on the hull and rig, and the stream on the keel, push her away from the point she is held by.
+    const wind = o.tws * o.tws * 0.012;
+    const cur = Math.hypot(env.currentX, env.currentY);
+    let fx = -Math.sin(o.twd) * wind + env.currentX * cur * 6;
+    let fy = -Math.cos(o.twd) * wind + env.currentY * cur * 6;
+    const f = Math.hypot(fx, fy);
+    if (f < 1e-4) { fx = -Math.sin(s.heading); fy = -Math.cos(s.heading); } else { fx /= f; fy /= f; }
+    // She sheers a little from side to side on the rode, more in a breeze.
+    const sheer = Math.sin(s.t / 9) * 0.12 * clamp(o.tws / 8, 0, 1.2);
+    const tx = s.holdX + (fx * Math.cos(sheer) - fy * Math.sin(sheer)) * s.holdScope;
+    const ty = s.holdY + (fx * Math.sin(sheer) + fy * Math.cos(sheer)) * s.holdScope;
+    const k = 1 - Math.exp(-dt / 14);
+    let moveX = (tx - s.x) * k;
+    let moveY = (ty - s.y) * k;
+    const step = Math.hypot(moveX, moveY);
+    const most = 1.2 * dt;
+    if (step > most) { moveX *= most / step; moveY *= most / step; }
+    s.x += moveX;
+    s.y += moveY;
+    // The bow points up the rode.
+    const up = Math.atan2(s.holdX - s.x, s.holdY - s.y);
+    if (Math.hypot(s.holdX - s.x, s.holdY - s.y) > 0.5) {
+      const turn = wrapPi(up - s.heading);
+      s.yawRate = clamp(turn * 0.25, -0.12, 0.12);
+      s.heading = wrapTau(s.heading + s.yawRate * dt);
+    }
+    s.speed = 0;
+    s.lateral = 0;
+    s.rudder = approach(s.rudder, 0, PILOT_RUDDER_RATE * dt);
+    s.boomAngle = approach(s.boomAngle, 0, BOOM_SLEW * 0.2 * dt);
+    s.jibAngle = approach(s.jibAngle, 0, JIB_SLEW * 0.2 * dt);
+    // Bare poles: a few degrees of roll from the wind on the rig, no more.
+    const lean = -(o.awa >= 0 ? 1 : -1) * Math.min(4, (o.aws / KT) * 0.12) * D2R * Math.abs(Math.sin(o.awa));
+    s.heel += (lean - s.heel) * (1 - Math.exp(-dt / 2));
+    Object.assign(o.main, emptySail());
+    Object.assign(o.jib, emptySail());
+    o.heelLoad = 0;
+    o.heelPenalty = 1;
+    o.targetSpeed = 0;
+    o.weatherHelm = 0;
+    o.rudderGrip = 1;
+    o.knockedDown = false;
+    o.pilotBeating = false;
+    o.roundingUp = false;
+    o.inIrons = false;
+    o.underKeel = env.depth === undefined ? null : env.depth - this.boat.dimensions.draft;
+    o.aground = env.depth !== undefined && env.depth < this.boat.dimensions.draft + 0.05;
+    o.sog = Math.hypot(moveX, moveY) / dt;
+    o.cog = o.sog > 0.01 ? wrapTau(Math.atan2(moveX, moveY)) : s.heading;
     s.tick += 1;
     s.t = s.tick * dt;
   }
@@ -692,6 +791,7 @@ function structuredCloneState(s: SimState): SimState {
   const m = s.maneuver;
   out.maneuver = m && Number.isFinite(m.targetHeading) ? { ...m } : null;
   if (!['hand', 'heading', 'wind', 'route'].includes(out.helmMode as string)) out.helmMode = 'hand';
+  if (!['none', 'anchor', 'mooring'].includes(out.hold as string)) out.hold = 'none';
   return out as unknown as SimState;
 }
 

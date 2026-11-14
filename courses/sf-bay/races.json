@@ -1,0 +1,40 @@
+[
+  {
+    "id": "strait-cove",
+    "name": "Raccoon Strait to McCovey Cove",
+    "blurb": "Through the strait, round Angel Island, down the city front and under the Bay Bridge to the ballpark. 7.5 miles.",
+    "marks": [
+      { "name": "Point Stuart", "x": 300, "y": 4150 },
+      { "name": "Raccoon Strait", "x": 1800, "y": 4800 },
+      { "name": "Quarry Point", "x": 3300, "y": 4100 },
+      { "name": "Point Blunt", "x": 3300, "y": 2000 },
+      { "name": "Blossom Rock", "x": 4101, "y": -1150 },
+      { "name": "Bay Bridge", "x": 5600, "y": -3300 },
+      { "name": "South Beach", "x": 5900, "y": -5300 },
+      { "name": "McCovey Cove", "x": 5532, "y": -5891 }
+    ]
+  },
+  {
+    "id": "alcatraz-lap",
+    "name": "Round Alcatraz",
+    "blurb": "From the city front out round the Rock and Harding Rock and home. 5.4 miles, with the ferries to dodge.",
+    "marks": [
+      { "name": "City Front", "x": 1757, "y": -1900 },
+      { "name": "Blossom Rock", "x": 4101, "y": -1150 },
+      { "name": "North of Alcatraz", "x": 2900, "y": 150 },
+      { "name": "Harding Rock", "x": 290, "y": 763 },
+      { "name": "City Front", "x": 1757, "y": -1900 }
+    ]
+  },
+  {
+    "id": "gate-dash",
+    "name": "Golden Gate dash",
+    "blurb": "A beat out to the bridge against the sea breeze, then a fast run back. 4.3 miles in the strongest tide on the Bay.",
+    "marks": [
+      { "name": "Crissy Field", "x": -700, "y": -1750 },
+      { "name": "Golden Gate", "x": -2500, "y": -1150 },
+      { "name": "Harding Rock", "x": 290, "y": 763 },
+      { "name": "Crissy Field", "x": -700, "y": -1750 }
+    ]
+  }
+]

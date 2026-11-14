@@ -1,0 +1,11 @@
+{
+  "events": [
+    {
+      "id": "race-night-2026-11-14",
+      "name": "Race night",
+      "course": "strait-cove",
+      "spot": "raccoon",
+      "at": "2026-11-14T19:30:00-08:00"
+    }
+  ]
+}

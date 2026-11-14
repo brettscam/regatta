@@ -1,28 +1,89 @@
 import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
 import type { Logbook } from '../net/logbook';
+import { onWeb } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
-interface RoadmapItem { id: string; status: string; title: string; text: string }
-interface Release { id: string; name: string; when: string; blurb: string; items: RoadmapItem[] }
+interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
+interface Release { id: string; name: string; theme: string; when: string; blurb: string; items: RoadmapItem[] }
+/** The lanes of the board: what part of the game an item belongs to. */
+const AREAS: Array<[string, string]> = [
+  ['experience', 'Sailing experience'],
+  ['multiplayer', 'Multiplayer and racing'],
+  ['world', 'Places and life aboard'],
+  ['platform', 'Platform'],
+  ['progress', 'Progression'],
+];
+/** The columns: how soon. An item's status puts it in one. */
+const COLUMNS: Array<[string, string]> = [
+  ['building', 'This sprint'],
+  ['next', 'Next sprint'],
+  ['later', 'Later'],
+  ['idea', 'Ideas'],
+  ['shipped', 'Shipped'],
+];
 const roadmap = roadmapJson as { updated: string; releases: Release[] };
 interface Note { id: string; date: string; title: string; items: string[] }
 /** Release notes, newest first. */
 const notes = (releasesJson as { notes: Note[] }).notes;
 const SEEN = 'regatta.seen';
 
-const STATUS: Record<string, string> = { shipped: 'Shipped', building: 'Being built', next: 'Up next', later: 'Planned', idea: 'Idea' };
 const KINDS: Array<[string, string, string]> = [
   ['feedback', 'Feedback', 'What do you think? What felt right, what felt off?'],
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
-type Tab = 'roadmap' | 'news' | 'feedback' | 'logbook';
+type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook';
+/**
+ * Every control, in plain words, grouped by what the player is trying to do and in the order a newcomer needs them.
+ * Each row: the keys (one string per key cap; "or" and "+" are joiners, anything else long is a gesture), what it is called, what it does.
+ * Sailing is done on the boat's own parts or with these keys: there are no sailing buttons.
+ */
+const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string, string]> }> = [
+  { title: 'Steer and set the sails', note: 'These five are all you need to get going.', rows: [
+    [['A', 'D'], 'Steer', 'Turn the wheel left or right. The arrow keys do the same.'],
+    [['W', 'S'], 'Mainsail', 'The big sail. W pulls it in, S lets it out.'],
+    [['Q', 'E'], 'Jib', 'The front sail. Q pulls it in, E lets it out.'],
+    [['T'], 'Tack', 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.'],
+    [['P'], 'Autopilot', 'On or off. While it is on the boat steers herself and the crew looks after the sails.'],
+  ] },
+  { title: 'Or use the mouse', rows: [
+    [['Point and scroll'], 'Grab the boat', 'Point at the wheel, the boom (the pole along the bottom of the mainsail) or a winch, then scroll or drag to move it.'],
+    [['Drag'], 'Look around', 'Drag anywhere else to swing the camera. Scroll to move in and out.'],
+  ] },
+  { title: 'See more', rows: [
+    [['1', '2', '3', '4'], 'Camera', 'Jump to a view: the wheel, the mast, the bow, or above the boat.'],
+    [['M'], 'Chart', 'The map. Plan a route and see the wind and tide forecast.'],
+    [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
+    [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
+    [['C'], 'Coaching', 'Tips on or off.'],
+    [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
+  ] },
+  { title: 'Race and talk', rows: [
+    [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
+    [['Enter'], 'Message', 'Type a message to the other boats.'],
+  ] },
+  { title: 'Stop for a while', rows: [
+    [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
+    [['Z'], 'Sleep', 'Skip to the morning. Only while stopped, and only when you are alone on the water.'],
+    [['O'], 'Go ashore', 'While stopped, launches the kayak. Paddle with W A S D. Press O at a beach or a bar to land, and O beside your boat to climb back aboard.'],
+  ] },
+  { title: 'Catch supper', rows: [
+    [['K'], 'Crab pot', 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.'],
+    [['L'], 'Fishing line', 'Line out or in. When "Fish on" appears, press L quickly to catch it.'],
+  ] },
+  { title: 'If you get stuck', rows: [
+    [['U'], 'Tow', 'Run aground? This tows you back to deep water.'],
+    [['Space'], 'Pause', 'Only when you are alone on the water.'],
+    [['Drag the clock'], 'Faster time', 'Drag the clock in the corner sideways to speed time up. Only when you are alone.'],
+    [['B'], 'This board', 'Roadmap, what is new, these keys, feedback and your logbook.'],
+  ] },
+];
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
  * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the page's
- * shared database, which only the published page has.
+ * shared database, which only the published claude.ai page has. On the website there is none yet, and each tab says so.
  */
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
@@ -36,6 +97,9 @@ export class Board {
   private note = '';
   private sent: FeedbackEntry[] = [];
   private busy = false;
+  /** Which lane the roadmap is narrowed to, and whether what has shipped is shown. */
+  private area = 'all';
+  private showShipped = false;
   private readonly link = document.getElementById('boardlink');
   private readonly flash = document.getElementById('newsflash');
   /** The newest release note this person has read. */
@@ -133,6 +197,8 @@ export class Board {
     else if (d.tab) { this.tab = d.tab as Tab; this.note = ''; this.render(); }
     else if (d.kind) { this.kind = d.kind; this.render(); }
     else if (d.vote && d.item) void this.castVote(d.item, Number(d.vote));
+    else if (d.area) { this.area = d.area; this.render(); }
+    else if (d.act === 'shipped') { this.showShipped = !this.showShipped; this.render(); }
     else if (d.act === 'send') void this.send();
     else if (d.act === 'copy') void this.copy();
     else if (d.suggest) { this.tab = 'feedback'; this.kind = 'idea'; this.render(); }
@@ -179,26 +245,41 @@ export class Board {
 
   private roadmap(): string {
     const canVote = this.store.canWrite;
-    const releases = roadmap.releases.map((r) => {
-      const items = r.items.map((it) => {
-        const t = this.tally[it.id] ?? { up: 0, down: 0 };
-        const mine = this.store.vote(it.id);
-        const votes = it.status === 'shipped' ? '' : `
-          <div class="votes" role="group" aria-label="Vote on ${esc(it.title)}">
-            <button type="button" data-item="${it.id}" data-vote="1" aria-pressed="${mine === 1}" aria-label="Vote up" ${canVote ? '' : 'disabled'}>▲</button>
-            <b title="${t.up} up, ${t.down} down">${t.up - t.down}</b>
-            <button type="button" data-item="${it.id}" data-vote="-1" aria-pressed="${mine === -1}" aria-label="Vote down" ${canVote ? '' : 'disabled'}>▼</button>
-          </div>`;
-        return `<li class="item ${it.status}">${votes}<div><span class="status">${STATUS[it.status] ?? it.status}</span><b>${esc(it.title)}</b><p>${esc(it.text)}</p></div></li>`;
+    const all = roadmap.releases.flatMap((r) => r.items.map((it) => ({ ...it, theme: r.theme })));
+    const score = (id: string) => { const t = this.tally[id]; return t ? t.up - t.down : 0; };
+    const shipped = all.filter((it) => it.status === 'shipped').length;
+    const columns = COLUMNS.filter(([id]) => id !== 'shipped' || this.showShipped);
+    const lanes = AREAS.filter(([id]) => this.area === 'all' || this.area === id);
+    const card = (it: (typeof all)[number]): string => {
+      const t = this.tally[it.id] ?? { up: 0, down: 0 };
+      const mine = this.store.vote(it.id);
+      const votes = it.status === 'shipped' ? '' : `
+        <div class="votes" role="group" aria-label="Vote on ${esc(it.title)}">
+          <button type="button" data-item="${it.id}" data-vote="1" aria-pressed="${mine === 1}" aria-label="Vote up" ${canVote ? '' : 'disabled'}>▲</button>
+          <b title="${t.up} up, ${t.down} down">${t.up - t.down}</b>
+          <button type="button" data-item="${it.id}" data-vote="-1" aria-pressed="${mine === -1}" aria-label="Vote down" ${canVote ? '' : 'disabled'}>▼</button>
+        </div>`;
+      return `<li class="item card ${it.status} area-${it.area}">${votes}<div><b>${esc(it.title)}</b><p>${esc(it.text)}</p>${it.theme ? `<span class="theme">${esc(it.theme)}</span>` : ''}</div></li>`;
+    };
+    const head = `<div class="rm-corner"></div>${columns.map(([id, name]) => `<div class="rm-head ${id}">${name}<i>${all.filter((it) => it.status === id && (this.area === 'all' || it.area === this.area)).length}</i></div>`).join('')}`;
+    const rows = lanes.map(([area, name]) => {
+      const cells = columns.map(([status, colName]) => {
+        const items = all.filter((it) => it.area === area && it.status === status).sort((a, b) => score(b.id) - score(a.id));
+        return `<ul class="rm-cell ${items.length ? '' : 'empty'}" data-col="${colName}">${items.map(card).join('')}</ul>`;
       }).join('');
-      return `<section class="release"><header><h3>${esc(r.name)}</h3><span>${esc(r.when)}</span></header><p class="blurb">${esc(r.blurb)}</p><ul>${items}</ul></section>`;
+      return `<div class="rm-lane area-${area}"><span>${name}</span></div>${cells}`;
     }).join('');
+    const chips = [['all', 'Everything'] as [string, string], ...AREAS].map(([id, name]) => `<button type="button" class="chip area-${id}" data-area="${id}" aria-pressed="${this.area === id}">${name}</button>`).join('');
     const how = canVote
-      ? 'Vote for what you want most. One vote per item, and you can change it.'
+      ? 'Vote for what you want most. One vote per item, and you can change it. The most wanted rise to the top of each box.'
       : this.store.online
         ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
-        : 'Voting works on the shared page when you are signed in.';
-    return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}${releases}`;
+        : onWeb()
+          ? 'Voting is not available on this website yet. It needs accounts, which have not been built here.'
+          : 'Voting works on the shared page when you are signed in.';
+    return `<p class="lede">${how} <button type="button" class="link" data-suggest="1">Something missing? Suggest it.</button></p>${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
+      <div class="rm-filter">${chips}<button type="button" class="chip shipped" data-act="shipped" aria-pressed="${this.showShipped}">Shipped · ${shipped}</button></div>
+      <div class="rm-scroll"><div class="rm-board" style="--cols:${columns.length}">${head}${rows}</div></div>`;
   }
 
   private feedback(): string {
@@ -217,7 +298,7 @@ export class Board {
         ${canSend ? `<button type="button" class="primary" data-act="send" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Sending' : 'Send'}</button>` : ''}
         <button type="button" data-act="copy">Copy it instead</button>
       </div>
-      ${canSend ? '' : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on.</p>`}
+      ${canSend ? '' : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : onWeb() ? 'Feedback cannot be sent from this website yet.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on${onWeb() ? ' to whoever gave you the link' : ''}.</p>`}
       ${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       ${earlier}`;
   }
@@ -229,19 +310,30 @@ export class Board {
     return `<p class="lede">What has changed, newest first. The game updates under you while you sail: your boat carries on where she was.</p>${list}`;
   }
 
+  private keys(): string {
+    const caps = (keys: string[]): string => keys.map((k) => (k === '+' ? '<i>+</i>' : k.length > 6 ? `<span class="gesture">${esc(k)}</span>` : `<kbd>${esc(k)}</kbd>`)).join('');
+    const groups = KEYS.map((g) => `<section class="keygroup"><h3>${esc(g.title)}</h3>${g.note ? `<p class="lede">${esc(g.note)}</p>` : ''}
+      <ul class="keylist">${g.rows.map(([keys, name, what]) => `<li><span class="caps">${caps(keys)}</span><span class="what"><b>${esc(name)}</b>${esc(what)}</span></li>`).join('')}</ul></section>`).join('');
+    return `<div class="keypage">${groups}</div>`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
     const mine = `<div class="stats">
       ${stat('Miles sailed', t.miles.toFixed(1))}${stat('Hours under way', t.hours.toFixed(1))}${stat('Sails', String(t.sails))}
       ${stat('Marks rounded', String(t.marks))}${stat('Tacks and gybes', String(t.tacks))}${stat('Knockdowns', String(t.knockdowns))}${stat('Top speed', `${t.topKt.toFixed(1)} kt`)}
+      ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}
     </div>`;
     const fleet = this.logbook.fleet;
     const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
     const table = fleet.length
       ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
-      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
-    return `<p class="lede">Your logbook adds up every sail on this device. On the shared page it is also kept with your sign-in, so it follows you. Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
+      : `<p class="lede">${this.store.online ? 'Nobody else has logged a sail yet.' : onWeb() ? 'The fleet\'s logbooks are not available on this website yet.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
+    const kept = onWeb()
+      ? 'On this website it is kept in this browser only: there are no accounts here yet, so it does not follow you to another device.'
+      : 'On the shared page it is also kept with your sign-in, so it follows you.';
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${table}`;
   }
 
   private render(): void {
@@ -249,13 +341,13 @@ export class Board {
     const active = document.activeElement as HTMLTextAreaElement | null;
     const caret = active?.id === 'board-text' ? active.selectionStart : null;
     this.el.innerHTML = `
-      <div class="board-frame" role="dialog" aria-label="Roadmap and feedback">
+      <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
       </div>`;
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();

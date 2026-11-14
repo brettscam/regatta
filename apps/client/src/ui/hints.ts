@@ -115,7 +115,8 @@ export class Hints {
   update(dt: number): void {
     this.clock += dt;
     if (!this.el.hidden && this.clock > this.hideAt) this.el.hidden = true;
-    if (!this.enabled || this.ctx.busy()) {
+    // At anchor or on a mooring nothing is being sailed, so there is nothing to coach.
+    if (!this.enabled || this.ctx.busy() || this.ctx.sim.state.hold !== 'none') {
       this.held.clear();
       return;
     }

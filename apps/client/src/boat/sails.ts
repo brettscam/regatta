@@ -196,6 +196,11 @@ export class Mainsail {
     this.mesh.name = 'main';
   }
 
+  /** Share of the luff that is up the mast right now: 1 full sail, 0 down on the boom. */
+  get hoisted(): number {
+    return this.hoist;
+  }
+
   /** Width of the sail at height v (0 foot, 1 head) for the full sail. */
   private chord(v: number): number {
     const foot = this.geo.mainFoot;

@@ -43,8 +43,19 @@ export class Pilot {
     return this.passage.marks[this.passage.nextIndex] ?? null;
   }
 
+  /** At anchor or made fast there is nothing to steer. Says so, and returns true, rather than pretend to engage. */
+  private heldFast(): boolean {
+    const hold = this.sim.state.hold;
+    if (hold === 'none') return false;
+    this.hooks.say(hold === 'anchor'
+      ? 'She is at anchor, so there is nothing for the pilot to steer. X weighs anchor'
+      : 'She is made fast, so there is nothing for the pilot to steer. X lets her go');
+    return true;
+  }
+
   /** P: engage in the selected mode, or hand the wheel back. */
   toggle(): void {
+    if (this.heldFast()) return;
     if (this.engaged) {
       // Leave the rudder where it is: the wheel holds where it is left.
       this.sim.setControl('rudder', this.sim.state.rudder);
@@ -58,6 +69,7 @@ export class Pilot {
 
   /** Step to the next thing the pilot can hold. If it is steering, it changes over at once. */
   cycle(): void {
+    if (this.heldFast()) return;
     this.mode = ORDER[(ORDER.indexOf(this.mode) + 1) % ORDER.length];
     if (this.engaged) this.engage(this.mode, true);
     else this.hooks.say(`Pilot set to hold ${MODE_NAME[this.mode]}. P engages it`);

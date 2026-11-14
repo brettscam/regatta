@@ -147,6 +147,13 @@ export interface SimState {
   crashGybes: number;
   /** How many of those laid her flat. */
   knockdowns: number;
+  /** What is holding her: nothing, her own anchor, or a mooring or dock line. Held, her sails are stowed. */
+  hold: 'none' | 'anchor' | 'mooring';
+  /** Where the anchor or mooring is. */
+  holdX: number;
+  holdY: number;
+  /** Metres of rode or line between that point and the bow. */
+  holdScope: number;
   maneuver: Maneuver | null;
 }
 
