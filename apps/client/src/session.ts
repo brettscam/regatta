@@ -146,7 +146,7 @@ export class Session {
     this.race = new Race({
       sim: this.sim, world, passage: this.passage, fleet: this.fleet, spec: opts.spec, scene: stage.scene, logbook: opts.logbook,
       skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
-      say: (text) => this.hud.raiseAlarm(text, 5),
+      say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       alarm: (text) => this.alarm(text),
       finished: () => this.fleetPanel.toggle(true),
       invite: (from, text) => {

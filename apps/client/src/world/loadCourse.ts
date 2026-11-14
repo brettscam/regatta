@@ -41,8 +41,18 @@ export interface LoadedCourse extends ReplayData {
 
 const ROOT = '../../../../courses/';
 const abouts = import.meta.glob<CourseAbout>('../../../../courses/*/about.json', { eager: true, import: 'default' });
-const json = import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic}.json', { import: 'default' });
-const binaries = import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default' });
+/** True in the single-file build (set in `vite.config.ts`). */
+declare const __SINGLE__: boolean;
+/** Make an already-loaded set of modules look like the load-on-demand kind. */
+const ready = <T>(all: Record<string, T>): Record<string, () => Promise<T>> => Object.fromEntries(Object.entries(all).map(([k, v]) => [k, () => Promise.resolve(v)]));
+// The single-file build has no network to fetch from, and inlining load-on-demand modules into one script leaves them
+// defined after the code that waits for them. So there everything is loaded up front; on the web each water is fetched when chosen.
+const json = __SINGLE__
+  ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic}.json', { import: 'default', eager: true }))
+  : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic}.json', { import: 'default' });
+const binaries = __SINGLE__
+  ? ready(import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default', eager: true }))
+  : import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default' });
 
 /** Every water on offer, in the order the join screen lists them. */
 export const COURSES: CourseAbout[] = Object.values(abouts).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));

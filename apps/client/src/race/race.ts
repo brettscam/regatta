@@ -78,7 +78,7 @@ export interface RaceContext {
   /** The courses a fixed event can name. */
   courses: RaceCourse[];
   /** A passing remark, an alarm that needs the player, and word that someone has called a race. */
-  say(text: string): void;
+  say(text: string, seconds?: number): void;
   alarm(text: string): void;
   invite(from: string, text: string): void;
   /** The player has finished: show how everyone stands. */
@@ -152,12 +152,61 @@ export class Race {
     this.place = 0;
     this.called.clear();
     this.offers.delete(call.id);
+    const towed = this.musterAtStart(call);
     this.legStart = { x: sim.state.x, y: sim.state.y };
     passage.setRoute(call.marks, sim.state, sim.state.t);
     for (let i = 0; i < call.pace; i++) this.pacers.push(new PaceBoat(i, spec, world, scene, call.marks));
     const start = call.marks[0];
-    this.ctx.say(`${mine ? 'Race called' : 'Race joined'}: ${call.name}. Gun in ${clockText(this.countdown)}. Be at ${start.name} when it goes`);
+    const left = this.countdown;
+    const when = left > 0 ? `Gun in ${clockText(left)}` : `It started ${clockText(-left)} ago`;
+    this.ctx.say(towed
+      ? `${mine ? 'Race called' : 'Race joined'}: ${call.name}. You have been towed to the start area, just short of ${start.name}. ${when}. Pass ${start.name} after the gun`
+      : `${mine ? 'Race called' : 'Race joined'}: ${call.name}. ${when}. Be at ${start.name} when it goes`, 9);
     this.version++;
+  }
+
+  /**
+   * Everyone starts together. A boat that enters from far off is towed to the start area: a few hundred metres short of
+   * the start mark, on the far side from the first leg, each boat in her own berth so the fleet is spread along the line.
+   * @returns true if she was moved
+   */
+  private musterAtStart(call: RaceCall): boolean {
+    const { sim, world, spec, fleet } = this.ctx;
+    const s = sim.state;
+    const start = call.marks[0];
+    if (Math.hypot(start.x - s.x, start.y - s.y) < 450) return false;
+    const next = call.marks[1] ?? start;
+    const along = Math.atan2(next.x - start.x, next.y - start.y);
+    // Berths fan out either side of the line of the first leg, the first boats nearest the middle. Pace boats lie ahead of them.
+    const taken = fleet.boats.filter((b) => b.raceId === call.id).length;
+    const need = spec.dimensions.draft + 2.5;
+    for (let k = taken; k < taken + 14; k++) {
+      const back = 330 + Math.floor(k / 4) * 70;
+      const side = (k % 2 === 0 ? 1 : -1) * (45 + Math.floor((k % 4) / 2) * 60) + (Math.random() - 0.5) * 24;
+      const x = start.x - Math.sin(along) * back + Math.cos(along) * side;
+      const y = start.y - Math.cos(along) * back - Math.sin(along) * side;
+      // Room to lie there: water under her and around her.
+      let clear = world.depth(x, y, s.t) >= need;
+      for (let j = 0; j < 6 && clear; j++) clear = world.depth(x + Math.sin(j) * 70, y + Math.cos(j) * 70, s.t) >= spec.dimensions.draft + 1;
+      if (!clear) continue;
+      if (s.hold !== 'none') sim.release();
+      s.x = x;
+      s.y = y;
+      // Lying head to wind with a little way on, ready to bear away for the mark.
+      s.heading = world.wind(x, y, s.t).dir;
+      s.speed = 0.8;
+      s.lateral = 0;
+      s.yawRate = 0;
+      s.heel = 0;
+      s.knock = 0;
+      s.rudder = 0;
+      s.rudderCmd = 0;
+      s.maneuver = null;
+      sim.setHelm('hand');
+      sim.setCrewTrim(true);
+      return true;
+    }
+    return false;
   }
 
   /** Give the race up. The route stays on the chart. */

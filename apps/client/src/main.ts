@@ -99,7 +99,7 @@ const waterView = (): WaterView => ({ about: data.about, spots: data.starts, tim
 // The roadmap and the feedback form are there from the first screen.
 const logbook = new Logbook();
 const board = new Board(logbook);
-board.places = places;
+board.places = data.places;
 window.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
   if (e.code === 'KeyB' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) board.toggle();
@@ -127,6 +127,8 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
   }
   const spot = data.starts.find((s) => s.id === choice.spot) ?? data.starts[0];
   document.body.classList.remove('lobby');
+  // The bar-hop card lists the places of the water she is on.
+  board.places = data.places;
   session = new Session(stage, {
     spec: BOATS[choice.boat],
     livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort },
