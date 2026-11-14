@@ -28,7 +28,8 @@ export class FleetPanel {
   /** Pace boats asked for. Until the player chooses: two when alone, none with friends, since each player's pace boats sail a little differently. */
   private pace: number | null = null;
   private clock = 0;
-  private drawn = '';
+  private parts: HTMLElement[] | null = null;
+  private readonly shown: string[] = ['', '', ''];
 
   constructor(private readonly ctx: FleetPanelContext) {
     this.course = ctx.courses[0]?.id ?? 'chart';
@@ -98,7 +99,8 @@ export class FleetPanel {
     return `<h3>On the water</h3><ul class="roster">${mine}${rows}</ul>${alone}`;
   }
 
-  private setup(): string {
+  /** With no race on: what is on offer (which can change by itself), and the form for calling one (which only changes when touched). */
+  private setup(): { live: string; form: string } {
     const race = this.ctx.race;
     const offers = [...race.offers.values()].map((o) => `<div class="offer"><p><b>${esc(o.host)}</b> has called <b>${esc(o.name)}</b>. ${esc(String(o.marks.length))} marks, start at ${esc(o.marks[0].name)}.</p><button type="button" class="primary" data-join="${esc(o.id)}">Join</button></div>`).join('');
     const chart = this.ctx.chartRoute();
@@ -111,16 +113,17 @@ export class FleetPanel {
     const fixed = event && evCourse && !isOpen(event)
       ? `<div class="offer"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. It opens for joining here ${OPENS_BEFORE} minutes before. Be near <b>${esc(evCourse.marks[0].name)}</b> by then.</p></div>`
       : '';
-    return `${fixed}${offers}
+    return { live: `${fixed}${offers}`, form: `
       <h3>Call a race</h3>
       <div class="courses">${courses}</div>
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
       ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
       <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
-      <button type="button" class="primary" data-act="call">Call the race</button>`;
+      <button type="button" class="primary" data-act="call">Call the race</button>` };
   }
 
-  private running(): string {
+  /** In a race: the clock and the standings, which tick, and the way out, which does not. */
+  private running(): { live: string; form: string } {
     const race = this.ctx.race;
     const call = race.call!;
     const me = this.ctx.me();
@@ -136,18 +139,26 @@ export class FleetPanel {
       : race.finish !== null
         ? `<p class="count">${clockText(race.finish)}</p><p class="lede">Your time. ${table.length > 1 ? `You placed ${race.place} of ${table.length}.` : ''}</p>`
         : `<p class="count">${clockText(race.elapsed)}</p><p class="lede">Racing. Next mark <b>${esc(race.nextMark?.name ?? '')}</b>.</p>`;
-    return `<h3>${esc(call.name)}</h3>${head}
+    return { live: `<h3>${esc(call.name)}</h3>${head}
       <table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Marks</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>
-      <button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>`;
+      <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>`, form: `<button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>` };
   }
 
+  /**
+   * The panel is three parts, each redrawn only when its own words change. The roster and the race clock tick every second;
+   * the form does not, so a list being scrolled or a button being pressed is never replaced under the pointer.
+   */
   private render(): void {
-    const html = `
-      <header><h2>Fleet and racing</h2><button type="button" data-act="close" aria-label="Close">Close</button></header>
-      <div class="fleet-body">${this.roster()}${this.ctx.race.call ? this.running() : this.setup()}</div>`;
-    if (html === this.drawn) return;
-    this.drawn = html;
-    this.el.innerHTML = html;
+    if (!this.parts) {
+      this.el.innerHTML = '<header><h2>Fleet and racing</h2><button type="button" data-act="close" aria-label="Close">Close</button></header><div class="fleet-body"><div class="part"></div><div class="part"></div><div class="part"></div></div>';
+      this.parts = [...this.el.querySelectorAll<HTMLElement>('.part')];
+    }
+    const race = this.ctx.race.call ? this.running() : this.setup();
+    const html = [this.roster(), race.live, race.form];
+    html.forEach((h, i) => {
+      if (this.shown[i] === h) return;
+      this.shown[i] = h;
+      this.parts![i].innerHTML = h;
+    });
   }
 }

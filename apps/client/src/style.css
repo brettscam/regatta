@@ -467,3 +467,8 @@ body.lobby .night { display: none; }
 .cheat .more { color: var(--dim); }
 body.lobby .cheat { display: none; }
 @media (max-width: 1340px) { .cheat { left: 50%; top: auto; bottom: calc(var(--edge-bottom) + 210px); max-width: calc(100% - 32px); } }
+
+/* The race panel's three parts stack like the single column they replaced. */
+.fleet-body .part { display: flex; flex-direction: column; gap: 10px; }
+.fleet-body .part:empty { display: none; }
+.fleetpanel { max-height: calc(100% - 110px); }
