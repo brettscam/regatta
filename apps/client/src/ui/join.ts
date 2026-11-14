@@ -3,6 +3,7 @@ import type { Waypoint } from '@slack-tide/nav';
 import type { ReplayWorld } from '@slack-tide/world';
 import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
 import { onWeb } from '../net/platform';
+import { inText, nextEvent, whenText } from '../race/events';
 
 export interface StartSpot {
   id: string;
@@ -152,7 +153,13 @@ export class JoinFlow {
     const when = this.opts.times.map((t) =>
       `<button type="button" class="chip" data-time="${t.id}" aria-pressed="${t.id === this.choice.time}" title="${esc(t.say)}"><b>${clock.format(new Date(start + t.hours * 3600000))}</b>${esc(t.name)}</button>`).join('');
     const picked = this.opts.times.find((t) => t.id === this.choice.time);
-    return `<h2>Where do you want to sail?</h2>
+    // A race fixed for later today: tell everyone on the way in where to start from.
+    const event = onWeb() ? null : nextEvent();
+    const from = event && this.opts.spots.find((sp) => sp.id === event.spot);
+    const race = event && from
+      ? `<p class="racenight"><b>${esc(event.name)}</b> The gun goes at ${esc(whenText(event))}, ${esc(inText(event))}. To race, start from <b>${esc(from.name)}</b>. Once you are sailing, press R: the race opens for joining 25 minutes before the gun.</p>`
+      : '';
+    return `${race}<h2>Where do you want to sail?</h2>
       <div class="when" role="group" aria-label="Time to cast off">${when}</div>
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
       <div class="cards">${cards}</div>

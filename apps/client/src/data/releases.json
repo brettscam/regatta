@@ -1,6 +1,16 @@
 {
   "notes": [
     {
+      "id": "v12",
+      "date": "2026-11-14",
+      "title": "Race night, and keys you can read",
+      "items": [
+        "Race night: Raccoon Strait to McCovey Cove, gun at 7:30 PM Pacific on Saturday 14 November. Start from Raccoon Strait. The race opens for joining 25 minutes before the gun: press R, then Join, and be at Point Stuart when it goes.",
+        "A race can now be fixed for a real time. It shows on the way in and under the clock, and runs without anyone having to call it.",
+        "The Keys page is rewritten in plain words, starting with the five keys you need first."
+      ]
+    },
+    {
       "id": "v11",
       "date": "2026-11-14",
       "title": "The tender is a kayak, and race nights hold their clock",

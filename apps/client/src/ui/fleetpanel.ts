@@ -1,6 +1,7 @@
 import { KT, R2D } from '@slack-tide/sim';
 import type { RemoteBoat } from '../net/fleet';
 import { onWeb } from '../net/platform';
+import { inText, isOpen, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
 import { clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -104,7 +105,13 @@ export class FleetPanel {
     const options = [...this.ctx.courses.map((c) => ({ id: c.id, name: c.name, blurb: c.blurb })), ...(chart.length >= 2 ? [{ id: 'chart', name: 'The route on your chart', blurb: `${chart.length} marks, from ${chart[0].name} to ${chart[chart.length - 1].name}. Plan it on the chart (M), then race it.` }] : [])];
     const courses = options.map((c) => `<button type="button" class="course" data-course="${c.id}" aria-pressed="${c.id === this.course}"><b>${esc(c.name)}</b><span>${esc(c.blurb)}</span></button>`).join('');
     const chips = (label: string, key: string, values: number[], now: number, unit: string) => `<div class="chips"><span>${label}</span>${values.map((v) => `<button type="button" data-${key}="${v}" aria-pressed="${v === now}">${v}${unit}</button>`).join('')}</div>`;
-    return `${offers}
+    // A race fixed for later: say when, where to be, and when it opens.
+    const event = nextEvent();
+    const evCourse = event && this.ctx.courses.find((c) => c.id === event.course);
+    const fixed = event && evCourse && !isOpen(event)
+      ? `<div class="offer"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. It opens for joining here ${OPENS_BEFORE} minutes before. Be near <b>${esc(evCourse.marks[0].name)}</b> by then.</p></div>`
+      : '';
+    return `${fixed}${offers}
       <h3>Call a race</h3>
       <div class="courses">${courses}</div>
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}

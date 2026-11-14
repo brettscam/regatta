@@ -374,10 +374,19 @@ body.lobby .trimcard { display: none; }
 @media (max-width: 760px) { .trimcard { width: calc(100% - 32px); bottom: calc(var(--edge-bottom) + 210px); } }
 
 /* ---- keys tab ----------------------------------------------------------------------------------- */
-.board .keys { display: grid; grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr); gap: 6px 16px; margin: 6px 0 0; font-size: 13.5px; line-height: 1.45; }
-.board .keys dt { font-weight: 600; color: var(--ink); }
-.board .keys dd { margin: 0; color: rgba(238, 243, 244, 0.82); }
 .board-frame nav { flex-wrap: wrap; }
+.board .keypage { display: grid; gap: 22px; max-width: 720px; margin: 0 auto; width: 100%; }
+.board .keygroup h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.board .keygroup .lede { margin-bottom: 4px; }
+.board .keylist { display: grid; gap: 0; margin-top: 6px; }
+.board .keylist li { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 16px; align-items: start; padding: 10px 0; border-top: 1px solid rgba(238, 243, 244, 0.09); }
+.board .keylist .caps { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.board .keylist kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 8px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: rgba(238, 243, 244, 0.09); border: 1px solid rgba(238, 243, 244, 0.28); border-bottom-width: 3px; border-radius: 7px; }
+.board .keylist .caps i { font-style: normal; color: var(--dim); }
+.board .keylist .gesture { font-size: 12.5px; font-weight: 600; color: var(--amber); line-height: 1.3; padding-top: 6px; }
+.board .keylist .what { font-size: 14px; line-height: 1.5; color: rgba(238, 243, 244, 0.84); }
+.board .keylist .what b { display: block; font-size: 14.5px; color: var(--ink); }
+@media (max-width: 560px) { .board .keylist li { grid-template-columns: 1fr; gap: 6px; } }
 
 /* ---- roadmap as a board: sprint columns across, lanes by area ------------------------------------ */
 .board-frame.wide { width: min(1320px, 100%); }
@@ -431,3 +440,7 @@ body.lobby .trimcard { display: none; }
 .night .title { font-size: clamp(26px, 4.6vw, 48px); font-weight: 300; letter-spacing: 0.2em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; }
 .night .title small { display: block; margin-top: 14px; font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
 body.lobby .night { display: none; }
+
+/* ---- a race fixed for later, on the join screen -------------------------------------------------- */
+.join .racenight { margin: 0 0 12px; padding: 10px 13px; font-size: 13.5px; line-height: 1.5; border: 1px solid var(--amber); border-radius: 10px; background: rgba(255, 196, 107, 0.08); }
+.join .racenight b:first-child { display: block; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); margin-bottom: 2px; }

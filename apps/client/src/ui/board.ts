@@ -34,43 +34,50 @@ const KINDS: Array<[string, string, string]> = [
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
 type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook';
-/** Every control, grouped. Sailing is done on the boat's own parts or with these keys: there are no sailing buttons. */
-const KEYS: Array<[string, Array<[string, string]>]> = [
-  ['Sailing', [
-    ['Point at the wheel, boom or a winch', 'Scroll or drag to turn, ease or trim it'],
-    ['A D or ← →', 'Wheel to port or starboard'],
-    ['W S', 'Mainsheet in, mainsheet out'],
-    ['Q E', 'Trim the working jib sheet, ease the loaded one'],
-    ['T', 'Tack or gybe, with the crew on the sheets'],
-    ['P, Shift+P', 'Autopilot on or off, and what it holds: heading, wind angle, route'],
-  ]],
-  ['Seeing', [
-    ['Drag, scroll', 'Look around, move in and out'],
-    ['1 2 3 4', 'Helm, mast, foredeck and drone views'],
-    ['M', 'Chart and passage plan'],
-    ['F', 'Wind tunnel: the air over the sails, and what the trim is asking for'],
-    ['H', 'Hide or show the instruments'],
-    ['C', 'Coaching hints on or off'],
-  ]],
-  ['With other boats', [
-    ['R', 'Fleet and racing: who is out, call a race, join one'],
-    ['Enter', 'Hail the fleet'],
-  ]],
-  ['Stopping', [
-    ['X', 'Anchor, pick up a mooring or come alongside. X again to get under way'],
-    ['Z', 'At anchor or moored: turn in for the night'],
-    ['O', 'At anchor or moored: launch the kayak. Paddle with W A S D, O lands her on a shore, O alongside the boat comes back aboard'],
-    ['U', 'Aground: a tow to the nearest deep water'],
-  ]],
-  ['Catching supper', [
-    ['K', 'Drop a crab pot (under 3 kt, in 4 to 35 m). K again beside its buoy hauls it'],
-    ['L', 'Fishing line out or in. When a fish is on, L strikes'],
-  ]],
-  ['The game', [
-    ['Space', 'Pause (alone on the water)'],
-    ['Drag the clock', 'Speed time up (alone on the water)'],
-    ['B', 'This board: roadmap, what is new, keys, feedback, logbook'],
-  ]],
+/**
+ * Every control, in plain words, grouped by what the player is trying to do and in the order a newcomer needs them.
+ * Each row: the keys (one string per key cap; "or" and "+" are joiners, anything else long is a gesture), what it is called, what it does.
+ * Sailing is done on the boat's own parts or with these keys: there are no sailing buttons.
+ */
+const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string, string]> }> = [
+  { title: 'Steer and set the sails', note: 'These five are all you need to get going.', rows: [
+    [['A', 'D'], 'Steer', 'Turn the wheel left or right. The arrow keys do the same.'],
+    [['W', 'S'], 'Mainsail', 'The big sail. W pulls it in, S lets it out.'],
+    [['Q', 'E'], 'Jib', 'The front sail. Q pulls it in, E lets it out.'],
+    [['T'], 'Tack', 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.'],
+    [['P'], 'Autopilot', 'On or off. While it is on the boat steers herself and the crew looks after the sails.'],
+  ] },
+  { title: 'Or use the mouse', rows: [
+    [['Point and scroll'], 'Grab the boat', 'Point at the wheel, the boom (the pole along the bottom of the mainsail) or a winch, then scroll or drag to move it.'],
+    [['Drag'], 'Look around', 'Drag anywhere else to swing the camera. Scroll to move in and out.'],
+  ] },
+  { title: 'See more', rows: [
+    [['1', '2', '3', '4'], 'Camera', 'Jump to a view: the wheel, the mast, the bow, or above the boat.'],
+    [['M'], 'Chart', 'The map. Plan a route and see the wind and tide forecast.'],
+    [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
+    [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
+    [['C'], 'Coaching', 'Tips on or off.'],
+    [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
+  ] },
+  { title: 'Race and talk', rows: [
+    [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
+    [['Enter'], 'Message', 'Type a message to the other boats.'],
+  ] },
+  { title: 'Stop for a while', rows: [
+    [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
+    [['Z'], 'Sleep', 'Skip to the morning. Only while stopped, and only when you are alone on the water.'],
+    [['O'], 'Go ashore', 'While stopped, launches the kayak. Paddle with W A S D. Press O at a beach or a bar to land, and O beside your boat to climb back aboard.'],
+  ] },
+  { title: 'Catch supper', rows: [
+    [['K'], 'Crab pot', 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.'],
+    [['L'], 'Fishing line', 'Line out or in. When "Fish on" appears, press L quickly to catch it.'],
+  ] },
+  { title: 'If you get stuck', rows: [
+    [['U'], 'Tow', 'Run aground? This tows you back to deep water.'],
+    [['Space'], 'Pause', 'Only when you are alone on the water.'],
+    [['Drag the clock'], 'Faster time', 'Drag the clock in the corner sideways to speed time up. Only when you are alone.'],
+    [['B'], 'This board', 'Roadmap, what is new, these keys, feedback and your logbook.'],
+  ] },
 ];
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -304,7 +311,10 @@ export class Board {
   }
 
   private keys(): string {
-    return KEYS.map(([group, rows]) => `<section class="release"><header><h3>${esc(group)}</h3></header><dl class="keys">${rows.map(([k, what]) => `<dt>${esc(k)}</dt><dd>${esc(what)}</dd>`).join('')}</dl></section>`).join('');
+    const caps = (keys: string[]): string => keys.map((k) => (k === '+' ? '<i>+</i>' : k.length > 6 ? `<span class="gesture">${esc(k)}</span>` : `<kbd>${esc(k)}</kbd>`)).join('');
+    const groups = KEYS.map((g) => `<section class="keygroup"><h3>${esc(g.title)}</h3>${g.note ? `<p class="lede">${esc(g.note)}</p>` : ''}
+      <ul class="keylist">${g.rows.map(([keys, name, what]) => `<li><span class="caps">${caps(keys)}</span><span class="what"><b>${esc(name)}</b>${esc(what)}</span></li>`).join('')}</ul></section>`).join('');
+    return `<div class="keypage">${groups}</div>`;
   }
 
   private log(): string {

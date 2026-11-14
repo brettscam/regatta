@@ -8,6 +8,7 @@ import type { Logbook } from '../net/logbook';
 import type { Wave } from '../scene/waves';
 import type { TrafficVessel } from '../scene/traffic';
 import type { Passage } from '../ui/passage';
+import { CLOSES_AFTER, gunTime, inText, isOpen, nextEvent, whenText } from './events';
 import { PaceBoat } from './pace';
 
 export interface RaceMark { name: string; x: number; y: number }
@@ -22,6 +23,11 @@ export interface RaceCall {
   host: string;
   /** How many pace boats sail it too. */
   pace: number;
+  /**
+   * For a race fixed on the real clock: the gun in milliseconds since 1970. The countdown then runs on the real clock,
+   * which every boat shares exactly, and `gun` is only that moment as it fell on the season clock when the call was made.
+   */
+  at?: number;
 }
 export interface Standing {
   name: string;
@@ -69,6 +75,8 @@ export interface RaceContext {
   logbook: Logbook;
   skipper: string;
   boatName: string;
+  /** The courses a fixed event can name. */
+  courses: RaceCourse[];
   /** A passing remark, an alarm that needs the player, and word that someone has called a race. */
   say(text: string): void;
   alarm(text: string): void;
@@ -105,12 +113,16 @@ export class Race {
 
   /** Seconds until the gun. Negative once it has gone. */
   get countdown(): number {
-    return this.call ? this.call.gun - this.now : 0;
+    const c = this.call;
+    if (!c) return 0;
+    return c.at ? (c.at - Date.now()) / 1000 : c.gun - this.now;
   }
 
   /** Seconds since the gun. */
   get elapsed(): number {
-    return this.call ? this.now - this.call.gun : 0;
+    const c = this.call;
+    if (!c) return 0;
+    return c.at ? (Date.now() - c.at) / 1000 : this.now - c.gun;
   }
 
   get nextMark(): RaceMark | null {
@@ -244,6 +256,21 @@ export class Race {
         this.ctx.invite(b.name || call.host, `calls a race: ${call.name}. Gun in ${clockText(call.gun - now)}. Press R to join`);
       }
     }
+    // A race fixed for a real time opens for joining a while before its gun. Every boat builds the same call from the same data.
+    const event = nextEvent();
+    const course = event && this.ctx.courses.find((c) => c.id === event.course);
+    if (event && course && isOpen(event)) {
+      live.add(event.id);
+      if (this.call?.id !== event.id) {
+        const at = gunTime(event);
+        if (!this.offers.has(event.id)) this.version++;
+        this.offers.set(event.id, { id: event.id, name: `${event.name}: ${course.name}`, marks: course.marks, gun: Math.round(now + (at - Date.now()) / 1000), host: 'The race committee', pace: 0, at });
+        if (!this.told.has(event.id) && at > Date.now()) {
+          this.told.add(event.id);
+          this.ctx.invite('The race committee', `calls ${event.name}: ${course.name}. Gun at ${whenText(event)}, ${inText(event)}. Press R to join`);
+        }
+      }
+    }
     for (const id of this.offers.keys()) {
       if (!live.has(id)) {
         this.offers.delete(id);
@@ -272,8 +299,15 @@ export class Race {
   line(): string {
     const call = this.call;
     if (!call) {
-      const offer = [...this.offers.values()].find((o) => o.gun > this.now);
-      return offer ? `${offer.host} calls a race · gun in ${clockText(offer.gun - this.now)} · R to join` : '';
+      const offer = [...this.offers.values()].find((o) => (o.at ? o.at > Date.now() - CLOSES_AFTER * 60e3 : o.gun > this.now));
+      if (offer) {
+        const left = offer.at ? (offer.at - Date.now()) / 1000 : offer.gun - this.now;
+        return left > 0 ? `${offer.host} calls a race · gun in ${clockText(left)} · R to join` : `${offer.name} started ${clockText(-left)} ago · R to join late`;
+      }
+      // Something fixed for later today: keep it in view.
+      const event = nextEvent();
+      const course = event && this.ctx.courses.find((c) => c.id === event.course);
+      return event && course ? `${event.name} · ${course.name} · gun at ${whenText(event)}, ${inText(event)}` : '';
     }
     if (!this.started) return `Race · gun in ${clockText(this.countdown)} · start at ${call.marks[0].name}`;
     const table = this.standings();

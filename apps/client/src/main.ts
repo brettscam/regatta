@@ -5,6 +5,7 @@ import timesJson from '../../../courses/sf-bay/times.json';
 import placesJson from '../../../courses/sf-bay/places.json';
 import racesJson from '../../../courses/sf-bay/races.json';
 import type { RaceCourse } from './race/race';
+import { gunTime, nextEvent } from './race/events';
 import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
 import { Session, type Place } from './session';
@@ -48,6 +49,13 @@ function settle(c: Partial<Choice>): Choice {
     skipper: (c.skipper ?? '').slice(0, 16),
     tutorial: c.tutorial ?? true,
   };
+}
+
+/** With a fixed race less than an hour and a half off, the way in starts at its start, in the afternoon breeze. */
+function raceNight(c: Choice): Choice {
+  const event = nextEvent();
+  if (!event || gunTime(event) - Date.now() > 90 * 60e3 || !spots.some((s) => s.id === event.spot)) return c;
+  return { ...c, spot: event.spot, time: DEFAULT_TIME };
 }
 
 const data = await loadCourse();
@@ -138,7 +146,7 @@ function begin(): void {
     lineup: LINEUP,
     boats: BOATS,
     world,
-    initial: settle(savedChoice()),
+    initial: raceNight(settle(savedChoice())),
     onPreview: (choice, step) => {
       setClock(choice);
       lobby?.show(choice, step);

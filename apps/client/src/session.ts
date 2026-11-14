@@ -144,7 +144,7 @@ export class Session {
     this.fleet.onHail = (from, text) => this.heard(from, text);
     this.race = new Race({
       sim: this.sim, world, passage: this.passage, fleet: this.fleet, spec: opts.spec, scene: stage.scene, logbook: opts.logbook,
-      skipper: opts.skipper, boatName: opts.livery.name ?? '',
+      skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
       say: (text) => this.hud.raiseAlarm(text, 5),
       alarm: (text) => this.alarm(text),
       invite: (from, text) => {
