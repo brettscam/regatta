@@ -1,5 +1,7 @@
 import type { Account, Db, Room, UserApi } from '../platform';
 import { makeClient } from './client';
+import { WebDb } from './db';
+import { makeIdentity } from './identity';
 import { WebRoom } from './room';
 
 /**
@@ -8,9 +10,11 @@ import { WebRoom } from './room';
  */
 export interface Backend {
   room(area: string): Room;
-  db: Db | null;
+  db: Db;
   user: UserApi;
-  account: Account | null;
+  account: Account;
+  /** Settles once it is known whether this person is signed in. */
+  ready: Promise<void>;
 }
 
 let made: Backend | null = null;
@@ -20,17 +24,10 @@ export function backend(): Backend {
 }
 
 function make(): Backend {
+  // A sign-in link brings its result back in the address. Note it before the client reads it and tidies it away.
+  const arrivedWith = location.hash;
   const client = makeClient();
-  /** The signed-in person's id, kept up to date so that it can be read without waiting. */
-  let uid: string | null = null;
-  const settled = client.auth.getSession().then(({ data }) => { uid = data.session?.user.id ?? null; }, () => {});
-  client.auth.onAuthStateChange((_event, session) => { uid = session?.user.id ?? null; });
-
-  const user: UserApi = {
-    id: async () => { await settled; return uid; },
-    can: async () => { await settled; return uid !== null; },
-    profiles: async () => ({}),
-  };
+  const identity = makeIdentity(client, arrivedWith);
 
   // One water at a time: asking for another area leaves the one before.
   let water: WebRoom | null = null;
@@ -39,8 +36,8 @@ function make(): Backend {
       water.close();
       water = null;
     }
-    return (water ??= new WebRoom(client, area, () => uid));
+    return (water ??= new WebRoom(client, area, identity.uid));
   };
 
-  return { room, db: null, user, account: null };
+  return { room, db: new WebDb(client), user: identity.user, account: identity.account, ready: identity.ready };
 }

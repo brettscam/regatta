@@ -143,5 +143,7 @@ export async function user(): Promise<UserApi | null> {
 /** Signing in and out. Null on claude.ai and wherever there is no backend. */
 export async function account(): Promise<Account | null> {
   if (claudeUse() || !web) return null;
-  return (await web()).account;
+  const backend = await web();
+  await backend.ready;
+  return backend.account;
 }

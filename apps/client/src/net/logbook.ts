@@ -1,9 +1,10 @@
 /**
  * The skipper's logbook: miles, hours and the rest, added up across every sail.
  * It always keeps a copy on this device. On the shared page it is also saved to the page's database under the
- * person's own id, where the rest of the fleet can read it. This is the seed of experience points and accounts.
+ * person's own id, where the rest of the fleet can read it. On the website the same happens once the person has
+ * signed in, and anyone can read the fleet's. This is the seed of experience points and accounts.
  */
-import { db as askDb, user as askUser, type Db } from './platform';
+import { account as askAccount, db as askDb, onWeb, user as askUser, type Db } from './platform';
 
 export interface LogTotals {
   miles: number;
@@ -58,19 +59,36 @@ export class Logbook {
     } catch { /* start a fresh book */ }
     void this.connect();
     window.addEventListener('pagehide', () => this.keep());
+    // On the website a person can sign in or out while the page is open. The book is then connected again,
+    // and a book just signed in to is saved at the next chance instead of after the usual few minutes.
+    void askAccount().then((a) => a?.onChange(() => {
+      void this.connect().then(() => {
+        if (this.uid) {
+          this.sinceSave = 120;
+          this.dirty = true;
+        }
+        this.onFleet();
+      });
+    })).catch(() => {});
   }
+
+  private unwatch: () => void = () => {};
 
   private async connect(): Promise<void> {
     try {
       const [db, user] = await Promise.all([askDb(), askUser()]);
       this.uid = (await user?.id()) ?? null;
-      if (!db || !this.uid) return;
+      // On the website the fleet's books can be read by anyone. Everywhere else they are for people who are signed in.
+      if (!db || (!this.uid && !onWeb())) return;
       this.db = db;
-      // If this person has sailed on another device, carry on from whichever book has more in it.
-      const snap = await this.db.doc(`profiles/${this.uid}`).get();
-      const theirs = snap.exists ? clean((snap.data()?.log ?? {}) as Partial<LogTotals>) : ZERO;
-      if (theirs.miles > this.totals.miles) this.totals = theirs;
-      this.db.collection('profiles').onSnapshot((s) => {
+      if (this.uid) {
+        // If this person has sailed on another device, carry on from whichever book has more in it.
+        const snap = await this.db.doc(`profiles/${this.uid}`).get();
+        const theirs = snap.exists ? clean((snap.data()?.log ?? {}) as Partial<LogTotals>) : ZERO;
+        if (theirs.miles > this.totals.miles) this.totals = theirs;
+      }
+      this.unwatch();
+      this.unwatch = this.db.collection('profiles').onSnapshot((s) => {
         this.fleet = s.docs.map((d) => {
           const p = (d.data() ?? {}) as Partial<Profile>;
           return {
