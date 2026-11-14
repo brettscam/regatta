@@ -22,6 +22,8 @@ export interface StartTime {
   name: string;
   hours: number;
   say: string;
+  /** The time a newcomer to this water is offered. Early afternoon where no time says so. */
+  default?: boolean;
 }
 
 /** What the player picked on the way in. */
@@ -143,8 +145,8 @@ export class JoinFlow {
       const water = await this.opts.onWater(id);
       this.water = water;
       this.choice.water = id;
-      // The same time of day if this water offers it, and its first start.
-      if (!water.times.some((t) => t.id === this.choice.time)) this.choice.time = water.times[Math.min(1, water.times.length - 1)].id;
+      // The time of day this water is best met at, and its first start.
+      this.choice.time = (water.times.find((t) => t.default) ?? water.times.find((t) => t.id === 'afternoon') ?? water.times[0]).id;
       this.choice.spot = water.spots[0].id;
     } catch {
       // It could not be fetched: stay where we are.

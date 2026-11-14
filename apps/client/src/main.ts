@@ -59,7 +59,7 @@ function settle(c: Partial<Choice>): Choice {
   return {
     water: data.about.id,
     spot: spots.some((s) => s.id === c.spot) ? c.spot! : spots[0].id,
-    time: times.some((t) => t.id === c.time) ? c.time! : times.some((t) => t.id === DEFAULT_TIME) ? DEFAULT_TIME : times[0].id,
+    time: times.some((t) => t.id === c.time) ? c.time! : (times.find((t) => t.default) ?? times.find((t) => t.id === DEFAULT_TIME) ?? times[0]).id,
     boat,
     colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
     name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',

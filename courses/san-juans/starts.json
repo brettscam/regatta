@@ -3,7 +3,7 @@
     "id": "channel",
     "name": "San Juan Channel",
     "where": "Off Friday Harbor, in the middle of the islands",
-    "teaches": "Room to learn in, with a tide that matters. A beat down to Griffin Bay and a run home on the flood.",
+    "teaches": "Room to learn in, with a tide that matters. Beat down to Griffin Bay before the flood sets in, and run home on it.",
     "x": 600, "y": -5900,
     "route": [
       { "name": "Turn Rock", "x": 2900, "y": -7000 },
