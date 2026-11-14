@@ -1,21 +1,17 @@
 import { isSoundState, type SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
-import startsJson from '../../../courses/sf-bay/starts.json';
-import timesJson from '../../../courses/sf-bay/times.json';
-import placesJson from '../../../courses/sf-bay/places.json';
-import racesJson from '../../../courses/sf-bay/races.json';
-import type { RaceCourse } from './race/race';
-import { gunTime, nextEvent } from './race/events';
+import { eventWater, gunTime, nextEvent, setEventWater } from './race/events';
 import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
 import { Lobby } from './lobby';
-import { Session, type Place } from './session';
+import { Session } from './session';
 import { Stage } from './stage';
 import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
-import { JoinFlow, type Choice, type StartSpot, type StartTime } from './ui/join';
-import { loadCourse } from './world/loadCourse';
+import { JoinFlow, type Choice, type WaterView } from './ui/join';
+import { COURSES, DEFAULT_COURSE, hasCourse, loadCourse } from './world/loadCourse';
 
-// Regatta. The world is a real past afternoon on San Francisco Bay, replayed: NOAA's model of the wind, tidal stream and tide.
+// Regatta. The world is a real past day on real water, replayed: NOAA's models of the wind, tidal stream and tide.
+// San Francisco Bay unless another water is chosen: ?course=san-juans opens on the San Juan Islands.
 // For play testing, the join screen can be skipped: ?go=1 with any of &spot=gate &boat=perf45 &tutorial=1
 // &time=evening or &start=8.5 (hours into the season, which begins at 08:00) &x=1300&y=250&hdg=293
 const params = new URLSearchParams(location.search);
@@ -23,10 +19,7 @@ const num = (key: string, fallback: number) => {
   const v = Number(params.get(key));
   return params.has(key) && Number.isFinite(v) ? v : fallback;
 };
-const spots = startsJson as StartSpot[];
-const times = timesJson as StartTime[];
 const DEFAULT_TIME = 'afternoon';
-const places = placesJson as Place[];
 const SAVED = 'regatta.join';
 
 function savedChoice(): Partial<Choice> {
@@ -37,12 +30,36 @@ function savedChoice(): Partial<Choice> {
   }
 }
 
-/** A complete, valid choice from whatever was asked for or remembered. */
+/** A fixed race less than an hour and a half off. */
+function raceSoon() {
+  const event = nextEvent(null);
+  return event && gunTime(event) - Date.now() <= 90 * 60e3 ? event : null;
+}
+
+/** The water to open on: the one asked for, else where tonight's race is, else where they sailed last, else the Bay. */
+function firstWater(): string {
+  const asked = params.get('course');
+  if (hasCourse(asked)) return asked;
+  // The test parameters have always meant the Bay unless they say otherwise.
+  if (params.has('go')) return DEFAULT_COURSE;
+  const event = raceSoon();
+  if (event && hasCourse(eventWater(event))) return eventWater(event);
+  const last = savedChoice().water;
+  return hasCourse(last) ? last : DEFAULT_COURSE;
+}
+
+let data = await loadCourse(firstWater());
+let world = new ReplayWorld(data, 0);
+setEventWater(data.about.id);
+
+/** A complete, valid choice for the water showing, from whatever was asked for or remembered. */
 function settle(c: Partial<Choice>): Choice {
   const boat = c.boat && BOATS[c.boat] && LINEUP.some((e) => e.id === c.boat && e.status === 'ready') ? c.boat : DEFAULT_BOAT;
+  const { starts: spots, times } = data;
   return {
+    water: data.about.id,
     spot: spots.some((s) => s.id === c.spot) ? c.spot! : spots[0].id,
-    time: times.some((t) => t.id === c.time) ? c.time! : DEFAULT_TIME,
+    time: times.some((t) => t.id === c.time) ? c.time! : (times.find((t) => t.default) ?? times.find((t) => t.id === DEFAULT_TIME) ?? times[0]).id,
     boat,
     colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
     name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',
@@ -53,20 +70,31 @@ function settle(c: Partial<Choice>): Choice {
 
 /** With a fixed race less than an hour and a half off, the way in starts at its start, in the afternoon breeze. */
 function raceNight(c: Choice): Choice {
-  const event = nextEvent();
-  if (!event || gunTime(event) - Date.now() > 90 * 60e3 || !spots.some((s) => s.id === event.spot)) return c;
+  const event = raceSoon();
+  if (!event || eventWater(event) !== data.about.id || !data.starts.some((s) => s.id === event.spot)) return c;
   return { ...c, spot: event.spot, time: DEFAULT_TIME };
 }
 
-const data = await loadCourse();
-const world = new ReplayWorld(data, 0);
 /** Put the world's clock at the chosen time of day. ?start=hours overrides it for play testing. */
 function setClock(choice: Choice): void {
-  const t = times.find((k) => k.id === choice.time) ?? times[0];
+  const t = data.times.find((k) => k.id === choice.time) ?? data.times[0];
   world.startOffset = num('start', t.hours) * 3600;
 }
 setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
+
+/** Change the water: fetch the course if it is not here yet, and put it on the stage with a world of its own. */
+async function useCourse(id: string): Promise<void> {
+  if (id === data.about.id) return;
+  const next = await loadCourse(id);
+  data = next;
+  world = new ReplayWorld(data, 0);
+  setEventWater(id);
+  setClock(settle({}));
+  stage.setCourse(data, world);
+  if (lobby) lobby.spots = data.starts;
+}
+const waterView = (): WaterView => ({ about: data.about, spots: data.starts, times: data.times, world });
 
 // The roadmap and the feedback form are there from the first screen.
 const logbook = new Logbook();
@@ -97,7 +125,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     lobby.dispose();
     lobby = null;
   }
-  const spot = spots.find((s) => s.id === choice.spot) ?? spots[0];
+  const spot = data.starts.find((s) => s.id === choice.spot) ?? data.starts[0];
   document.body.classList.remove('lobby');
   session = new Session(stage, {
     spec: BOATS[choice.boat],
@@ -109,8 +137,8 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     tutorial: choice.tutorial && !resume,
     skipper: choice.skipper,
     logbook,
-    places,
-    races: racesJson as RaceCourse[],
+    places: data.places,
+    races: data.races,
     boardOpen: () => board.isOpen,
     boats: BOATS,
     resume,
@@ -124,10 +152,18 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
 interface HotReload { snapshot?: (fn: () => unknown) => void; ready?: (fn: (data: unknown) => void) => void; data?: unknown }
 const hot = (window as unknown as { claude?: { hot?: HotReload } }).claude?.hot;
 hot?.snapshot?.(() => (session && chosen ? { sim: session.snapshot(), choice: chosen, clock: world.startOffset } : {}));
-const resume = (saved: unknown): void => {
+const resume = async (saved: unknown): Promise<void> => {
   const s = saved as { sim?: SimState; choice?: Partial<Choice>; clock?: number } | undefined;
   // Only carry on from a state that is whole. Anything else starts again from the join screen.
   if (session || !isSoundState(s?.sim) || !s?.choice) return;
+  // She carries on in the water she was in. A boat handed over from before there was a choice was on the Bay.
+  const water = hasCourse(s.choice.water) ? s.choice.water : DEFAULT_COURSE;
+  try {
+    await useCourse(water);
+  } catch {
+    return;
+  }
+  if (session) return;
   castOff(settle(s.choice), s.sim, s.clock);
 };
 
@@ -140,14 +176,17 @@ function begin(): void {
     return;
   }
   document.body.classList.add('lobby');
-  lobby = new Lobby(stage, spots, BOATS);
+  lobby = new Lobby(stage, data.starts, BOATS);
   new JoinFlow({
-    spots,
-    times,
+    ...waterView(),
+    waters: COURSES,
     lineup: LINEUP,
     boats: BOATS,
-    world,
     initial: raceNight(settle(savedChoice())),
+    onWater: async (id) => {
+      await useCourse(id);
+      return waterView();
+    },
     onPreview: (choice, step) => {
       setClock(choice);
       lobby?.show(choice, step);
@@ -157,11 +196,11 @@ function begin(): void {
 }
 
 if (hot?.ready) {
-  hot.ready((saved) => { resume(saved); begin(); });
+  hot.ready((saved) => { void resume(saved).then(begin); });
   // If the hand-over never answers, start anyway.
   setTimeout(begin, 2500);
 } else {
-  resume(hot?.data);
+  await resume(hot?.data);
   begin();
 }
 

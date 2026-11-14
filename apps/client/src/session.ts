@@ -139,6 +139,7 @@ export class Session {
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
     this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
     this.fleet.clockLimit = world.seasonLength;
+    this.fleet.water = stage.course.id;
     this.gusts = new GustWatch(world, this.sim);
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
@@ -156,7 +157,7 @@ export class Session {
     this.fleet.extra = () => {
       const out: Record<string, unknown> = {};
       for (const f of this.features) Object.assign(out, f.wire?.());
-      return { ...out, ...this.race.wire(), st: this.status() };
+      return { ...out, ...this.race.wire(), st: this.status(), cs: this.stage.course.id };
     };
     this.fleetPanel = new FleetPanel({
       race: this.race,
@@ -291,7 +292,7 @@ export class Session {
     window.setTimeout(() => line.remove(), 45000);
   }
 
-  /** Every other vessel on the water: the Bay's traffic and any boats sailing in company. */
+  /** Every other vessel on the water: the course's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
     const traffic = this.race.pacers.length ? [...this.stage.traffic.vessels, ...this.race.vessels()] : this.stage.traffic.vessels;
     if (!this.fleet.boats.length) return traffic;

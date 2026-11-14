@@ -249,6 +249,9 @@ export class Fleet {
   /** More to tell the room with each position: what she is doing, and any race. Merged into what is sent. */
   extra: () => Record<string, unknown> = () => ({});
 
+  /** The course this boat is sailing, which the session also sends as `cs`. Boats on another water are not shown. */
+  water = 'sf-bay';
+
   /** Called when another boat hails. */
   onHail: (from: string, text: string) => void = () => {};
   private hailed: { text: string; at: number } | null = null;
@@ -286,6 +289,8 @@ export class Fleet {
       // This tab's own boat is already on screen. A second tab of the same person is a second boat.
       if (p.sameTab || p.kind !== 'viewer') continue;
       if (typeof p.presence?.x !== 'number') continue;
+      // A boat on another water is not in this one. A page that does not say is on San Francisco Bay.
+      if ((typeof p.presence.cs === 'string' ? p.presence.cs : 'sf-bay') !== this.water) continue;
       seen.add(p.peer);
       // What she says she is. All of it is another page's word, so check it before using it.
       const v = p.presence;

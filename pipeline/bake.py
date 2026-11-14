@@ -1,7 +1,9 @@
-"""Bake the Central San Francisco Bay course package from NOAA SFBOFS output and elevation tiles.
+"""Bake a course package from NOAA tide model output, HRRR wind and elevation tiles.
 
-Run fetch_sfbofs.py, fetch_hrrr.py and fetch_terrain.py first. Then:
-    python3 bake_sfbay.py <sfbofs work dir> <tile dir> <output dir> <hrrr work dir>
+Run fetch_ofs.py, fetch_hrrr.py and fetch_terrain.py for the course first. Then:
+    python3 bake.py <course> <tide model work dir> <tile dir> <output dir> <hrrr work dir>
+
+The course is an id from pipeline/courses ("sf-bay", "san-juans") or a path to a definition file.
 
 Writes course.json plus three small binaries:
     current.bin   surface current, int8 east and north per cell per hour
@@ -23,52 +25,18 @@ import numpy as np
 from PIL import Image
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 from scipy.ndimage import map_coordinates
+from scipy.spatial import cKDTree
 
+import course as courses
 import fetch_hrrr
-from fetch_sfbofs import FIRST_CYCLE, FORECAST_HOURS, TRUTH_HOURS, wanted
+import fetch_ofs
 from fetch_terrain import ZOOM
 
-ORIGIN = dict(lat=37.83, lon=-122.45)
-EARTH = 6371008.8
-M_PER_DEG_LAT = EARTH * math.pi / 180.0
-M_PER_DEG_LON = M_PER_DEG_LAT * math.cos(math.radians(ORIGIN["lat"]))
-
-# Local boxes in metres: (x0, y0, x1, y1).
-CHART = (-13600.0, -7600.0, 11000.0, 9600.0)
-TERRAIN = (-17200.0, -12400.0, 13400.0, 13200.0)
-CURRENT_DX = 200.0
-DEPTH_DX = 100.0
-TERRAIN_DX = 80.0
-WIND_DX = 1230.0
-COAST_DX = 30.0
 CURRENT_SCALE = 0.03   # m/s per count
-TERRAIN_MAX = 820.0    # metres at count 255
 
-# Positions are approximate, from general knowledge, and should be checked against a chart.
-MARKS = [
-    ("gate", "Golden Gate", 37.8197, -122.4786, "bridge"),
-    ("alcatraz", "Alcatraz", 37.8267, -122.4230, "island"),
-    ("blunt", "Point Blunt", 37.8530, -122.4190, "point"),
-    ("angel", "Angel Island", 37.8609, -122.4326, "island"),
-    ("harding", "Harding Rock", 37.8383, -122.4467, "buoy"),
-    ("blossom", "Blossom Rock", 37.8183, -122.4033, "buoy"),
-    ("bonita", "Point Bonita", 37.8155, -122.5297, "point"),
-    ("fortpoint", "Fort Point", 37.8106, -122.4771, "point"),
-    ("sausalito", "Sausalito", 37.8590, -122.4800, "town"),
-    ("cityfront", "City Front", 37.8090, -122.4300, "town"),
-    ("treasure", "Treasure Island", 37.8235, -122.3707, "island"),
-    ("tiburon", "Tiburon", 37.8735, -122.4560, "town"),
-]
-TIDE_STATION = ("San Francisco (Presidio)", 37.8063, -122.4659)
-BRIDGE = dict(south=(37.8140, -122.4778), north=(37.8254, -122.4794))
-
-
-def to_xy(lat, lon):
-    return (np.asarray(lon) - ORIGIN["lon"]) * M_PER_DEG_LON, (np.asarray(lat) - ORIGIN["lat"]) * M_PER_DEG_LAT
-
-
-def to_latlon(x, y):
-    return ORIGIN["lat"] + np.asarray(y) / M_PER_DEG_LAT, ORIGIN["lon"] + np.asarray(x) / M_PER_DEG_LON
+# Everything about a place comes from its definition in pipeline/courses: the origin, the boxes (local metres,
+# x0, y0, x1, y1), the grid spacings, the marks and the tide station. Mark positions there are approximate, from
+# general knowledge, and should be checked against a chart.
 
 
 def grid(box, dx):
@@ -138,40 +106,69 @@ def ring_area(p):
     return 0.5 * abs(np.dot(p[:-1, 0], p[1:, 1]) - np.dot(p[1:, 0], p[:-1, 1]))
 
 
-def coast_rings(dem):
-    xs, ys, nx, ny = grid((CHART[0] - 300, CHART[1] - 300, CHART[2] + 300, CHART[3] + 300), COAST_DX)
+def coast_rings(c, dem, land_of):
+    CHART = c.spec["chart"]
+    xs, ys, nx, ny = grid((CHART[0] - 300, CHART[1] - 300, CHART[2] + 300, CHART[3] + 300), c.spec["dx"]["coast"])
     gx, gy = np.meshgrid(xs, ys)
-    lat, lon = to_latlon(gx, gy)
+    lat, lon = c.to_latlon(gx, gy)
     z = dem(lat, lon)
+    if land_of is not None:
+        z = np.where(land_of(gx, gy, z), 1.0, -1.0)
     gen = contourpy.contour_generator(x=xs, y=ys, z=z, fill_type=contourpy.FillType.OuterOffset)
     polys, offsets = gen.filled(0.3, 1e6)
     rings = []
     for pts, offs in zip(polys, offsets):
         for a, b in zip(offs[:-1], offs[1:]):
-            ring = simplify(np.asarray(pts[a:b]), 14.0)
-            if len(ring) >= 4 and ring_area(ring) > 4000:
+            ring = simplify(np.asarray(pts[a:b]), c.spec["coast"]["tolerance"])
+            if len(ring) >= 4 and ring_area(ring) > c.spec["coast"]["minArea"]:
                 rings.append([int(round(v)) for v in ring.ravel()])
     return rings
 
 
 # ---- main -----------------------------------------------------------------------------------------
 
-def main(work, tile_dir, out, hrrr_dir):
+def main(name, work, tile_dir, out, hrrr_dir):
+    c = courses.load(name)
+    to_xy, to_latlon = c.to_xy, c.to_latlon
+    CHART, TERRAIN = tuple(c.spec["chart"]), tuple(c.spec["terrain"])
+    dx = c.spec["dx"]
+    CURRENT_DX, DEPTH_DX, TERRAIN_DX, WIND_DX = dx["current"], dx["depth"], dx["terrain"], dx["wind"]
+    TERRAIN_MAX = c.spec["terrainMax"]   # metres at count 255
+    TIDE_STATION = c.spec["tideStation"]
+    FIRST_CYCLE, TRUTH_HOURS, FORECAST_HOURS = c.first_cycle, c.truth_hours, c.forecast_hours
     os.makedirs(out, exist_ok=True)
     geom = np.load(os.path.join(work, "geometry.npz"))
     keep = geom["keep"]
     nx_, ny_ = to_xy(geom["lat"], geom["lon"])
-    tri = mtri.Triangulation(nx_, ny_, geom["nv"])
+    # Only the elements kept by the fetch: the whole model can be hundreds of thousands of triangles.
+    # Triangle numbers from here on are positions in the kept list, which is how the hourly files are stored.
+    tri = mtri.Triangulation(nx_, ny_, geom["nv"][keep])
     finder = tri.get_trifinder()
-    full_to_kept = np.cumsum(keep) - 1
     dem = load_dem(tile_dir)
+
+    # Where the land is. By default the elevation tiles say: anything above half a metre.
+    # Some tiles are no use for that: around the San Juans their sea is coarse bathymetry that rings above zero
+    # between the islands. A course can ask for `"landFrom": "model"` instead, and then water is wherever the tide
+    # model has water, and land is ground above half a metre that the model does not cover.
+    land_of = None
+    if c.spec.get("landFrom") == "model":
+        land_of = lambda gx, gy, elev: (np.asarray(finder(gx, gy)) < 0) & (elev > 0.5)
 
     # Current grid: which model element each cell sits in.
     cxs, cys, cnx, cny = grid(CHART, CURRENT_DX)
     cgx, cgy = np.meshgrid(cxs, cys)
     elem = finder(cgx, cgy)
-    inside = (elem >= 0) & keep[np.clip(elem, 0, None)]
-    cell_elem = np.where(inside, full_to_kept[np.clip(elem, 0, None)], 0)
+    inside = elem >= 0
+    cell_elem = np.where(inside, elem, 0)
+    # Where the grid is coarse beside a narrow pass, a cell whose centre misses the model's water by less than
+    # `currentReach` cells takes the nearest element's stream, so the pass keeps its rate. Off unless the course asks.
+    reach = c.spec.get("currentReach", 0) * CURRENT_DX
+    if reach > 0:
+        ex, ey = to_xy(geom["latc"][keep], geom["lonc"][keep])
+        away, nearest = cKDTree(np.c_[ex, ey]).query(np.c_[cgx.ravel(), cgy.ravel()])
+        near = (away.reshape(cgx.shape) < reach) & ~inside
+        cell_elem = np.where(near, nearest.reshape(cgx.shape), cell_elem)
+        inside = inside | near
 
     # Wind grid, filled from NOAA's 3 km HRRR model: linear between its points, nearest beyond them.
     wxs, wys, wnx, wny = grid(CHART, WIND_DX)
@@ -196,15 +193,14 @@ def main(work, tile_dir, out, hrrr_dir):
     sx, sy = to_xy(TIDE_STATION[1], TIDE_STATION[2])
     tide_node = int(np.argmin((nx_ - sx) ** 2 + (ny_ - sy) ** 2))
 
-    def load(cycle, fh):
-        return np.load(os.path.join(work, f"{cycle:%Y%m%d}.t{cycle:%H}z.f{fh:03d}.npz"))
+    def load(cycle, kind, n):
+        return np.load(fetch_ofs.hour_path(work, cycle, kind, n))
 
-    jobs = wanted()
-    truth_jobs = jobs[:TRUTH_HOURS + 1]
+    truth_jobs = fetch_ofs.truth_jobs(c)
     current = np.zeros((TRUTH_HOURS + 1, cny, cnx, 2), dtype="i1")
     truth_wind, truth_tide = [], []
-    for i, (cycle, fh) in enumerate(truth_jobs):
-        d = load(cycle, fh)
+    for i, job in enumerate(truth_jobs):
+        d = load(*job)
         valid = FIRST_CYCLE + dt.timedelta(hours=i)
         stamp = dt.datetime.strptime(str(d["time"])[:19], "%Y-%m-%d %H:%M:%S")
         assert abs((stamp - valid).total_seconds()) < 120, (stamp, valid)  # the file's time is a rounded float
@@ -214,8 +210,17 @@ def main(work, tile_dir, out, hrrr_dir):
         current[i, ..., 1] = np.clip(np.round(v / CURRENT_SCALE), -127, 127)
         truth_wind.append(wind_of(fetch_hrrr.truth_path(hrrr_dir, i)))
         truth_tide.append(round(float(d["zeta"][tide_node]), 3))
-    forecast_tide = [round(float(load(FIRST_CYCLE, fh)["zeta"][tide_node]), 3) for fh in range(FORECAST_HOURS + 1)]
-    forecast_wind = [wind_of(fetch_hrrr.forecast_path(hrrr_dir, h)) for h in range(fetch_hrrr.forecast_span() + 1)]
+    model = c.model["name"].upper()
+    if c.model["archive"] == "forecast":
+        forecast_tide = [round(float(load(*job)["zeta"][tide_node]), 3) for job in fetch_ofs.forecast_jobs(c)]
+        truth_source = f"Tide and stream: {c.model['title']}, stitched from the first six hours of each six-hourly cycle."
+        tide_source = f"Tide: {model} {FIRST_CYCLE:%H}z cycle."
+    else:
+        station = np.load(fetch_ofs.forecast_tide_path(work))
+        forecast_tide = [round(float(z), 3) for z in station["zeta"]]
+        truth_source = f"Tide and stream: {c.model['title']}, the nowcast for each hour."
+        tide_source = f"Tide: {model} {FIRST_CYCLE:%H}z cycle, its station forecast nearest {TIDE_STATION[0]}."
+    forecast_wind = [wind_of(fetch_hrrr.forecast_path(hrrr_dir, h)) for h in range(fetch_hrrr.forecast_span(c) + 1)]
     current.tofile(os.path.join(out, "current.bin"))
 
     # Depth: the model's own bathymetry where it has water, the elevation tiles elsewhere.
@@ -224,8 +229,12 @@ def main(work, tile_dir, out, hrrr_dir):
     h_model = np.asarray(mtri.LinearTriInterpolator(tri, geom["h"])(dgx, dgy).filled(np.nan))
     lat, lon = to_latlon(dgx, dgy)
     elev = dem(lat, lon)
-    depth = np.where(np.isnan(h_model), np.clip(-elev, 0, None), h_model)
-    depth = np.where(elev > 0.5, 0.0, np.maximum(depth, 0.6))
+    if land_of is None:
+        depth = np.where(np.isnan(h_model), np.clip(-elev, 0, None), h_model)
+        depth = np.where(elev > 0.5, 0.0, np.maximum(depth, 0.6))
+    else:
+        # Outside the model's water the tiles' soundings are not to be trusted either: call it a shoal.
+        depth = np.where(land_of(dgx, dgy, elev), 0.0, np.maximum(np.where(np.isnan(h_model), 0.6, h_model), 0.6))
     np.clip(np.round(depth * 2), 0, 255).astype("u1").tofile(os.path.join(out, "depth.bin"))
 
     # Terrain for the 3D view: land height only.
@@ -233,9 +242,12 @@ def main(work, tile_dir, out, hrrr_dir):
     tgx, tgy = np.meshgrid(txs, tys)
     lat, lon = to_latlon(tgx, tgy)
     land = np.clip(dem(lat, lon), 0, TERRAIN_MAX)
+    if land_of is not None:
+        # Land the model does not cover stands at least a metre proud, so the drawn shore is where the depth says it is.
+        land = np.where(land_of(tgx, tgy, land), np.maximum(land, 1.0), 0.0)
     np.round(np.sqrt(land / TERRAIN_MAX) * 255).astype("u1").tofile(os.path.join(out, "terrain.bin"))
 
-    rings = coast_rings(dem)
+    rings = coast_rings(c, dem, land_of)
 
     def mark(m):
         x, y = to_xy(m[2], m[3])
@@ -245,23 +257,24 @@ def main(work, tile_dir, out, hrrr_dir):
         x, y = to_xy(*latlon)
         return [round(float(x)), round(float(y))]
 
+    MARKS = c.spec["marks"]
     course = {
-        "id": "sf-bay",
-        "name": "Central San Francisco Bay",
-        "origin": ORIGIN,
-        "timeZone": "America/Los_Angeles",
+        "id": c.id,
+        "name": c.name,
+        "origin": c.origin,
+        "timeZone": c.spec["timeZone"],
         "season": {
             "id": f"{FIRST_CYCLE:%Y-%m-%d}",
             "start": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": TRUTH_HOURS,
             "stepSeconds": 3600,
-            "source": "Tide and stream: NOAA SFBOFS (San Francisco Bay Operational Forecast System), stitched from the first six hours of each six-hourly cycle. Wind and gusts: NOAA HRRR 3 km analyses, one an hour. Both from NOAA Open Data on AWS.",
+            "source": f"{truth_source} Wind and gusts: NOAA HRRR 3 km analyses, one an hour. Both from NOAA Open Data on AWS.",
         },
         "forecast": {
             "issued": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": FORECAST_HOURS,
-            "source": f"Wind: HRRR {fetch_hrrr.FORECAST_CYCLE:%H}z cycle of {fetch_hrrr.FORECAST_CYCLE:%d %b %Y}. Tide: SFBOFS {FIRST_CYCLE:%H}z cycle. Both as issued.",
-            "windIssued": f"{fetch_hrrr.FORECAST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
+            "source": f"Wind: HRRR {c.hrrr_forecast_cycle:%H}z cycle of {c.hrrr_forecast_cycle:%d %b %Y}. {tide_source} Both as issued.",
+            "windIssued": f"{c.hrrr_forecast_cycle:%Y-%m-%dT%H:%M:%SZ}",
         },
         "current": {"x0": CHART[0], "y0": CHART[1], "dx": CURRENT_DX, "nx": cnx, "ny": cny, "scale": CURRENT_SCALE, "steps": TRUTH_HOURS + 1, "file": "current.bin"},
         "depth": {"x0": CHART[0], "y0": CHART[1], "dx": DEPTH_DX, "nx": dnx, "ny": dny, "scale": 0.5, "file": "depth.bin"},
@@ -271,11 +284,16 @@ def main(work, tile_dir, out, hrrr_dir):
                  "note": "HRRR 10 m wind in tenths of a metre per second, blowing toward east (u) and north (v), and surface gust speed (g)."},
         "tide": {"station": TIDE_STATION[0], "x": xy(TIDE_STATION[1:])[0], "y": xy(TIDE_STATION[1:])[1], "truth": truth_tide, "forecast": forecast_tide,
                  "note": "Water level in metres above the model datum, close to mean sea level."},
-        "bridge": {"south": xy(BRIDGE["south"]), "north": xy(BRIDGE["north"])},
+        "bridge": {"south": xy(c.spec["bridge"]["south"]), "north": xy(c.spec["bridge"]["north"])} if "bridge" in c.spec else None,
         "marks": [mark(m) for m in MARKS],
         "bounds": {"x0": CHART[0], "y0": CHART[1], "x1": CHART[2], "y1": CHART[3]},
         "coast": rings,
     }
+    if course["bridge"] is None:
+        del course["bridge"]
+    if "streamAt" in c.spec:
+        label, name, lat, lon, flood = c.spec["streamAt"]
+        course["stream"] = {"label": label, "name": name, "x": xy((lat, lon))[0], "y": xy((lat, lon))[1], "flood": flood}
     with open(os.path.join(out, "course.json"), "w") as f:
         json.dump(course, f, separators=(",", ":"))
     sizes = {n: os.path.getsize(os.path.join(out, n)) // 1024 for n in ["course.json", "current.bin", "depth.bin", "terrain.bin"]}
@@ -283,4 +301,4 @@ def main(work, tile_dir, out, hrrr_dir):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:6])

@@ -20,27 +20,30 @@ export interface StageBoat {
 
 /**
  * Everything that is there whoever is sailing and before anyone is: the renderer, the sea, the sky, the land,
- * the Bay's traffic. The join screen and the sailing session both draw through this.
+ * the water's traffic. The join screen and the sailing session both draw through this.
+ * The sea and sky are made once. The land, marks and traffic belong to the course and are swapped with `setCourse`.
  */
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly sky: SkySystem;
   readonly ocean: Ocean;
-  readonly traffic: Traffic;
-  readonly course: CourseData;
-  readonly waves: Wave[];
+  traffic!: Traffic;
+  course!: CourseData;
+  world!: ReplayWorld;
+  readonly waves: Wave[] = [];
+  /** The land and what stands on it, for the course showing. */
+  private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
-  private readonly buoys: Buoy[];
+  private buoys: Buoy[] = [];
   private readonly focus = new THREE.Vector3();
-  private seaKt: number;
+  private seaKt = 0;
   private pixelRatio = Math.min(window.devicePixelRatio, 2);
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
   private camera: THREE.PerspectiveCamera | null = null;
 
-  constructor(readonly canvas: HTMLCanvasElement, data: LoadedCourse, readonly world: ReplayWorld) {
-    this.course = data.course;
+  constructor(readonly canvas: HTMLCanvasElement, data: LoadedCourse, world: ReplayWorld) {
     canvas.tabIndex = 0;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(this.pixelRatio);
@@ -55,18 +58,46 @@ export class Stage {
     this.sky = new SkySystem(this.renderer, this.scene);
     this.ocean = new Ocean(this.sky.reflection.texture);
     this.scene.add(this.ocean.mesh);
-    this.scene.add(buildTerrain(this.course, data.terrain), buildBridge(this.course), buildScenery(this.course, data.terrain));
-    this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
-    for (const b of this.buoys) this.scene.add(b.group);
-    // Other vessels on the Bay. Where each one is depends only on the time, so everyone sees the same traffic.
-    this.traffic = new Traffic(this.course, world);
-    this.scene.add(this.traffic.group);
-
-    // The sea runs with the afternoon's wind. Its height follows the wind after that.
-    const wind = world.wind(0, 0, 0);
-    this.waves = buildWaves(wind.dir, wind.speed / KT);
-    this.seaKt = wind.speed / KT;
+    this.setCourse(data, world);
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /**
+   * Put a course on the stage: its land, what stands on it, its buoys and its traffic. Whatever was there goes.
+   * What stands on the land is named by the course's own `about.json`, so San Francisco's bridge and skyline
+   * are only ever built for San Francisco Bay.
+   */
+  setCourse(data: LoadedCourse, world: ReplayWorld): void {
+    if (this.land) {
+      this.scene.remove(this.land);
+      this.land.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        mesh.geometry?.dispose();
+        for (const m of Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : []) m.dispose();
+      });
+    }
+    this.course = data.course;
+    this.world = world;
+    const scenery = data.about.scenery ?? {};
+    const pieces = new Set(scenery.pieces ?? []);
+    const land = new THREE.Group();
+    land.name = 'course';
+    land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
+    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain));
+    if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
+    this.sky.setMarineLayer(pieces.has('marine-layer'));
+    this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
+    for (const b of this.buoys) land.add(b.group);
+    // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.
+    this.traffic = new Traffic(data.traffic, world);
+    land.add(this.traffic.group);
+    this.scene.add(land);
+    this.land = land;
+
+    // The sea runs with the wind of the hour. Its height follows the wind after that.
+    const wind = world.wind(0, 0, 0);
+    this.waves.splice(0, this.waves.length, ...buildWaves(wind.dir, wind.speed / KT));
+    this.seaKt = wind.speed / KT;
   }
 
   /** Height of the sea at a scene position. */

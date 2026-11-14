@@ -1,0 +1,11 @@
+{
+  "id": "sf-bay",
+  "name": "San Francisco Bay",
+  "where": "California",
+  "say": "A sea breeze that builds all afternoon, and a tide through the Golden Gate",
+  "order": 1,
+  "scenery": {
+    "landCover": "sf-bay",
+    "pieces": ["golden-gate-bridge", "san-francisco", "marine-layer"]
+  }
+}
