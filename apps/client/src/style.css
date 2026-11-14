@@ -453,3 +453,13 @@ body.lobby .night { display: none; }
 .board .barhop li i { font-style: normal; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
 .board .barhop li.been { border-style: solid; border-color: var(--amber); background: rgba(255, 196, 107, 0.08); }
 .board .barhop li.been i { color: var(--amber); }
+
+/* ---- the main keys, across the top for the first minute ------------------------------------------- */
+.cheat[hidden] { display: none; }
+/* It sits in the clear water between the instruments on the left and the clock on the right, which is a little right of centre. */
+.cheat { left: calc(50% + 125px); top: var(--edge-top); transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 8px 14px; width: max-content; max-width: calc(100% - 590px); font-size: 12.5px; color: rgba(238, 243, 244, 0.86); pointer-events: none; }
+.cheat span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.cheat kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink); background: rgba(238, 243, 244, 0.1); border: 1px solid rgba(238, 243, 244, 0.3); border-bottom-width: 2px; border-radius: 5px; }
+.cheat .more { color: var(--dim); }
+body.lobby .cheat { display: none; }
+@media (max-width: 1340px) { .cheat { left: 50%; top: auto; bottom: calc(var(--edge-bottom) + 210px); max-width: calc(100% - 32px); } }

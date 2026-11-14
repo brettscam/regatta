@@ -77,6 +77,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['U'], 'Tow', 'Run aground? This tows you back to deep water.'],
     [['Space'], 'Pause', 'Only when you are alone on the water.'],
     [['Drag the clock'], 'Faster time', 'Drag the clock in the corner sideways to speed time up. Only when you are alone.'],
+    [['/'], 'Key reminder', 'Shows or hides the strip of main keys at the top of the screen.'],
     [['B'], 'This board', 'Roadmap, what is new, these keys, feedback and your logbook.'],
   ] },
 ];

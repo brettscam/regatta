@@ -1,3 +1,4 @@
+import { CheatStrip } from './cheat';
 import { Dockside } from './dock';
 import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
@@ -22,5 +23,6 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new Mooring(ctx),
     new Tow(ctx),
     new FlowView(ctx),
+    new CheatStrip(ctx),
   ];
 }
