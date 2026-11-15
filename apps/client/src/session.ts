@@ -17,6 +17,7 @@ import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
 import type { AboardContext, Feature } from './aboard/feature';
+import type { Residents } from './aboard/residents';
 import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
 import { Race, type RaceCourse } from './race/race';
@@ -107,6 +108,8 @@ export class Session {
   private readonly identity: Identity;
   /** What the features aboard are handed. Its boat is kept current. */
   private aboard!: AboardContext;
+  /** The boats that live on this water, as other vessels. See `aboard/residents.ts`. */
+  private residents: Residents | null = null;
   private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0 };
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
@@ -248,12 +251,14 @@ export class Session {
       sharing: () => this.sharing,
       company: () => this.fleet.boats,
       race: this.race,
+      races: opts.races,
       seasonNow: () => world.seasonTime(this.sim.state.t),
       held: (code) => this.controls.isHeld(code),
       sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
     };
     this.features = createFeatures(this.aboard);
+    this.residents = this.features.find((f): f is Residents => f.id === 'residents') ?? null;
   }
 
   /**
@@ -332,8 +337,11 @@ export class Session {
       input.value = '';
       this.stage.canvas.focus();
       if (!text) return;
-      if (this.fleet.hail(text)) this.heard('You', text);
-      else this.hud.raiseAlarm(alone() ? 'Nobody to hear that: hailing other boats is not available in this copy of the game' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
+      // Other people's boats hear it, and so does any boat that lives here and is close enough.
+      const company = this.fleet.hail(text);
+      const locals = this.features.filter((f) => f.hail?.(text)).length > 0;
+      if (company || locals) this.heard('You', text);
+      else this.hud.raiseAlarm(alone() ? 'Nobody near enough to hear that. Sail within a few hundred metres of a boat and hail her again' : 'Nobody near enough to hear that. Hail when other people are on the water with you, or within a few hundred metres of a boat that lives here', 6);
     });
     input.addEventListener('blur', () => { this.hailBox.hidden = true; });
   }
@@ -341,7 +349,9 @@ export class Session {
   private openHail(): void {
     this.hailBox.hidden = false;
     const input = this.hailBox.querySelector('input') as HTMLInputElement;
-    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : alone() ? 'No hailing in this copy of the game. Enter to close' : 'No other boats here yet. Enter to close';
+    let local: string | null = null;
+    for (const f of this.features) local ??= f.withinHail?.() ?? null;
+    input.placeholder = this.sharing ? (local ? `Hail the fleet and ${local}, then Enter` : 'Hail the fleet, then Enter') : local ? `Hail ${local}, then Enter` : 'Nobody within hail. Sail closer to a boat. Enter to close';
     input.focus();
   }
 
@@ -358,7 +368,9 @@ export class Session {
 
   /** Every other vessel on the water: the course's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
-    const traffic = this.race.pacers.length ? [...this.stage.traffic.vessels, ...this.race.vessels()] : this.stage.traffic.vessels;
+    // The boats that live on this water are vessels like any other: on the chart, and with a wake.
+    const locals = this.residents?.vessels ?? [];
+    const traffic = this.race.pacers.length || locals.length ? [...this.stage.traffic.vessels, ...locals, ...this.race.vessels()] : this.stage.traffic.vessels;
     if (!this.fleet.boats.length) return traffic;
     const company: TrafficVessel[] = this.fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.boatName || b.name || 'Another boat', kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: b.length, beam: b.length / 3 }));
     return [...traffic, ...company];

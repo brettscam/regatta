@@ -5,6 +5,7 @@ import {
   type Berthed, type Hull,
 } from './contactRules';
 import type { AboardContext, Feature } from './feature';
+import type { Residents } from './residents';
 import { deepWater, leaveAt } from './tow';
 
 /** Another vessel she could hit, as this page sees it now. */
@@ -19,8 +20,8 @@ interface Other extends Hull {
 }
 
 /**
- * Boats hitting each other. The player's hull is checked every sim step against other people's boats, the pace boats
- * and the ferries and ships. On contact she is pushed clear and loses the way she had toward the other hull, so
+ * Boats hitting each other. The player's hull is checked every sim step against other people's boats, the pace boats,
+ * the ferries and ships, and the boats that live on the water (`residents.ts`). On contact she is pushed clear and loses the way she had toward the other hull, so
  * nothing passes through anything; there is a thud, a jolt, and a line naming the other vessel and the closing speed.
  *
  * Each hit adds to her hull damage (`sim.state.damage`, which the sim turns into lost speed and which is saved with
@@ -106,6 +107,14 @@ export class Contact implements Feature {
       others.push({
         id: `traffic-${v.id}`, name: v.name, x: v.x, y: v.y, heading: v.heading, length: v.length, beam: v.beam,
         vx: Math.sin(v.heading) * v.sog, vy: Math.cos(v.heading) * v.sog, slop: CONTACT.slopLocal, heavy: v.kind !== 'sail',
+      });
+    }
+    // The boats that live here. A launch is as hard as a ferry; a yacht, a fishing boat or a kayak is not.
+    for (const v of ctx.feature<Residents>('residents')?.vessels ?? []) {
+      if (!near(v.x, v.y, v.length)) continue;
+      others.push({
+        id: v.id, name: v.name, x: v.x, y: v.y, heading: v.heading, length: v.length, beam: v.beam,
+        vx: Math.sin(v.heading) * v.sog, vy: Math.cos(v.heading) * v.sog, slop: CONTACT.slopLocal, heavy: v.heavy,
       });
     }
     return others;

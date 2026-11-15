@@ -10,7 +10,8 @@ const TAU = Math.PI * 2;
 export interface TrafficVessel {
   id: string;
   name: string;
-  kind: 'ferry' | 'ship' | 'sail';
+  /** `power` and `paddle` are the small craft that live on a water: fishing boats and launches, kayaks. See `aboard/residents.ts`. */
+  kind: 'ferry' | 'ship' | 'sail' | 'power' | 'paddle';
   x: number;
   y: number;
   heading: number;
@@ -24,7 +25,7 @@ export interface TrafficRoute {
   name: string;
   kind: 'ferry' | 'ship' | 'sail';
   /** Which model to build. */
-  model: 'catamaran' | 'ferry' | 'container' | 'sloop';
+  model: 'catamaran' | 'ferry' | 'carferry' | 'container' | 'sloop';
   length: number;
   beam: number;
   speedKt: number;
@@ -32,8 +33,8 @@ export interface TrafficRoute {
   mode: 'shuttle' | 'loop';
   /** Seconds stopped at each end of a shuttle. */
   dwell?: number;
-  /** A vessel that leaves the chart is not shown while it is stopped at the far ends. */
-  hideAtEnds?: boolean;
+  /** A vessel that leaves the chart is not shown while it is stopped at the far ends. `last` hides her at the last way point only: her first is a berth on the chart. */
+  hideAtEnds?: boolean | 'last';
   /** Seconds into its cycle at the traffic file's reference time. */
   phase: number;
   /** Hull or stripe colour: "#1f5fa8". */
@@ -50,6 +51,8 @@ export interface TrafficRoute {
 export interface TrafficSpec {
   /** Hours into the season at which each route's `phase` is read. */
   referenceHours: number;
+  /** What this water's coast station calls itself on the radio: "Bay Radio". Made up, so it cannot be taken for a real one. */
+  station?: string;
   routes: TrafficRoute[];
 }
 
@@ -187,7 +190,7 @@ export class Track {
       this.point(0, out);
       out.heading = turn(this.bearing(1) + Math.PI, (tau - 2 * T - dwell) / dwell);
       out.sog = 0;
-      out.active = !r.hideAtEnds;
+      out.active = r.hideAtEnds !== true;
     }
   }
 }
@@ -200,7 +203,7 @@ const WHITE = mat(0xeeece6, 0.6);
 const GLASS = mat(0x15202a, 0.25, 0.4);
 const DARK = mat(0x22262b, 0.8);
 
-function box(parent: THREE.Object3D, m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh {
+export function box(parent: THREE.Object3D, m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
@@ -209,7 +212,7 @@ function box(parent: THREE.Object3D, m: THREE.Material, w: number, h: number, d:
 }
 
 /** A hull as a plan outline pushed up from below the waterline to the deck. `fine` is how pointed the bow is. */
-function hull(length: number, beam: number, bottom: number, top: number, m: THREE.Material, fine = 0.3, sternWidth = 0.8): THREE.Mesh {
+export function hull(length: number, beam: number, bottom: number, top: number, m: THREE.Material, fine = 0.3, sternWidth = 0.8): THREE.Mesh {
   const L = length / 2;
   const B = beam / 2;
   const shape = new THREE.Shape();
@@ -277,6 +280,31 @@ function buildFerry(r: TrafficRoute): THREE.Group {
   return g;
 }
 
+/** A double-ended car ferry: a car deck open at both ends, two passenger decks over it, a wheelhouse at each end. */
+function buildCarFerry(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const B = r.beam;
+  const stripe = mat(r.color, 0.5);
+  g.add(hull(L, B, -2.2, 3.2, WHITE, 0.16, 0.8));
+  g.add(hull(L * 1.004, B * 1.01, 0.3, 1.1, stripe, 0.16, 0.8));
+  // The car deck: dark down the middle where it is open to the ends.
+  box(g, WHITE, B * 0.96, 4.6, L * 0.8, 0, 5.5, 0);
+  box(g, DARK, B * 0.5, 3.6, L * 0.82, 0, 5.1, 0);
+  box(g, WHITE, B * 0.9, 2.8, L * 0.62, 0, 9.2, 0);
+  box(g, GLASS, B * 0.91, 1.1, L * 0.58, 0, 9.5, 0);
+  box(g, stripe, B * 0.91, 0.4, L * 0.62, 0, 10.8, 0);
+  box(g, WHITE, B * 0.7, 2.4, L * 0.4, 0, 11.9, 0);
+  box(g, GLASS, B * 0.71, 0.9, L * 0.36, 0, 12.1, 0);
+  for (const end of [-1, 1]) {
+    box(g, WHITE, B * 0.42, 2.4, L * 0.07, 0, 14.2, end * L * 0.27);
+    box(g, GLASS, B * 0.43, 0.9, L * 0.072, 0, 14.5, end * L * 0.27);
+  }
+  box(g, stripe, 2.4, 3.6, 4.2, 0, 14.8, 0);
+  box(g, DARK, 0.25, 4, 0.25, 0, 17.4, -L * 0.27);
+  return g;
+}
+
 function buildContainerShip(r: TrafficRoute): THREE.Group {
   const g = new THREE.Group();
   const L = r.length;
@@ -317,7 +345,7 @@ function buildContainerShip(r: TrafficRoute): THREE.Group {
 }
 
 /** A triangle of cloth with some belly, lying in the YZ plane with its luff up the Y axis and its foot along +Z. */
-function sailCloth(luff: number, foot: number, belly: number, m: THREE.Material): THREE.Mesh {
+export function sailCloth(luff: number, foot: number, belly: number, m: THREE.Material): THREE.Mesh {
   const NU = 5;
   const NV = 7;
   const pos: number[] = [];
@@ -428,6 +456,7 @@ export class Traffic {
       let sails: SloopParts | null = null;
       if (r.model === 'catamaran') group = buildCatamaran(r);
       else if (r.model === 'ferry') group = buildFerry(r);
+      else if (r.model === 'carferry') group = buildCarFerry(r);
       else if (r.model === 'container') group = buildContainerShip(r);
       else ({ group, parts: sails } = buildSloopModel(r));
       group.name = r.id;
