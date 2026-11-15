@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { CourseData } from '@slack-tide/world';
 import { buildCity } from './city';
-import { clearCityNight } from './massing';
 import { landUse, smoothNoise } from './terrain';
 
 /** Small seeded generator, so the city is built the same on every machine. */
@@ -58,11 +57,11 @@ function boxes(blocks: Block[], name: string, material?: THREE.Material): THREE.
 
 /**
  * What stands on the land: the city and its towers, piers, Alcatraz, hillside towns, marinas, the Bay Bridge, trees.
- * Positions are from general knowledge and are checked against the terrain, so nothing is built on water.
+ * The city, Alcatraz and the Bay Bridge are built in `city.ts` from real latitudes and longitudes. The rest is placed
+ * from general knowledge and checked against the terrain, so nothing is built on water.
  * Course coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
  */
 export function buildScenery(course: CourseData, terrainHeights: Uint8Array, depths: Uint8Array): THREE.Group {
-  clearCityNight();
   const g = course.terrain;
   const group = new THREE.Group();
   group.name = 'scenery';

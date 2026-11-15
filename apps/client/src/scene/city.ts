@@ -511,10 +511,10 @@ export function buildCity(g: Ground): City {
           m.hall(q.x, q.y, 2.6, 22, 13, 6.5 + g.rnd() * 2, 3, turn, wood[Math.floor(g.rnd() * wood.length)], C(0.4, 0.38, 0.36), WIN.homes);
         }
       }
-      // The floats lie off the west side, where the depth chart leaves no room to sail. Each carries a heap of sea lions.
+      // The floats lie alongside, wherever the depth chart leaves no room to sail. Each carries a heap of sea lions.
       let floats = 0;
       for (let d = 20; d <= 260 && floats < 14; d += 16) {
-        for (const across of [42, 54, 66]) {
+        for (const across of [-66, -54, -42, -31, 31, 42, 54, 66]) {
           const q = off(t, d, across, turn);
           if (g.dry(q.x, q.y) || g.sailable(q.x, q.y) || g.rnd() < 0.3) continue;
           m.solid({ x: q.x, y: q.y, base: -0.4, w: 9, d: 5.5, h: 0.9, turn, color: C(0.6, 0.55, 0.45) });
@@ -565,26 +565,36 @@ export function buildCity(g: Ground): City {
         m.solid({ x: c.x, y: c.y, base: -2, w: out + 6, d: 12, h: 4.6, turn: north, color: timber });
       }
       // She wants her whole length in water that is too thin to sail, or she would lie across somebody's course.
-      const berth = (across: number, half: number): { x: number; y: number } | null => {
-        for (let d = out + 30; d >= -40; d -= 10) {
-          const q = off(s, d, across, north);
-          const ok = [-half, 0, half].every((a) => { const e = off(q, a, 0, north); return !g.dry(e.x, e.y) && !g.sailable(e.x, e.y); });
-          if (ok) return q;
+      // Look outward from her real berth for the nearest place that takes her, along the pier or square to it.
+      const berth = (want: { x: number; y: number }, half: number, taken?: { x: number; y: number }): { x: number; y: number; turn: number } | null => {
+        for (let d = 0; d <= 320; d += 10) {
+          for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+            const q = { x: want.x + Math.cos(a) * d, y: want.y + Math.sin(a) * d };
+            if (taken && Math.hypot(q.x - taken.x, q.y - taken.y) < 60) continue;
+            for (const turn of [north, north + Math.PI / 2]) {
+              const ok = [-half, -half / 2, 0, half / 2, half].every((along) => {
+                const e = off(q, along, 0, turn);
+                return g.heightAt(e.x, e.y) < 0.2 && !g.sailable(e.x, e.y);
+              });
+              if (ok) return { ...q, turn };
+            }
+            if (d === 0) break;
+          }
         }
         return null;
       };
-      const b = berth(18, 36);
+      const b = berth(g.at(37.8094, -122.4222), 38);
       if (b) {
         mark('balclutha', b);
-        squareRigger(m, b.x, b.y, north);
+        squareRigger(m, b.x, b.y, b.turn);
       }
-      const e = berth(-24, 40);
+      const e = berth(g.at(37.809, -122.4214), 42, b ?? undefined);
       if (e) {
         // The ferry Eureka: white, two decks, one black stack.
         mark('eureka', e);
         m.next();
-        m.solid({ x: e.x, y: e.y, base: -0.5, w: 86, d: 19, sides: 10, h: 3.4, turn: north, color: C(0.16, 0.16, 0.17) });
-        m.solid({ x: e.x, y: e.y, base: 2.9, w: 72, d: 17, h: 7.5, turn: north, color: C(0.93, 0.92, 0.88), win: WIN.homes });
+        m.solid({ x: e.x, y: e.y, base: -0.5, w: 86, d: 19, sides: 10, h: 3.4, turn: e.turn, color: C(0.16, 0.16, 0.17) });
+        m.solid({ x: e.x, y: e.y, base: 2.9, w: 72, d: 17, h: 7.5, turn: e.turn, color: C(0.93, 0.92, 0.88), win: WIN.homes });
         m.lathe(e.x, e.y, 10.4, [[1.6, 0], [1.6, 9]], 8, C(0.1, 0.1, 0.1));
       }
     }
@@ -742,6 +752,10 @@ function sign(text: string, wide: number, high: number, x: number, y: number, z:
     ctx.font = 'bold 64px Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    // A dark edge to each letter, so the sign reads against a pale sky as well as against the hill.
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#3b2a22';
+    ctx.strokeText(text, 256, 44, 500);
     ctx.fillText(text, 256, 44, 500);
   }
   const map = new THREE.CanvasTexture(canvas);
@@ -827,7 +841,7 @@ function bayBridge(m: Massing, g: Ground, lines: { steel: number[]; lights: numb
     const top = TOPS[k];
     const legAt = (side: number, z: number) => L(s, side * (12.6 - (z / top) * 2.4), z);
     for (const side of [-1, 1]) {
-      m.beam(legAt(side, 6), legAt(side, top), 5.2, 6.4, steel);
+      m.beam(legAt(side, 6), legAt(side, top), 7.5, 6.4, steel);
       m.solid({ x: legAt(side, top)[0], y: legAt(side, top)[1], base: top, w: 7.5, d: 4, h: 3.2, turn, color: shade });
     }
     const levels = [14, 38, LOWER - 4, UPPER + 22, UPPER + 44, top - 22, top - 3].filter((z, i, all) => i === 0 || z > all[i - 1] + 8);

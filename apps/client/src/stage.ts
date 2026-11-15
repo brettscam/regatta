@@ -6,7 +6,7 @@ import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
-import { setCityNight } from './scene/massing';
+import { clearCityNight, setCityNight } from './scene/massing';
 import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
 
@@ -77,6 +77,8 @@ export class Stage {
         for (const m of Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : []) m.dispose();
       });
     }
+    // Whatever followed the shore lights belonged to the land that has just gone.
+    clearCityNight();
     this.course = data.course;
     this.world = world;
     const scenery = data.about.scenery ?? {};

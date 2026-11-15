@@ -287,7 +287,11 @@ export function cityMaterial(): THREE.MeshStandardMaterial {
             diffuseColor.rgb *= mix(1.0, kind > 3.5 ? 0.7 : 0.46, w);
             float share = (kind > 3.5 ? 0.22 : 0.3) + 0.3 * fract(vWin.w * 7.31);
             float lit = step(1.0 - share, rnd);
-            float glow = mix(mean * share, glass * lit, sharp);
+            // Far off, single windows are too small to see: there the lights show as whole lit patches of a wall.
+            vec2 patchId = floor(vWin.xy / vec2(10.0, 7.8));
+            float rndP = fract(sin(dot(patchId + vWin.w * 53.0, vec2(41.3, 289.1))) * 43758.5453);
+            float farGlow = mean * share * (0.25 + 1.6 * step(1.0 - share * 0.5, rndP));
+            float glow = mix(farGlow, glass * lit, sharp);
             vec3 tint = mix(vec3(1.0, 0.8, 0.52), vec3(0.86, 0.93, 1.0), step(0.62, fract(rnd * 13.7 + vWin.w)) * sharp);
             cityGlow = tint * glow * uNight * 1.35;
             diffuseColor.rgb *= 1.0 - 0.35 * uNight;
