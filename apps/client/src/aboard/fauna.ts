@@ -122,6 +122,13 @@ export interface Fauna {
   gulls: Spot[];
   /** Tide rips and points where bait fish are driven to the top. */
   bait: Array<{ x: number; y: number }>;
+  /** What the crew calls an animal here, where the Bay's name or remark for it would be wrong. */
+  guide?: Partial<Record<Kind, { name: string; first: string }>>;
+}
+
+/** An animal's name and the remark made the first time it is seen, on a given water. */
+export function fieldGuide(courseId: string, kind: Kind): { name: string; first: string } {
+  return FAUNA[courseId]?.guide?.[kind] ?? FIELD_GUIDE[kind];
 }
 
 /**
@@ -184,6 +191,52 @@ export const FAUNA: Record<string, Fauna> = {
       { x: 300, y: 1100 }, // Harding Rock
       { x: 4300, y: -1400 }, // Blossom Rock
     ],
+  },
+  // The British Virgin Islands in February. Only the animals this file already knows how to draw and that really
+  // live here: pelicans and gulls. No seals, sea lions, harbor porpoise or cormorants. Turtles, rays, frigatebirds,
+  // tarpon and dolphins each want a kind of their own and are not here yet. Humpbacks do winter north of the islands,
+  // but the whale here is one that comes in on a strong flood, and this tide never runs hard enough to bring her.
+  bvi: {
+    porpoise: [],
+    seals: [],
+    quietSeals: false,
+    haulouts: [],
+    sealions: [],
+    whale: [],
+    pelicans: [
+      { path: [[-6400, 100], [-5900, -600], [-5600, -1500], [-7300, -2900]], n: 2 }, // Road Harbour and along to Nanny Cay
+      { path: [[-8700, -11100], [-7700, -11350], [-7100, -11500]], n: 1 }, // the Bight
+      { path: [[17300, 8900], [18800, 8700], [20000, 8900]], n: 2 }, // North Sound
+      { path: [[-22500, 2000], [-21300, 1900], [-20300, 1700]], n: 1 }, // White Bay and Great Harbour
+      { path: [[-12600, 500], [-11900, 800], [-11500, 1500]], n: 1 }, // Cane Garden Bay
+      { path: [[1200, 3700], [1900, 3550], [2400, 4300]], n: 1 }, // Trellis Bay and Marina Cay
+    ],
+    cormorants: [],
+    perches: [],
+    gulls: [
+      { x: -8000, y: -9800, r: 260, n: 6, up: 30 }, // the Indians
+      { x: -17000, y: 1800, r: 220, n: 4, up: 16 }, // Sandy Cay
+      { x: 10230, y: -330, r: 240, n: 5, up: 35 }, // Fallen Jerusalem
+      { x: 20000, y: 9150, r: 160, n: 3, up: 14 }, // Saba Rock
+      { x: -1300, y: -6100, r: 220, n: 4, up: 40 }, // Dead Chest
+    ],
+    bait: [
+      { x: -8700, y: -9800 }, // off the Indians
+      { x: 3300, y: -4600 }, // Salt Island Passage
+      { x: 18150, y: 10700 }, // the channel past Colquhoun Reef
+      { x: -500, y: -10400 }, // the south end of Peter Island
+      { x: -11800, y: -7000 }, // Flanagan Passage
+    ],
+    guide: {
+      pelican: {
+        name: 'Brown pelican',
+        first: 'Brown pelicans, gliding in line a wing tip off the water. They are here all year and roost on the rocks and in the mangroves. A single bird folding up and dropping means bait fish',
+      },
+      gull: {
+        name: 'Laughing gull',
+        first: 'Laughing gulls, the dark-winged gull of the Caribbean, named for the call. Where they gather over the water, tuna or jacks are driving bait fish to the top',
+      },
+    },
   },
 };
 

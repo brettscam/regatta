@@ -6,6 +6,7 @@ import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
+import { buildMooringFields, buildPalms, buildVirginIslands, shoalMap } from './scene/tropics';
 import { clearCityNight, setCityNight } from './scene/massing';
 import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
@@ -89,6 +90,18 @@ export class Stage {
     if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
+    if (pieces.has('palms')) land.add(buildPalms(this.course, data.terrain));
+    if (pieces.has('mooring-fields')) land.add(buildMooringFields(this.course, data.terrain, data.depth, data.places));
+    if (pieces.has('virgin-islands')) land.add(buildVirginIslands(this.course, data.terrain));
+    // The water itself. Clear tropical water is blue where it is deep and shows its bottom where it is not.
+    if (scenery.water === 'clear') {
+      const shoals = shoalMap(this.course, data.depth);
+      this.ocean.setWater(new THREE.Color(0.006, 0.035, 0.085), new THREE.Color(0.02, 0.14, 0.2));
+      this.ocean.setShoals(shoals.texture, shoals.x, shoals.z, shoals.width, shoals.depth);
+    } else {
+      this.ocean.setWater();
+      this.ocean.setShoals(null);
+    }
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
     for (const b of this.buoys) land.add(b.group);
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.

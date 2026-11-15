@@ -1,0 +1,48 @@
+[
+  {
+    "id": "channel-sprint",
+    "name": "Channel sprint",
+    "blurb": "A triangle in the Sir Francis Drake Channel off Road Town: a close reach across to Dead Chest, a run down to Nanny Cay and a beat home. 8.5 miles in flat water.",
+    "marks": [
+      { "name": "Road Harbour", "x": -5400, "y": -1800 },
+      { "name": "Dead Chest", "x": -1500, "y": -5200 },
+      { "name": "Nanny Cay", "x": -8300, "y": -3900 },
+      { "name": "Road Harbour", "x": -5400, "y": -1800 }
+    ]
+  },
+  {
+    "id": "round-the-islands",
+    "name": "Round Norman and Peter",
+    "blurb": "Out of the channel past the Indians, round the outside of Norman Island and Peter Island in the open Caribbean, and back in by Dead Chest. 18 miles, islands to port.",
+    "marks": [
+      { "name": "Road Harbour", "x": -5400, "y": -1800 },
+      { "name": "The Indians", "x": -9000, "y": -9700 },
+      { "name": "Norman, west end", "x": -8900, "y": -13300 },
+      { "name": "Norman, south side", "x": -5600, "y": -13300 },
+      { "name": "Peter, south end", "x": 0, "y": -12000 },
+      { "name": "Dead Chest", "x": -700, "y": -5800 },
+      { "name": "Road Harbour", "x": -5400, "y": -1800 }
+    ]
+  },
+  {
+    "id": "bar-to-bar",
+    "name": "Bar to bar",
+    "blurb": "The whole channel, west to east, by its best-known stops: Soper's Hole, the Bight, Cooper Island, the Baths and into North Sound for Bitter End. 28 miles, most of it to windward in the trades. Start early.",
+    "marks": [
+      { "name": "Soper's Hole", "x": -15500, "y": -4600 },
+      { "name": "Flanagan Passage", "x": -11800, "y": -7000 },
+      { "name": "The Bight", "x": -8600, "y": -11100 },
+      { "name": "The Indians", "x": -9000, "y": -9700 },
+      { "name": "Peter Island", "x": -7200, "y": -7000 },
+      { "name": "Cooper Island", "x": 3000, "y": -2700 },
+      { "name": "The Baths", "x": 10200, "y": 900 },
+      { "name": "Spanish Town", "x": 10500, "y": 4600 },
+      { "name": "Mountain Point", "x": 12300, "y": 7400 },
+      { "name": "Seal Dogs", "x": 13200, "y": 10500 },
+      { "name": "Mosquito Rock", "x": 15600, "y": 11700 },
+      { "name": "Colquhoun Reef", "x": 18150, "y": 10900 },
+      { "name": "North Sound", "x": 18300, "y": 9300 },
+      { "name": "Bitter End", "x": 19500, "y": 8600 }
+    ]
+  }
+]

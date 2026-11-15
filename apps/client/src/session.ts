@@ -36,6 +36,8 @@ export interface Place {
   kind?: 'mooring' | 'dock' | 'anchorage';
   /** Where the crew goes once ashore. */
   ashore?: { name: string; say: string };
+  /** What kind of stop it is, where a water says: the sort a bar hop or a poker run would score. */
+  stop?: 'bar' | 'beach' | 'snorkel' | 'marina';
 }
 
 export interface SessionOptions {
