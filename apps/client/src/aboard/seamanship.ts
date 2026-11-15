@@ -17,6 +17,7 @@ export class SeamanshipPoints implements Feature {
   readonly id = 'xp';
   enabled = true;
   private readonly el = document.createElement('div');
+  private readonly panel = document.getElementById('fleetpanel');
   private readonly scorer = new Seamanship();
   private readonly queue: Line[] = [];
   private showing = 0;
@@ -105,6 +106,8 @@ export class SeamanshipPoints implements Feature {
       } else this.showing = 0;
     }
     this.el.hidden = !this.enabled || this.showing <= 0 || this.ctx.hud.readoutHidden;
+    // The fleet panel opens over this corner, and opens by itself at the end of a race: stand beside it then.
+    if (!this.el.hidden) this.el.classList.toggle('beside', this.panel?.hidden === false);
   }
 
   /** The player has just finished a race: points for finishing and for every boat astern. Once for each race. */

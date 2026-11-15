@@ -383,20 +383,20 @@ describe('a race', () => {
   });
 
   it('a win against pace boats is a bunch, and against people a bigger one', () => {
-    expect(raceAwards({ ...r, pacers: 3, pacersBeaten: 3 })[1]).toEqual({ kind: 'place', points: 100, label: 'Race won against 3 boats' });
-    expect(raceAwards({ ...r, people: 3, peopleBeaten: 3 })[1].points).toBe(280);
-    expect(raceAwards({ ...r, people: 1, peopleBeaten: 1 })[1]).toEqual({ kind: 'place', points: 160, label: 'Race won against 1 boat' });
-    expect(raceAwards({ ...r, people: 9, peopleBeaten: 9 })[1].points).toBe(500);
+    expect(raceAwards({ ...r, pacers: 3, pacersBeaten: 3 })[1]).toEqual({ kind: 'place', points: 150, label: 'Race won against 3 boats' });
+    expect(raceAwards({ ...r, people: 3, peopleBeaten: 3 })[1].points).toBe(375);
+    expect(raceAwards({ ...r, people: 1, peopleBeaten: 1 })[1]).toEqual({ kind: 'place', points: 225, label: 'Race won against 1 boat' });
+    expect(raceAwards({ ...r, people: 9, peopleBeaten: 9 })[1].points).toBe(600);
   });
 
   it('pays by boats beaten further down, and nothing for last', () => {
-    expect(raceAwards({ ...r, place: 2, people: 1, peopleBeaten: 0, pacers: 2, pacersBeaten: 2 })[1]).toEqual({ kind: 'place', points: 40, label: '2nd of 4' });
+    expect(raceAwards({ ...r, place: 2, people: 1, peopleBeaten: 0, pacers: 2, pacersBeaten: 2 })[1]).toEqual({ kind: 'place', points: 50, label: '2nd of 4' });
     expect(raceAwards({ ...r, place: 4, pacers: 3, pacersBeaten: 0 })).toHaveLength(1);
   });
 
   it('a short course pays in proportion', () => {
-    expect(raceAwards({ ...r, miles: 1.5, pacers: 3, pacersBeaten: 3 })[1].points).toBe(50);
-    expect(raceAwards({ ...r, miles: 0.2, pacers: 3, pacersBeaten: 3 })[1].points).toBe(25);
+    expect(raceAwards({ ...r, miles: 1.5, pacers: 3, pacersBeaten: 3 })[1].points).toBe(75);
+    expect(raceAwards({ ...r, miles: 0.2, pacers: 3, pacersBeaten: 3 })[1].points).toBe(38);
     expect(courseMiles([{ x: 0, y: 0 }, { x: 1852, y: 0 }, { x: 1852, y: 926 }])).toBeCloseTo(1.5);
   });
 });

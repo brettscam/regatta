@@ -307,6 +307,8 @@ export function counted(what: string, n: number, since: number): Award | null {
 
 // ---- racing ------------------------------------------------------------------------------------------
 
+/** Points for each person and each pace boat beaten (and the most that can come to), and the winner's bonus over people or over pace boats only. */
+export const RACE = { person: 75, pacer: 25, most: 450, win: 150, winPace: 75 } as const;
 const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
 
 /** The length of a course from its first mark, the start, round the rest, in nautical miles. */
@@ -343,7 +345,7 @@ export function raceAwards(r: RaceResult): Award[] {
   if (!others || !beaten) return out;
   const scale = Math.min(1, Math.max(0.25, r.miles / 3));
   const won = r.place === 1;
-  const raw = Math.min(400, 60 * r.peopleBeaten + 20 * r.pacersBeaten) + (won ? (r.people > 0 ? 100 : 40) : 0);
+  const raw = Math.min(RACE.most, RACE.person * r.peopleBeaten + RACE.pacer * r.pacersBeaten) + (won ? (r.people > 0 ? RACE.win : RACE.winPace) : 0);
   out.push({ kind: 'place', points: Math.round(raw * scale), label: won ? `Race won against ${others} ${others === 1 ? 'boat' : 'boats'}` : `${ORDINAL[r.place - 1] ?? `${r.place}th`} of ${others + 1}` });
   return out;
 }
