@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v22",
+      "date": "2026-11-15",
+      "title": "The radio: channel 16",
+      "items": [
+        "Ferries and ships now call on the radio as they leave a berth or come through the Golden Gate, and call you by name if they are about to pass close. Shift+V turns the calls off.",
+        "On the website, hold V to talk to every boat on your water, with the sound of a real VHF set. Release to listen. A light among the hails shows who is transmitting.",
+        "Your browser asks for the microphone the first time you press V. Refuse and you can still listen.",
+        "Voice is on the website only for now, and reaches up to eight boats on a water."
+      ]
+    },
+    {
       "id": "v21",
       "date": "2026-11-15",
       "title": "Home screen, your own skipper, and the engine",

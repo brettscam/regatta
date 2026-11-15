@@ -249,7 +249,7 @@
         },
         {
           "id": "talk",
-          "status": "next",
+          "status": "shipped",
           "title": "Talk to the fleet",
           "text": "Text hails are in. Next: voice on a VHF channel, so it sounds like the real thing.",
           "area": "multiplayer"

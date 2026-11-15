@@ -43,6 +43,48 @@ export interface Room {
   readonly stamped?: boolean;
 }
 
+// ---- voice: the radio, on the website only --------------------------------------------------------
+
+/** What the radio needs from the game. */
+export interface VoiceHost {
+  /** The ids (`RoomPeer.peer`) of the other boats on this water now. */
+  company(): readonly string[];
+  /** Where received voices go, once the game's sound is running. */
+  audio(): { ctx: AudioContext; input: AudioNode } | null;
+  /** Another boat has keyed up, or let go. */
+  talking(peer: string, on: boolean): void;
+}
+
+/** `unasked` until the player first keys up. `refused` when the browser was not allowed it, `missing` when there is none. */
+export type Mic = 'unasked' | 'asking' | 'live' | 'refused' | 'missing';
+
+export interface VoiceState {
+  /** True once this boat's radio is switched on: she has keyed up, or heard that somebody else has. */
+  on: boolean;
+  /** True while this boat's microphone is going out. */
+  transmitting: boolean;
+  mic: Mic;
+  /** Boats connected, and boats on the water still being raised. */
+  linked: number;
+  raising: number;
+  /** True when there were more radios on this water than one boat can connect to. */
+  crowded: boolean;
+}
+
+/**
+ * Push-to-talk voice between the boats on one water, browser to browser. Nothing is recorded or stored, and the
+ * voice goes nowhere but to the other boats.
+ */
+export interface Voice {
+  /** Start listening for other boats' radios. Costs nothing until somebody keys up. */
+  open(host: VoiceHost): void;
+  /** Key down or up. The first key down asks the browser for the microphone. Resolves with how that went. */
+  transmit(on: boolean): Promise<Mic>;
+  state(): VoiceState;
+  /** Stop the microphone and drop every connection. */
+  close(): void;
+}
+
 // ---- db: documents -------------------------------------------------------------------------------
 
 export interface DocSnap { id: string; exists: boolean; data(): Record<string, unknown> | undefined }
@@ -142,6 +184,12 @@ export async function user(): Promise<UserApi | null> {
   const use = claudeUse();
   if (use) return (await use('user')) as UserApi | null;
   return web ? (await web()).user : null;
+}
+
+/** The voice radio of one sailing area. Null on claude.ai and wherever there is no backend. */
+export async function voice(area = 'sf-bay'): Promise<Voice | null> {
+  if (claudeUse() || !web) return null;
+  return (await web()).voice(area);
 }
 
 /** Signing in and out. Null on claude.ai and wherever there is no backend. */

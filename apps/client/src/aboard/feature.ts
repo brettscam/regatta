@@ -30,6 +30,8 @@ export interface AboardContext {
   logbook: Logbook;
   /** A passing remark at the bottom of the screen. */
   say(text: string, seconds?: number): void;
+  /** A line among the hails, as if spoken by `from`: where words on the radio are written out. */
+  heard(from: string, text: string): void;
   /** Something that needs the player. Also drops time back to real speed. */
   alarm(text: string): void;
   /** True while other people's boats are on the water. The clock is shared then, so time cannot be skipped. */

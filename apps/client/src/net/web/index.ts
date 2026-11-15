@@ -1,8 +1,9 @@
-import type { Account, Db, Room, UserApi } from '../platform';
+import type { Account, Db, Room, UserApi, Voice } from '../platform';
 import { makeClient } from './client';
 import { WebDb } from './db';
 import { makeIdentity } from './identity';
 import { WebRoom } from './room';
+import { VoiceMesh } from './voice';
 
 /**
  * The website's backend, on Supabase: `room` on Realtime, `db` on Postgres tables, `user` and `account` on Auth.
@@ -10,6 +11,8 @@ import { WebRoom } from './room';
  */
 export interface Backend {
   room(area: string): Room;
+  /** The voice radio of one sailing area. It does nothing until it is opened. */
+  voice(area: string): Voice;
   db: Db;
   user: UserApi;
   account: Account;
@@ -31,7 +34,7 @@ function make(): Backend {
 
   // One water at a time: asking for another area leaves the one before.
   let water: WebRoom | null = null;
-  const room = (area: string): Room => {
+  const room = (area: string): WebRoom => {
     if (water && water.area !== area) {
       water.close();
       water = null;
@@ -39,5 +42,15 @@ function make(): Backend {
     return (water ??= new WebRoom(client, area, identity.uid));
   };
 
-  return { room, db: new WebDb(client), user: identity.user, account: identity.account, ready: identity.ready };
+  // One radio at a time as well. It goes by the same id as this page's boat, so that a voice can be given her name.
+  let radio: { area: string; mesh: VoiceMesh } | null = null;
+  const voice = (area: string): Voice => {
+    if (radio && radio.area !== area) {
+      radio.mesh.close();
+      radio = null;
+    }
+    return (radio ??= { area, mesh: new VoiceMesh(client, area, room(area).me) }).mesh;
+  };
+
+  return { room, voice, db: new WebDb(client), user: identity.user, account: identity.account, ready: identity.ready };
 }

@@ -73,6 +73,11 @@ export class Sound {
     loop().connect(flogTone).connect(chop).connect(this.flog).connect(this.master);
   }
 
+  /** Where another maker of sound joins the game's: the context and the master volume. Null until sound has started. */
+  output(): { ctx: AudioContext; node: AudioNode } | null {
+    return this.ctx && this.ctx.state === 'running' ? { ctx: this.ctx, node: this.master } : null;
+  }
+
   private noiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
     const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
     const data = buf.getChannelData(0);

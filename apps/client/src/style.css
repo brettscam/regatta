@@ -626,3 +626,13 @@ body:not(.lobby):has(#readout.hidden) .boardlink { left: var(--edge-left); }
   .board-frame nav { order: 3; flex: 1 0 100%; }
   .board-frame nav button { padding: 6px 9px; font-size: 12.5px; }
 }
+
+/* ---- the radio (aboard/radio.ts): a light among the hails while somebody is on the air ----------- */
+.hails .radio { order: 1; display: flex; align-items: center; gap: 8px; width: fit-content; background: var(--glass); border-radius: 10px; font-size: 12.5px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.hails .radio i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px var(--amber); }
+.hails .radio.tx { border-color: rgba(255, 107, 94, 0.6); }
+.hails .radio.tx i { background: #ff6b5e; box-shadow: 0 0 8px #ff6b5e; }
+.hails .radio b { letter-spacing: 0.1em; }
+.hails .radio span { color: var(--dim); }
+/* A ferry's call runs to three lines, so the hails sit clear of the line of text at the bottom of the screen. */
+.hails { bottom: calc(var(--edge-bottom) + 80px); }
