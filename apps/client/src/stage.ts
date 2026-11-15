@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { KT } from '@slack-tide/sim';
-import type { CourseData, ReplayWorld } from '@slack-tide/world';
+import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
 import { clearCityNight, setCityNight } from './scene/massing';
-import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
+import { WakeField } from './scene/wakes';
+import { buildWaves, setSea, setSeaState, waveHeight, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
 
 export interface StageBoat {
@@ -33,12 +34,17 @@ export class Stage {
   course!: CourseData;
   world!: ReplayWorld;
   readonly waves: Wave[] = [];
+  /** The wakes of the water's ships and ferries. See `scene/wakes.ts`. */
+  wakes!: WakeField;
+  /** The sea state the water is drawn with: the one where the boat being followed is, eased so it never jumps. */
+  readonly sea: Sea = emptySea();
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
   private buoys: Buoy[] = [];
   private readonly focus = new THREE.Vector3();
   private seaKt = 0;
+  private seaSet = false;
   private pixelRatio = Math.min(window.devicePixelRatio, 2);
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
@@ -94,6 +100,11 @@ export class Stage {
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.
     this.traffic = new Traffic(data.traffic, world);
     land.add(this.traffic.group);
+    this.wakes = new WakeField(data.traffic);
+    land.add(this.wakes.lines);
+    // The water gets its sea state here: every sim sailed on this world feels it from now on.
+    if (!world.seas) world.seas = new SeaState(world, data.about.sea ?? data.course.sea);
+    this.seaSet = false;
     this.scene.add(land);
     this.land = land;
 
@@ -103,9 +114,9 @@ export class Stage {
     this.seaKt = wind.speed / KT;
   }
 
-  /** Height of the sea at a scene position. */
+  /** Height of the sea at a scene position: the waves that are drawn, and any ship's wake going by. */
   seaLevel(x: number, z: number, seaTime: number, count = 6): number {
-    return waveHeight(this.waves, x, z, seaTime, count);
+    return waveHeight(this.waves, x, z, seaTime, count) + this.wakes.height(x, -z);
   }
 
   resize(camera: THREE.PerspectiveCamera | null = this.camera): void {
@@ -152,12 +163,26 @@ export class Stage {
     }
     if (!covered) this.keepPace(dtReal);
     const world = this.world;
-    // The sea follows the hourly wind: slowly, as a real sea does.
+    // The sea is the sea state where the boat is: wind, fetch, stream and depth (`SeaState`). It is eased over a few
+    // seconds so that sailing into a lee lays the water down smoothly.
     const hourly = world.wind(boat.x, -boat.z, t);
     this.seaKt += (hourly.speed / KT - this.seaKt) * Math.min(1, dtReal * rate * 0.004);
-    setSeaState(this.waves, this.seaKt);
+    const here = world.seas?.at(boat.x, -boat.z, t);
+    if (here) {
+      const ease = this.seaSet ? Math.min(1, dtReal * rate * 0.15) : 1;
+      const sea = this.sea;
+      const height = sea.height + (here.height - sea.height) * ease;
+      const steepness = sea.steepness + (here.steepness - sea.steepness) * ease;
+      Object.assign(sea, here);
+      sea.height = height;
+      sea.steepness = steepness;
+      this.seaSet = true;
+      setSea(this.waves, height, steepness);
+    } else setSeaState(this.waves, this.seaKt);
     this.ocean.setWaves(this.waves, hourly.dir, windKt);
 
+    this.wakes.advance(world.seasonTime(t));
+    this.wakes.draw(seaTime, this.waves);
     this.traffic.update(t, seaTime, this.waves);
     for (const b of this.buoys) {
       const c = world.current(b.x, b.y, t);

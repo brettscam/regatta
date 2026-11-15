@@ -5,6 +5,7 @@ import type { Place } from '../session';
 import type { AboardContext, Feature } from './feature';
 import { stamp } from './visited';
 import { KAYAK_HALF_BEAM, KAYAK_LENGTH, KayakModel } from './kayakModel';
+import { KAYAK_WAKE, kayakCapsizes } from '../scene/wakeField';
 import { call, fendOff, groundHeight, heldBackBy, launchSpot, madeGood, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
 
 const KT = 0.514444;
@@ -14,6 +15,9 @@ const KAYAK_VIEW: ViewPreset = { target: [0, 0.9, -0.3], yaw: -0.58, pitch: 0.27
 const SHOAL = -0.22;
 /** Length of the painter she lies to astern of the yacht. */
 const PAINTER = 3.5;
+/** Seconds a capsize costs: over she goes, and the paddler gets back in. The first part of it is the roll itself. */
+const SWIM = 7;
+const ROLL = 1.6;
 
 type Mode = 'stowed' | 'afloat' | 'ashore';
 const three = (deg: number): string => `${String(deg).padStart(3, '0')}°`;
@@ -52,6 +56,11 @@ export class Kayak implements Feature {
   /** Seconds she has been paddling and going astern over the ground, and real seconds until that may be remarked on again. */
   private losing = 0;
   private toldLosing = 0;
+  /** The passing of a ship whose wake has been warned of, and the one that last put her over. */
+  private wakeWarned = '';
+  private wakeDunked = '';
+  /** Seconds left of a capsize. No paddling meanwhile. */
+  private swim = 0;
   private readonly motion = { heave: 0, pitch: 0, heel: 0, set: false };
   private readonly tow = { x: 0, y: 0, heading: 0, out: false };
   private lastTick = -1;
@@ -144,6 +153,7 @@ export class Kayak implements Feature {
     this.helm(false);
     ctx.drone.flyTo(KAYAK_VIEW, 1.6);
     this.toldBlown = false;
+    this.swim = 0;
     this.losing = 0;
     this.toldLosing = 0;
     ctx.say('Kayak away. W paddles, Shift with W sprints for a short while, S backs, A and D steer. O lands her or brings you back aboard', 9);
@@ -250,7 +260,9 @@ export class Kayak implements Feature {
 
     let input: Paddling = { ahead: 0, steer: 0 };
     if (this.mode === 'afloat' && !frozen) {
-      input = this.input = this.drive ?? this.keys();
+      this.swim = Math.max(0, this.swim - dt);
+      this.wakes();
+      input = this.input = this.swim > 0 ? { ahead: 0, steer: 0 } : this.drive ?? this.keys();
       stepCraft(kayak, input, dt, this.water, this.yacht());
       this.toldLosing -= dt;
       this.think -= dt;
@@ -262,6 +274,32 @@ export class Kayak implements Feature {
     this.float(kayak.x, kayak.y, kayak.heading, dt, seaTime);
     // A sprint is a faster stroke, not a longer one.
     this.model.animate(frozen ? 0 : dt * (input.sprint && input.ahead > 0 && !kayak.blown ? 1.45 : 1), input.ahead, input.steer, this.clock);
+  }
+
+  /**
+   * A ship's wake and the kayak. A warning while it is still on its way, and if it is big and she takes it beam-on,
+   * over she goes: a roll, a few seconds in the water, and the paddler winded. Bow or stern to it, she rides over.
+   * The wake itself is the same one every player has (`scene/wakeField.ts`); it lifts and rolls her through `stage.seaLevel`.
+   */
+  private wakes(): void {
+    const { ctx, kayak } = this;
+    const sw = ctx.seaway;
+    if (!sw.wakeId || kayak.beached) return;
+    const w = sw.wake;
+    if (w.arriveIn > 0 && w.arriveIn < KAYAK_WAKE.warnAhead && w.peak >= KAYAK_WAKE.warn && this.wakeWarned !== sw.wakeId) {
+      this.wakeWarned = sw.wakeId;
+      ctx.alarm(`Ship's wake coming, turn into it: ${sw.wakeFrom}, ${w.peak.toFixed(1)} m, here in ${Math.max(5, Math.round(w.arriveIn / 5) * 5)} s`);
+    }
+    if (this.swim > 0 || this.wakeDunked === sw.wakeId || !kayakCapsizes(w.height, kayak.heading, w.dirX, w.dirY)) return;
+    this.wakeDunked = sw.wakeId;
+    this.swim = SWIM;
+    kayak.speed = 0;
+    kayak.turn = 0;
+    kayak.puff = 0;
+    kayak.blown = true;
+    // Blown is said here, in the same breath.
+    this.toldBlown = true;
+    ctx.alarm(`Capsized. ${sw.wakeFrom}'s wake caught her beam-on, ${w.height.toFixed(1)} m of it. You are back in her, soaked and winded. Next time turn her bow into it`);
   }
 
   private keys(): Paddling {
@@ -388,7 +426,9 @@ export class Kayak implements Feature {
     motion.heave += (heave - motion.heave) * ease;
     motion.pitch += (pitch - motion.pitch) * ease;
     motion.heel += (heel - motion.heel) * ease;
-    this.model.place(x, motion.heave + 0.01, z, heading, motion.pitch, motion.heel);
+    // Capsizing, she goes right round.
+    const over = this.mode === 'afloat' && this.swim > SWIM - ROLL ? ((SWIM - this.swim) / ROLL) * Math.PI * 2 : 0;
+    this.model.place(x, motion.heave + 0.01, z, heading, motion.pitch, motion.heel + over);
   }
 
   // ---- what the session asks -------------------------------------------------------------------

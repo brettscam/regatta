@@ -14,8 +14,25 @@ export interface EnvSample {
   depth?: number;
 }
 
+/**
+ * The sea running at one place and time, as the boat feels it: one wave train. Supplied to the sim, never worked out by it.
+ * Leave it out (no `sea` on the environment, or nothing returned) and the water is flat, exactly as before there was a sea.
+ */
+export interface SeaSample {
+  /** Significant height, metres, trough to crest. */
+  height: number;
+  /** Wavelength, metres, as it is here: shortened where it runs against the stream or over a shoal. */
+  length: number;
+  /** Direction the waves come FROM, radians clockwise from north, like the wind. */
+  dir: number;
+  /** Height over length. About 0.03 is an easy sea, 0.05 a steep chop, 0.08 and more is breaking. */
+  steepness: number;
+}
+
 export interface Environment {
   sample(x: number, y: number, t: number): EnvSample;
+  /** The sea at a place and time. Optional: an environment without it is flat water. */
+  sea?(x: number, y: number, t: number): SeaSample | null | undefined;
 }
 
 export interface ReefSpec {
@@ -238,6 +255,12 @@ export interface SimState {
    * whoever knows about collisions and repairs sets it.
    */
   damage: number;
+  /** Where she is on the wave under her, radians. It only moves while the environment gives her a sea. */
+  seaPhase: number;
+  /** Waves met since the start, for deciding which of them she slams on. */
+  seaCount: number;
+  /** How many times she has fallen off a wave going to windward and slammed. */
+  slams: number;
   maneuver: Maneuver | null;
 }
 
@@ -308,4 +331,8 @@ export interface SimOutputs {
   battery: number;
   /** True while the engine is running and in gear. */
   underPower: boolean;
+  /** Share of her speed the sea is taking, beating or motoring into it: 0 in flat water or with the sea abaft the beam. */
+  seaLoss: number;
+  /** 0 to 1, how much she is surfing: running in a sea big enough to carry her. */
+  surf: number;
 }
