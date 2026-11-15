@@ -426,7 +426,10 @@ export class Wildlife implements Feature {
             this.blow.visible = true;
             const age = 1 - a.blow;
             this.blow.position.set(a.x + fx * 4, sea + 0.4, -(a.y + fy * 4));
-            this.blow.scale.setScalar(0.55 + 0.75 * age);
+            // Drawn larger the farther off it is, as the pot buoys are drawn large: a blow is what the eye picks up at a mile,
+            // and at its true size it would be two dots on the screen.
+            const range = this.ctx.drone.camera.position.distanceTo(this.blow.position);
+            this.blow.scale.setScalar((0.55 + 0.75 * age) * Math.min(5, Math.max(1, range / 300)));
             (this.blow.material as THREE.MeshBasicMaterial).opacity = 0.8 * Math.min(1, a.blow * 1.7);
           }
         } else {

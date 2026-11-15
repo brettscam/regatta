@@ -4,7 +4,7 @@ import type { Place } from '../session';
 import type { AboardContext, Feature } from './feature';
 import { stamp } from './visited';
 import { KAYAK_HALF_BEAM, KAYAK_LENGTH, KayakModel } from './kayakModel';
-import { call, fendOff, groundHeight, launchSpot, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
+import { call, fendOff, groundHeight, heldBackBy, launchSpot, madeGood, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling, type Water } from './paddle';
 
 const KT = 0.514444;
 /** The drone's place over the kayak: lower and much closer than over the yacht, off her port quarter so the yacht shows beyond her. */
@@ -44,6 +44,13 @@ export class Kayak implements Feature {
   private told: string | null = null;
   private toldBoat = true;
   private think = 0;
+  /** What the paddler is doing now, for the remarks. */
+  private input: Paddling = { ahead: 0, steer: 0 };
+  /** Said once each time she runs out of wind. */
+  private toldBlown = false;
+  /** Seconds she has been paddling and going astern over the ground, and real seconds until that may be remarked on again. */
+  private losing = 0;
+  private toldLosing = 0;
   private readonly motion = { heave: 0, pitch: 0, heel: 0, set: false };
   private readonly tow = { x: 0, y: 0, heading: 0, out: false };
   private lastTick = -1;
@@ -68,6 +75,8 @@ export class Kayak implements Feature {
       current: (x, y) => world.current(x, y, ctx.sim.state.t),
       wind: (x, y) => world.gustyWind(x, y, ctx.sim.state.t),
       land: (x, y) => this.land(x, y),
+      // The chart's depth with the tide on it. Where the drawn shore reaches out past the chart's, call it a foot of water.
+      depth: (x, y) => Math.max(0.3, world.depth(x, y, ctx.sim.state.t)),
     };
   }
 
@@ -131,7 +140,10 @@ export class Kayak implements Feature {
     // Whoever was at the wheel is in the kayak now.
     this.helm(false);
     ctx.drone.flyTo(KAYAK_VIEW, 1.6);
-    ctx.say('Kayak away. W paddles, S backs, A and D steer. O lands her or brings you back aboard', 8);
+    this.toldBlown = false;
+    this.losing = 0;
+    this.toldLosing = 0;
+    ctx.say('Kayak away. W paddles, Shift with W sprints for a short while, S backs, A and D steer. O lands her or brings you back aboard', 9);
   }
 
   private goAshore(place: Place | null): void {
@@ -235,8 +247,9 @@ export class Kayak implements Feature {
 
     let input: Paddling = { ahead: 0, steer: 0 };
     if (this.mode === 'afloat' && !frozen) {
-      input = this.drive ?? this.keys();
+      input = this.input = this.drive ?? this.keys();
       stepCraft(kayak, input, dt, this.water, this.yacht());
+      this.toldLosing -= dt;
       this.think -= dt;
       if (this.think <= 0) {
         this.think = 0.5;
@@ -244,13 +257,14 @@ export class Kayak implements Feature {
       }
     }
     this.float(kayak.x, kayak.y, kayak.heading, dt, seaTime);
-    this.model.animate(frozen ? 0 : dt, input.ahead, input.steer, this.clock);
+    // A sprint is a faster stroke, not a longer one.
+    this.model.animate(frozen ? 0 : dt * (input.sprint && input.ahead > 0 && !kayak.blown ? 1.45 : 1), input.ahead, input.steer, this.clock);
   }
 
   private keys(): Paddling {
     const h = this.ctx.held;
     const on = (a: string, b: string) => (h(a) || h(b) ? 1 : 0);
-    return { ahead: on('KeyW', 'ArrowUp') - on('KeyS', 'ArrowDown'), steer: on('KeyD', 'ArrowRight') - on('KeyA', 'ArrowLeft') };
+    return { ahead: on('KeyW', 'ArrowUp') - on('KeyS', 'ArrowDown'), steer: on('KeyD', 'ArrowRight') - on('KeyA', 'ArrowLeft'), sprint: on('ShiftLeft', 'ShiftRight') === 1 };
   }
 
   /** Paddle for a while without the keys or the frame clock. For play testing from the console. */
@@ -259,9 +273,26 @@ export class Kayak implements Feature {
     for (let t = 0; t < seconds; t += 0.1) stepCraft(this.kayak, input, 0.1, this.water, this.yacht());
   }
 
+  /** A word when the paddler is spent, and when the tide or the wind is more than she can paddle against. */
+  private effort(): void {
+    const { ctx, kayak, input } = this;
+    if (kayak.blown && !this.toldBlown) ctx.say('You are blown. Drop back to a cruising stroke and get your wind back', 6);
+    this.toldBlown = kayak.blown;
+    // Paddling ahead and going astern over the ground, for a few seconds together.
+    if (input.ahead > 0 && !kayak.beached && madeGood(kayak, this.water) < -0.05) this.losing += 0.5;
+    else this.losing = 0;
+    if (this.losing < 4 || this.toldLosing > 0) return;
+    this.toldLosing = 90;
+    if (heldBackBy(kayak, this.water) === 'tide') {
+      const s = this.water.current(kayak.x, kayak.y);
+      ctx.say(`The tide is running ${(Math.hypot(s.x, s.y) / KT).toFixed(1)} kt against you, more than she can paddle: she is going astern over the ground. Work the eddies close inshore, or wait for it to ease`, 9);
+    } else ctx.say('This wind is more than she can be paddled into. Get under the lee of the land, or turn and run back', 8);
+  }
+
   /** A word when a landing or the yacht comes within reach, once per approach. */
   private pointOut(): void {
     const { ctx, kayak } = this;
+    this.effort();
     const place = placeInReach(kayak, ctx.places, kayak.beached || touchingShore(kayak.x, kayak.y, this.water.land));
     if (place?.ashore && place.id !== this.told) ctx.say(`${capital(place.ashore.name)} is close by. Ease up and press O to go ashore`, 6);
     this.told = place?.id ?? null;

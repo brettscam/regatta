@@ -5,8 +5,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ReplayWorld, type CourseData } from '@slack-tide/world';
 import {
-  BOARD_RANGE, DOCK_RANGE, TOP_SPEED, WALK_RANGE,
-  call, fendOff, groundHeight, landing, launchSpot, newCraft, rangeAndBearing, stepCraft, touchingShore,
+  BOARD_RANGE, CRUISE_SPEED, DOCK_RANGE, SECOND_WIND, SPRINT_SECONDS, SPRINT_SPEED, TOP_SPEED, WALK_RANGE,
+  call, fendOff, groundHeight, heldBackBy, landing, launchSpot, madeGood, newCraft, rangeAndBearing, shoalStream, stepCraft, touchingShore,
   type Paddling, type Shore, type Water,
 } from './paddle';
 
@@ -21,18 +21,62 @@ const run = (c: ReturnType<typeof newCraft>, input: Paddling, seconds: number, w
 };
 
 describe('paddling the kayak', () => {
-  it('works up to about four knots, and not at once', () => {
+  it('cruises at about three knots, and not at once', () => {
     const c = newCraft(0, 0, 0);
     run(c, ahead, 1.5);
-    expect(c.speed / KT).toBeGreaterThan(0.8);
-    expect(c.speed / KT).toBeLessThan(2.2);
+    expect(c.speed / KT).toBeGreaterThan(0.6);
+    expect(c.speed / KT).toBeLessThan(2);
     run(c, ahead, 25);
-    expect(c.speed / KT).toBeGreaterThan(3.7);
-    expect(c.speed / KT).toBeLessThan(4.1);
-    expect(c.speed).toBeLessThanOrEqual(TOP_SPEED);
+    expect(c.speed / KT).toBeGreaterThan(2.85);
+    expect(c.speed / KT).toBeLessThan(3.05);
+    expect(c.speed).toBeLessThanOrEqual(CRUISE_SPEED);
     // Due north: all of it went into y.
     expect(c.x).toBeCloseTo(0, 6);
-    expect(c.y).toBeGreaterThan(35);
+    expect(c.y).toBeGreaterThan(28);
+    // A cruising stroke costs her nothing.
+    expect(c.puff).toBe(1);
+    expect(c.blown).toBe(false);
+  });
+
+  it('sprints to about four and a half knots for under a minute, then is blown', () => {
+    const sprint: Paddling = { ahead: 1, steer: 0, sprint: true };
+    const c = newCraft(0, 0, 0);
+    run(c, sprint, 20);
+    expect(c.speed / KT).toBeGreaterThan(4.2);
+    expect(c.speed / KT).toBeLessThanOrEqual(4.5);
+    expect(c.speed).toBeLessThanOrEqual(SPRINT_SPEED);
+    expect(TOP_SPEED).toBe(SPRINT_SPEED);
+    expect(c.blown).toBe(false);
+    // Somewhere short of a minute the wind goes out of her.
+    let t = 20;
+    for (; !c.blown && t < 120; t += 0.1) run(c, sprint, 0.1);
+    expect(t).toBeGreaterThan(SPRINT_SECONDS - 3);
+    expect(t).toBeLessThan(60);
+    expect(c.puff).toBeLessThan(0.01);
+    // Holding the key down does no more than cruise now.
+    run(c, sprint, 15);
+    expect(c.blown).toBe(true);
+    expect(c.speed / KT).toBeLessThan(3.2);
+    expect(c.speed / KT).toBeGreaterThan(2.8);
+    // Paddling easily she gets her second wind in most of a minute, and all of it back in a few.
+    for (t = 0; c.blown && t < 300; t += 0.5) run(c, ahead, 0.5);
+    expect(t).toBeGreaterThan(30);
+    expect(t).toBeLessThan(70);
+    expect(c.puff).toBeGreaterThanOrEqual(SECOND_WIND);
+    // Sitting still it comes back quicker.
+    const resting = newCraft(0, 0, 0);
+    resting.puff = 0;
+    resting.blown = true;
+    const working = newCraft(0, 0, 0);
+    working.puff = 0;
+    working.blown = true;
+    run(resting, rest, 20);
+    run(working, ahead, 20);
+    expect(resting.puff).toBeGreaterThan(working.puff * 1.5);
+    // Backing and sprinting do not go together.
+    const back = newCraft(0, 0, 0);
+    run(back, { ahead: -1, steer: 0, sprint: true }, 20);
+    expect(back.puff).toBe(1);
   });
 
   it('glides on when the paddle comes out, and stops in the end', () => {
@@ -40,12 +84,12 @@ describe('paddling the kayak', () => {
     run(c, ahead, 25);
     const y0 = c.y;
     run(c, rest, 3);
-    expect(c.speed / KT).toBeGreaterThan(1.5);
-    expect(c.speed / KT).toBeLessThan(3);
+    expect(c.speed / KT).toBeGreaterThan(1.2);
+    expect(c.speed / KT).toBeLessThan(2.5);
     run(c, rest, 60);
     expect(c.speed).toBe(0);
     // A kayak length or three of carry.
-    expect(c.y - y0).toBeGreaterThan(8);
+    expect(c.y - y0).toBeGreaterThan(6);
     expect(c.y - y0).toBeLessThan(30);
   });
 
@@ -84,7 +128,7 @@ describe('paddling the kayak', () => {
     run(straight, ahead, 30);
     run(turning, { ahead: 1, steer: 1 }, 30);
     expect(turning.speed).toBeLessThan(straight.speed * 0.9);
-    expect(turning.speed / KT).toBeGreaterThan(2);
+    expect(turning.speed / KT).toBeGreaterThan(1.7);
   });
 
   it('is carried by all of the stream and a little of the wind', () => {
@@ -103,17 +147,106 @@ describe('paddling the kayak', () => {
   });
 
   it('is swept down a strong stream if she points straight across it', () => {
-    // Three knots running east. Two hundred metres to cross.
-    const water: Water = { ...still, current: () => ({ x: 3 * KT, y: 0 }) };
+    // Two knots running east. Two hundred metres to cross.
+    const water: Water = { ...still, current: () => ({ x: 2 * KT, y: 0 }) };
     const c = newCraft(0, 0, 0);
     let t = 0;
     for (; c.y < 200 && t < 600; t += 1 / 60) stepCraft(c, ahead, 1 / 60, water);
-    expect(t).toBeLessThan(120);
-    expect(c.x).toBeGreaterThan(120);
+    expect(t).toBeLessThan(150);
+    expect(c.x).toBeGreaterThan(110);
     // Pointing up into it, she holds a much better line.
     const ferry = newCraft(0, 0, -45 * D2R);
     for (t = 0; ferry.y < 200 && t < 600; t += 1 / 60) stepCraft(ferry, ahead, 1 / 60, water);
     expect(Math.abs(ferry.x)).toBeLessThan(40);
+  });
+
+  it('is slowed a good deal by a head wind and its chop, and helped a little by a following one', () => {
+    const over = (kt: number, dir: number, input: Paddling = ahead) => {
+      const c = newCraft(0, 0, 0);
+      const water: Water = { ...still, wind: () => ({ dir, speed: kt * KT }) };
+      run(c, input, 40, water);
+      return madeGood(c, water) / KT;
+    };
+    expect(over(0, 0)).toBeCloseTo(3, 1);
+    // Fifteen knots on the nose takes a third off her. Twenty leaves her under a knot.
+    expect(over(15, 0)).toBeGreaterThan(1.5);
+    expect(over(15, 0)).toBeLessThan(2.2);
+    expect(over(20, 0)).toBeGreaterThan(0.3);
+    expect(over(20, 0)).toBeLessThan(1.1);
+    // Twenty-five cannot be cruised into: she goes astern. A sprint makes a little, while it lasts.
+    expect(over(25, 0)).toBeLessThan(0);
+    expect(over(25, 0, { ahead: 1, steer: 0, sprint: true })).toBeGreaterThan(0.5);
+    // With it behind her she is a little faster, not a lot.
+    expect(over(15, Math.PI)).toBeGreaterThan(3.1);
+    expect(over(15, Math.PI)).toBeLessThan(3.9);
+  });
+
+  it('weathercocks: a wind on the beam brings her bow up into it unless the paddler corrects', () => {
+    // Heading north with fifteen knots from the east.
+    const water: Water = { ...still, wind: () => ({ dir: 90 * D2R, speed: 15 * KT }) };
+    const loose = newCraft(0, 0, 0);
+    run(loose, ahead, 20, water);
+    expect(loose.heading / D2R).toBeGreaterThan(30);
+    expect(loose.heading / D2R).toBeLessThan(80);
+    // From the west she turns the other way.
+    const other = newCraft(0, 0, 0);
+    run(other, ahead, 20, { ...still, wind: () => ({ dir: 270 * D2R, speed: 15 * KT }) });
+    expect(other.heading / D2R).toBeGreaterThan(280);
+    expect(other.heading / D2R).toBeLessThan(330);
+    // A stroke on the windward side now and then holds her course.
+    const held = newCraft(0, 0, 0);
+    for (let t = 0; t < 20; t += 1 / 60) {
+      const off = Math.atan2(Math.sin(held.heading), Math.cos(held.heading));
+      stepCraft(held, { ahead: 1, steer: off > 0.03 ? -1 : 0 }, 1 / 60, water);
+    }
+    expect(Math.abs(Math.atan2(Math.sin(held.heading), Math.cos(held.heading))) / D2R).toBeLessThan(8);
+    // Lying still she has no way on for the wind to work against, and stays as she is.
+    const still2 = newCraft(0, 0, 0);
+    run(still2, rest, 20, water);
+    expect(still2.heading).toBe(0);
+    // Dead ahead or dead astern there is nothing to turn her.
+    const into = newCraft(0, 0, 0);
+    run(into, ahead, 20, { ...still, wind: () => ({ dir: 0, speed: 15 * KT }) });
+    expect(Math.abs(Math.atan2(Math.sin(into.heading), Math.cos(into.heading)))).toBeLessThan(1e-6);
+  });
+
+  it('goes astern over the ground against a tide faster than she can paddle, and knows what is stopping her', () => {
+    // Four knots of ebb from ahead.
+    const ebb: Water = { ...still, current: () => ({ x: 0, y: -4 * KT }) };
+    const c = newCraft(0, 0, 0);
+    run(c, ahead, 30, ebb);
+    expect(c.speed / KT).toBeGreaterThan(2.8);
+    expect(c.y).toBeLessThan(-10);
+    expect(madeGood(c, ebb) / KT).toBeLessThan(-0.8);
+    expect(heldBackBy(c, ebb)).toBe('tide');
+    // A fair tide is all hers.
+    const fair = newCraft(0, 0, 0);
+    const flood: Water = { ...still, current: () => ({ x: 0, y: 2 * KT }) };
+    run(fair, ahead, 30, flood);
+    expect(madeGood(fair, flood) / KT).toBeCloseTo(5, 1);
+    // With no stream and a gale on the nose, it is the wind.
+    const gale: Water = { ...still, wind: () => ({ dir: 0, speed: 28 * KT }) };
+    const w = newCraft(0, 0, 0);
+    run(w, ahead, 30, gale);
+    expect(madeGood(w, gale)).toBeLessThan(0);
+    expect(heldBackBy(w, gale)).toBe('wind');
+  });
+
+  it('finds less stream close inshore, enough to work up against a tide that beats her in the deep', () => {
+    expect(shoalStream(10)).toBe(1);
+    expect(shoalStream(3)).toBe(1);
+    expect(shoalStream(1)).toBeCloseTo(0.533, 2);
+    expect(shoalStream(0)).toBeCloseTo(0.3, 5);
+    expect(shoalStream(NaN)).toBe(1);
+    // Three and a half knots against her. Deep water to the east of x = 0, a foot or two of it to the west.
+    const strait: Water = { ...still, current: () => ({ x: 0, y: -3.5 * KT }), depth: (x) => (x >= 0 ? 12 : 0.6) };
+    const deep = newCraft(50, 0, 0);
+    const inshore = newCraft(-50, 0, 0);
+    run(deep, ahead, 60, strait);
+    run(inshore, ahead, 60, strait);
+    expect(deep.y).toBeLessThan(-5);
+    expect(inshore.y).toBeGreaterThan(30);
+    expect(madeGood(inshore, strait)).toBeGreaterThan(0.5);
   });
 
   it('gives the same answer from one long frame as from many short ones', () => {
@@ -367,9 +500,14 @@ describe('on the Bay', () => {
     // From Ayala Cove, due south into the island.
     const ayala = places.find((p) => p.id === 'ayala')!;
     const c = newCraft(ayala.x, ayala.y, 180 * D2R);
-    for (let t = 0; t < 400; t += 0.1) stepCraft(c, ahead, 0.1, bay(3 * 3600));
+    // The wind would bring her head round if she let it: the paddler holds her on south.
+    for (let t = 0; t < 400; t += 0.1) {
+      const off = Math.atan2(Math.sin(Math.PI - c.heading), Math.cos(Math.PI - c.heading));
+      stepCraft(c, { ahead: 1, steer: Math.abs(off) > 0.05 ? Math.sign(off) : 0 }, 0.1, bay(3 * 3600));
+    }
     expect(land(c.x, c.y)).toBe(false);
-    expect(c.beached).toBe(true);
+    // Hard on the beach, or held a foot off it by the wind between one stroke and the next.
+    expect(c.beached || touchingShore(c.x, c.y, land)).toBe(true);
     expect(Math.hypot(c.x - ayala.x, c.y - ayala.y)).toBeLessThan(WALK_RANGE);
     // The beach has taken the way off her, so she can be landed where she lies.
     expect(Math.abs(c.speed)).toBeLessThan(0.5);
