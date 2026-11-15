@@ -125,6 +125,17 @@ export class Stage {
     this.land?.position.set(-x, 0, y);
   }
 
+  /**
+   * Make the sea afresh for the wind at a place and time, with no settling in. For when the boat has been moved a long
+   * way at once: the sea she left is not the sea she has arrived in.
+   * @param x, y course metres
+   */
+  settleSea(x: number, y: number, t: number): void {
+    const wind = this.world.wind(x, y, t);
+    this.waves.splice(0, this.waves.length, ...this.sea.build(wind.dir, wind.speed / KT));
+    this.seaKt = wind.speed / KT;
+  }
+
   /** The scene's zero has jumped by this much (scene metres) and the viewer with it: keep every wave where it was under them. */
   shiftSea(dx: number, dz: number): void {
     for (const w of this.waves) w.phase = (w.phase + w.k * (w.dx * dx + w.dz * dz)) % (Math.PI * 2);

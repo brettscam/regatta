@@ -78,7 +78,7 @@ export function sailcloth(): THREE.CanvasTexture {
     for (let i = 0; i < 40; i++) {
       const x = ((i * 97) % 251) / 251 * w;
       const y = ((i * 57) % 241) / 241 * h;
-      g.fillStyle = `rgba(60, 54, 44, ${0.03 + ((i * 13) % 7) * 0.006})`;
+      g.fillStyle = `rgba(60, 54, 44, ${0.012 + ((i * 13) % 7) * 0.003})`;
       g.beginPath();
       g.ellipse(x, y, 18 + (i % 5) * 9, 30 + (i % 7) * 12, 0, 0, Math.PI * 2);
       g.fill();
@@ -335,10 +335,14 @@ export function buildCaird(spec: BoatSpec): CairdModel {
   {
     const steer = add('tiller', new THREE.Group());
     steer.position.copy(rudderHead);
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, rudderHead.y + d.draft * 0.9, 0.34), wood);
-    blade.position.set(0, -(rudderHead.y + d.draft * 0.9) / 2, 0.19);
+    // A narrow stock down the sternpost and the blade below it, mostly under water.
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.03, rudderHead.y - 0.2, 0.09), wood);
+    stock.position.set(0, -(rudderHead.y - 0.2) / 2, 0.05);
+    stock.castShadow = true;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.3 + d.draft * 0.92, 0.3), wood);
+    blade.position.set(0, -rudderHead.y + 0.3 - (0.3 + d.draft * 0.92) / 2, 0.16);
     blade.castShadow = true;
-    steer.add(blade);
+    steer.add(stock, blade);
     // The tiller comes forward over the well, a little cranked so it clears the mizzen.
     const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.03, tillerLength, 7).rotateX(Math.PI / 2), spar);
     bar.position.set(0, 0.03, -tillerLength / 2);

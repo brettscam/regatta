@@ -8,13 +8,20 @@ import { Stage } from './stage';
 import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
 import { JoinFlow, type Choice, type WaterView } from './ui/join';
+import { ModeChoice, lastMode, type Mode } from './ui/mode';
+import { Expedition } from './expedition/start';
 import { COURSES, DEFAULT_COURSE, hasCourse, loadCourse } from './world/loadCourse';
 
 // Regatta. The world is a real past day on real water, replayed: NOAA's models of the wind, tidal stream and tide.
 // San Francisco Bay unless another water is chosen: ?course=san-juans opens on the San Juan Islands.
 // For play testing, the join screen can be skipped: ?go=1 with any of &spot=gate &boat=perf45 &tutorial=1
 // &time=evening or &start=8.5 (hours into the season, which begins at 08:00) &x=1300&y=250&hdg=293
+//
+// There are two ways to play, asked for on the first screen: Regatta, which is everything above, and Expedition,
+// voyages from history (src/expedition/). ?mode=expedition answers the question, and with &go=1 casts off on the
+// voyage at once (&seed=7 pins its weather, &truth=1 shows the true track on its chart). ?go=1 alone still means Regatta.
 const params = new URLSearchParams(location.search);
+const askedMode: Mode | null = params.get('mode') === 'expedition' ? 'expedition' : params.get('mode') === 'regatta' ? 'regatta' : null;
 const num = (key: string, fallback: number) => {
   const v = Number(params.get(key));
   return params.has(key) && Number.isFinite(v) ? v : fallback;
@@ -102,11 +109,14 @@ const board = new Board(logbook);
 board.places = data.places;
 window.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA)$/.test((e.target as HTMLElement).tagName);
+  // The roadmap belongs to Regatta. On an expedition the key does nothing.
+  if (expedition) return;
   if (e.code === 'KeyB' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) board.toggle();
   else if (e.code === 'Escape' && board.isOpen) board.toggle(false);
 });
 
 let session: Session | null = null;
+let expedition: Expedition | null = null;
 let lobby: Lobby | null = null;
 let chosen: Choice | null = null;
 
@@ -169,16 +179,8 @@ const resume = async (saved: unknown): Promise<void> => {
   castOff(settle(s.choice), s.sim, s.clock);
 };
 
-let begun = false;
-function begin(): void {
-  if (session || begun) return;
-  begun = true;
-  if (params.has('go')) {
-    castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, skipper: params.get('skipper') ?? undefined, tutorial: params.get('tutorial') === '1' }));
-    return;
-  }
-  document.body.classList.add('lobby');
-  lobby = new Lobby(stage, data.starts, BOATS);
+/** Regatta's way in: where, first sail, your boat. */
+function openJoin(): void {
   new JoinFlow({
     ...waterView(),
     waters: COURSES,
@@ -197,6 +199,46 @@ function begin(): void {
   });
 }
 
+/** Expedition: the stage is handed over until the voyage is left, then put back as it was. */
+function openExpedition(go: boolean): void {
+  lobby?.dispose();
+  lobby = null;
+  expedition = new Expedition({
+    stage, boats: BOATS, params,
+    onLeave: () => {
+      expedition = null;
+      world = new ReplayWorld(data, 0);
+      setClock(settle({}));
+      stage.setCourse(data, world);
+      firstScreen();
+    },
+  }, go);
+}
+
+/** The water behind the panel, and the first question: Regatta or Expedition. */
+function firstScreen(): void {
+  document.body.classList.add('lobby');
+  lobby = new Lobby(stage, data.starts, BOATS);
+  if (askedMode === 'regatta') return openJoin();
+  lobby.show(raceNight(settle(savedChoice())), 0);
+  new ModeChoice({
+    initial: lastMode(),
+    onChoose: (mode) => (mode === 'expedition' ? openExpedition(false) : openJoin()),
+  });
+}
+
+let begun = false;
+function begin(): void {
+  if (session || expedition || begun) return;
+  begun = true;
+  if (askedMode === 'expedition') return openExpedition(params.has('go'));
+  if (params.has('go')) {
+    castOff(settle({ time: params.get('time') ?? undefined, spot: params.get('spot') ?? undefined, boat: params.get('boat') ?? undefined, colour: params.get('colour') ?? undefined, name: params.get('name') ?? undefined, skipper: params.get('skipper') ?? undefined, tutorial: params.get('tutorial') === '1' }));
+    return;
+  }
+  firstScreen();
+}
+
 if (hot?.ready) {
   hot.ready((saved) => { void resume(saved).then(begin); });
   // If the hand-over never answers, start anyway.
@@ -210,7 +252,8 @@ let last = performance.now();
 function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (session) session.frame(dt);
+  if (expedition) expedition.frame(dt);
+  else if (session) session.frame(dt);
   else lobby?.frame(dt);
   requestAnimationFrame(frame);
 }

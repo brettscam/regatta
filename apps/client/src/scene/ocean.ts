@@ -130,6 +130,7 @@ const vertexShader = /* glsl */ `
   uniform vec4 uWaveA[NW]; // dir.x, dir.z, wavenumber, amplitude
   uniform vec4 uWaveB[NW]; // omega, steepness, phase, wavelength
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
+  uniform float uCalm;     // how much of the shorter waves is left alongside the hull: 0.35 for a yacht in a bay
   varying vec3 vWorld;
   varying vec2 vBase;
 
@@ -143,7 +144,7 @@ const vertexShader = /* glsl */ `
     vec2 rel = base - uBoat.xy;
     vec2 local = vec2(rel.x * uBoat.w + rel.y * uBoat.z, -rel.x * uBoat.z + rel.y * uBoat.w);
     float e = dot(local / vec2(3.0, 7.5), local / vec2(3.0, 7.5));
-    float calm = mix(0.35, 1.0, smoothstep(0.4, 1.8, e));
+    float calm = mix(uCalm, 1.0, smoothstep(0.4, 1.8, e));
 
     vec3 p = vec3(base.x, 0.0, base.y);
     for (int i = 0; i < NG; i++) {
@@ -300,9 +301,9 @@ const fragmentShader = /* glsl */ `
     float streaks = smoothstep(0.7, 0.95, streak) * smoothstep(0.45, 0.7, foamTex) * clamp((uWindKt - 13.0) / 14.0, 0.0, 0.45) * foamFine;
     // Above gale force the foam is blown in long dense streaks down the wind, and in a storm the sea is white with it.
     // Nothing below 34 knots changes, so a bay looks as it did.
-    float storm = clamp((uWindKt - 34.0) / 26.0, 0.0, 1.0);
+    float storm = clamp((uWindKt - 34.0) / 16.0, 0.0, 1.0);
     float blown = texture2D(uDetail, vec2(wUV.x / 140.0, wUV.y / 9.0) - vec2(uTime * 0.03, 0.0)).a;
-    streaks = max(streaks, storm * smoothstep(0.72 - 0.3 * storm, 0.9 - 0.2 * storm, blown * 0.7 + streak * 0.3) * (0.35 + 0.65 * foamTex));
+    streaks = max(streaks, storm * smoothstep(0.66 - 0.3 * storm, 0.86 - 0.2 * storm, blown * 0.7 + streak * 0.3) * (0.4 + 0.6 * foamTex) / (1.0 + dist * 0.004));
     float foam = max(caps, streaks);
 
     // The boat's own white water: along the hull, off the bow, and trailing astern.
@@ -422,6 +423,7 @@ export class Ocean {
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
       uHull: { value: new THREE.Vector3(1, 1, 1) },
+      uCalm: { value: 0.35 },
       uTrail: { value: this.trail },
       uShipA: { value: vec4s(SHIP_SLOTS) },
       uShipB: { value: vec4s(SHIP_SLOTS) },
@@ -466,11 +468,15 @@ export class Ocean {
   }
 
   /**
-   * The size of the boat whose white water and shadow are drawn, as ratios of the 38 ft sloop's beam, length and rig height.
+   * The size of the boat whose white water and shadow are drawn, as ratios of the 38 ft sloop's beam, length and rig height,
+   * and how much of the shorter waves is left standing alongside her.
    * Left alone, everything is drawn for that sloop, as it always was.
    */
-  setHull(beam: number, length: number, rig: number): void {
+  setHull(beam: number, length: number, rig: number, calm = 0.35): void {
     (this.uniforms.uHull.value as THREE.Vector3).set(beam, length, rig);
+    // A yacht's hull presses the chop flat alongside. In an ocean sea every wave is longer than the boat and lifts her
+    // whole, so a water with such a sea passes 1 and nothing is flattened: the boat rides exactly the water drawn.
+    this.uniforms.uCalm.value = calm;
   }
 
   /** Back to the 38 ft sloop and the Bay's water, as the sea is first made. */

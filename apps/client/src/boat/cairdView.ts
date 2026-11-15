@@ -82,9 +82,9 @@ class Cloth {
 
 // Burberry windproofs over wool, gone dark with grease and wet. Three men to a watch.
 const MEN: Kit[] = [
-  { jacket: 0x4b4439, vest: 0x413b31, trousers: 0x2e2b27, skin: 0xa9805f, cap: 0x3a342c, hood: true, bulk: 1.22 },
-  { jacket: 0x3d4038, vest: 0x35382f, trousers: 0x2a2825, skin: 0xb48a69, cap: 0x4d473b, hood: true, bulk: 1.26 },
-  { jacket: 0x54493a, vest: 0x493f32, trousers: 0x302c27, skin: 0x9c7455, cap: 0x2c2a27, hood: true, bulk: 1.2 },
+  { jacket: 0x7a6c56, vest: 0x6b5e4a, trousers: 0x3c3832, skin: 0xb58a67, cap: 0x5e5546, hood: true, bulk: 1.22 },
+  { jacket: 0x62665a, vest: 0x55594e, trousers: 0x38352f, skin: 0xbf9372, cap: 0x7a715f, hood: true, bulk: 1.26 },
+  { jacket: 0x85735a, vest: 0x75654e, trousers: 0x403b33, skin: 0xa87d5c, cap: 0x4a463e, hood: true, bulk: 1.2 },
 ];
 
 export class CairdView implements BoatDrawing {
@@ -437,6 +437,9 @@ export class CairdView implements BoatDrawing {
       f.footL.copy(f.pelvis).addScaledVector(f.fwd, 0.42).addScaledVector(f.right, -0.1);
       f.footR.copy(f.pelvis).addScaledVector(f.fwd, 0.42).addScaledVector(f.right, 0.1);
       f.footL.y = f.footR.y = sole;
+      // Inside the planking.
+      f.footL.x = clamp(f.footL.x, -0.34, 0.34);
+      f.footR.x = clamp(f.footR.x, -0.34, 0.34);
       f.kneeHint.copy(f.fwd).addScaledVector(Y, 1.2);
       f.handL.copy(f.pelvis).addScaledVector(f.fwd, 0.3).addScaledVector(f.right, -0.12);
       f.handR.copy(f.pelvis).addScaledVector(f.fwd, 0.3).addScaledVector(f.right, 0.12);

@@ -478,3 +478,29 @@ body.lobby .cheat { display: none; }
 /* ---- seen on the water: the animals card on the logbook -------------------------------------------- */
 .board .barhop.seen { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .board .barhop.seen li { padding: 8px 12px; }
+
+/* ---- Expedition: voyages from history ------------------------------------------------------------- */
+/* None of Regatta's company on a voyage in 1916: no roadmap link, no race bar, no fleet, no coach. */
+body.expedition .boardlink, body.expedition .newsflash, body.expedition .racebar, body.expedition .fleetpanel,
+body.expedition .coach, body.expedition .hint, body.expedition .hails, body.expedition .hail, body.expedition .cheat,
+body.expedition .trimcard, body.expedition .night { display: none; }
+.join .brief { margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(238, 243, 244, 0.88); }
+/* The instruments she had: three readings, each with a word beside it. */
+.readout .cells.period .v small { font-size: 12px; margin-left: 5px; }
+.readout .dial .legend .app::before { background: var(--amber); }
+/* The bare chart has no forecast strip under it, and a narrower side. */
+.chart-frame.bare { grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); width: min(1360px, 100%); }
+.chart-frame.bare .chart-map { cursor: grab; }
+.chart-frame.bare .chart-side { grid-row: 1; }
+.chart-frame.bare .chart-side .big { gap: 12px; }
+.chart-frame.bare .chart-side .big b { text-align: right; }
+@media (max-width: 760px) {
+  .chart-frame.bare { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .chart-frame.bare .chart-side { grid-column: 1; grid-row: 2; max-height: 40vh; }
+}
+/* The end of a voyage: one plain card in the middle of the screen. */
+.join.endcard { z-index: 7; left: 50%; top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(520px, calc(100% - 32px)); height: auto; max-height: calc(100% - 32px); }
+.join.endcard header h1 { letter-spacing: 0.16em; font-size: 26px; }
+.join .tally { margin: 4px 0 6px; display: grid; grid-template-columns: auto 1fr; gap: 9px 18px; align-items: baseline; }
+.join .tally dt { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.join .tally dd { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; }
