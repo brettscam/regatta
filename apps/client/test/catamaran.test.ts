@@ -3,6 +3,7 @@ import { Sim, KT, polarSpeed, type BoatSpec, type Environment } from '@slack-tid
 import { trackFix } from '@slack-tide/nav';
 import catJson from '../../../boats/cat42.json';
 import sloopJson from '../../../boats/sloop38.json';
+import blueJson from '../../../boats/blue50.json';
 import lineupJson from '../../../boats/lineup.json';
 import { capsizeAlarm, isCapsized, isPressed, placard, reefDue } from '../src/aboard/pressedRules';
 import { CONTACT, overlap, type Hull } from '../src/aboard/contactRules';
@@ -165,5 +166,23 @@ describe('the catamaran in the lineup', () => {
     expect(cat.sails.spinnaker).toBeUndefined();
     expect(cat.engine?.twinPivotDegS).toBeGreaterThan(0);
     expect(cat.dimensions.draft).toBeLessThan(1.5);
+  });
+});
+
+describe('the bluewater 50 in the lineup', () => {
+  const blue = blueJson as unknown as BoatSpec & Record<string, unknown>;
+
+  it('is ready to sail, with what the picker shows, and is drawn by the sloop builder with her own stern and bulwarks', () => {
+    expect((lineupJson as Array<{ id: string; status: string }>).find((e) => e.id === 'blue50')?.status).toBe('ready');
+    for (const key of ['tagline', 'role', 'difficulty', 'defaultName', 'homePort']) expect(typeof blue[key], key).toBe('string');
+    expect(blue.model).toBeUndefined();
+    expect((blue.hull as { sternTaper: number; bulwarkM: number }).sternTaper).toBeGreaterThan(0.221);
+    expect((blue.hull as { bulwarkM: number }).bulwarkM).toBeGreaterThan(0);
+    expect(blue.pressed).toBeUndefined();
+  });
+
+  it('is a wider, heavier hull to hit than the 38', () => {
+    expect(blue.dimensions.beam * CONTACT.radius).toBeGreaterThan(sloop.dimensions.beam * CONTACT.radius);
+    expect(placard(blue)).toBe('');
   });
 });

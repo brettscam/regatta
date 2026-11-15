@@ -21,9 +21,7 @@
   },
   {
     "id": "blue50",
-    "status": "yard",
-    "name": "50 ft bluewater cruiser",
-    "lengthFt": 50,
-    "role": "Long passages and heavy weather"
+    "file": "blue50.json",
+    "status": "ready"
   }
 ]

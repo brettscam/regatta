@@ -243,10 +243,16 @@ export function buildSloop(spec: BoatSpec, livery: Livery = {}): SloopModel {
   const half = L / 2;
   const B = d.beam / 2;
   const zAt = (t: number) => -half + L * t;
+  // How she is drawn aft and at the rail, where her boat file says she differs from the sloop these lines were drawn for.
+  const shape = (spec as BoatSpec & { hull?: { sternTaper?: number; bulwarkM?: number } }).hull;
+  /** How much of her beam she loses between her widest point and the transom. */
+  const STERN_TAPER = shape?.sternTaper ?? 0.221;
+  /** Height of solid bulwarks above the deck edge. 0 for an open toe rail. */
+  const BULWARK = shape?.bulwarkM ?? 0;
   const halfBeam = (t: number) => {
     if (t <= 0.58) return B * Math.pow(Math.sin((Math.max(t, 0) / 0.58) * (Math.PI / 2)), 0.82);
     const v = (t - 0.58) / 0.42;
-    return B - B * 0.221 * v * v;
+    return B - B * STERN_TAPER * v * v;
   };
   const sheerY = (t: number) => d.freeboard - 0.15 + 0.38 * k * Math.pow(1 - t, 2.4) + 0.03 * t;
   const keelY = spline([
@@ -533,9 +539,25 @@ export function buildSloop(spec: BoatSpec, livery: Livery = {}): SloopModel {
       const sheer: THREE.Vector3[] = [];
       for (let i = 0; i <= 40; i++) {
         const t = 0.01 + (0.99 * i) / 40;
-        sheer.push(new THREE.Vector3(side * (halfBeam(t) - 0.015), sheerY(t) + 0.025, zAt(t)));
+        sheer.push(new THREE.Vector3(side * (halfBeam(t) - 0.015), sheerY(t) + 0.025 + BULWARK, zAt(t)));
       }
       rails.add(tube(sheer, 0.022, teak));
+      if (BULWARK > 0) {
+        // Solid bulwarks: the topsides carried up above the deck edge, under the teak cap rail.
+        const p: number[] = [];
+        const ix: number[] = [];
+        sheer.forEach((top, i) => {
+          p.push(top.x, top.y - 0.025 - BULWARK, top.z, top.x, top.y - 0.01, top.z);
+          if (i < sheer.length - 1) ix.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+        });
+        const bg = new THREE.BufferGeometry();
+        bg.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+        bg.setIndex(ix);
+        bg.computeVertexNormals();
+        const wall = new THREE.Mesh(bg, new THREE.MeshPhysicalMaterial({ color: topsides, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.DoubleSide }));
+        wall.castShadow = true;
+        rails.add(wall);
+      }
       const tops: THREE.Vector3[] = [];
       const mids: THREE.Vector3[] = [];
       for (let t = 0.14; t <= 0.93; t += 0.113) {
