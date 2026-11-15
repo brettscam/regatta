@@ -237,9 +237,10 @@ function hat(k: Kit, head: THREE.Group, kind: string, colour: number): void {
       const r = 0.24;
       k.put(head, tube(r, r, 0.014, 3), felt, 0, 0.05, 0).rotation.y = Math.PI;
       for (const a of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) {
-        const side = k.put(head, box(r * 1.45, 0.075, 0.014), felt, Math.sin(a) * r * 0.47, 0.085, Math.cos(a) * r * 0.47);
-        side.rotation.y = a;
-        const trim = k.put(head, box(r * 1.45, 0.012, 0.018), GOLD, Math.sin(a) * r * 0.47, 0.124, Math.cos(a) * r * 0.47);
+        const side = k.put(head, box(r * 1.5, 0.11, 0.014), felt, Math.sin(a) * r * 0.5, 0.1, Math.cos(a) * r * 0.5);
+        side.rotation.order = 'YXZ';
+        side.rotation.set(0.3, a, 0);
+        const trim = k.put(head, box(r * 1.5, 0.014, 0.02), GOLD, Math.sin(a) * r * 0.565, 0.152, Math.cos(a) * r * 0.565);
         trim.rotation.y = a;
       }
       break;
@@ -368,7 +369,7 @@ export function dress(a: Avatar): Look {
       const flash = 0x1e90d6;
       all(neoprene, neoprene);
       hoop(k, body, 0.39, 0.09, flash, 1.01);
-      for (const s of [-1, 1]) k.put(body, box(0.02, 0.36, 0.1), flash, s * 0.168, 0.16, 0);
+      for (const s of [-1, 1]) k.put(body, box(0.012, 0.34, 0.07), flash, s * 0.163, 0.17, 0);
       look.foot = skin;
       break;
     }

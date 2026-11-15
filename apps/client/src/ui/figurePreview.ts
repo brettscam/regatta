@@ -99,8 +99,10 @@ export class FigurePreview {
     f.fwd.set(0, 0, -1);
     f.footL.set(-0.13, 0, 0.02);
     f.footR.set(0.13, 0, -0.02);
-    f.pelvis.set(sway, 0.9 * f.tall, 0);
-    f.neck.set(sway * 1.6, 0.9 * f.tall + 0.54 * f.tall + Math.sin(t * 1.6) * 0.004, -0.02);
+    // Legs all but straight: the hip is a leg's length and an ankle above the deck.
+    const hip = 0.08 + 0.865 * f.tall;
+    f.pelvis.set(sway, hip, 0);
+    f.neck.set(sway * 1.6, hip + 0.54 * f.tall + Math.sin(t * 1.6) * 0.004, -0.015);
     f.kneeHint.set(0, 0.2, -1);
     // One hand on the hip, the other easy at the side.
     f.handL.set(-0.3, f.pelvis.y - 0.1 * f.tall, -0.04);
@@ -115,7 +117,7 @@ export class FigurePreview {
   private draw(aspect: number, yaw: number, close: number): void {
     this.pose(yaw);
     const tall = this.figure.tall;
-    const headY = 1.44 * tall + 0.2;
+    const headY = 0.08 + 1.405 * tall + 0.19;
     const lookY = THREE.MathUtils.lerp(0.98 * tall + 0.06, headY, close);
     const dist = THREE.MathUtils.lerp(4.9, 1.75, close) / Math.min(1, aspect * 1.9);
     this.camera.aspect = aspect;
@@ -125,14 +127,14 @@ export class FigurePreview {
     this.renderer.render(this.scene, this.camera);
   }
 
-  /** A still picture of an avatar, head and shoulders, as a data address for an image. */
-  portrait(avatar: Avatar, size = 192): string {
+  /** A still picture of an avatar as a data address for an image: head and shoulders unless `close` says otherwise (0 is the whole figure). */
+  portrait(avatar: Avatar, size = 192, close = 0.82, yaw = 0.45): string {
     const was = { w: this.canvas.width, h: this.canvas.height };
     const ratio = this.renderer.getPixelRatio();
     this.figure.wear(avatar);
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(size, size, false);
-    this.draw(1, 0.45, 0.82);
+    this.draw(1, yaw, close);
     const url = this.canvas.toDataURL('image/png');
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(was.w / ratio, was.h / ratio, false);

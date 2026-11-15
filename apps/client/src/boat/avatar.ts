@@ -168,7 +168,7 @@ export function hatWorn(a: Avatar): string {
  */
 export function mateFor(skipper: Avatar): Avatar {
   if (skipper.outfit === 'foulies' || skipper.outfit === 'own') return { ...MATE_AVATAR };
-  // A lobster needs someone to cook it, and Father Christmas has help. The rest come as a pair.
+  // Father Christmas and a skipper in black tie get a deckhand in a Breton shirt. The rest come as a pair.
   const outfit = skipper.outfit === 'santa' || skipper.outfit === 'tux' ? 'breton' : skipper.outfit;
   return { ...MATE_AVATAR, outfit, hat: outfit === 'breton' ? 'beanie' : MATE_AVATAR.hat, hatShade: 2 };
 }

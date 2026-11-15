@@ -6,6 +6,7 @@ import { sightings } from '../aboard/sightings';
 import type { Logbook } from '../net/logbook';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
+import { mountAccountBadge } from './accountBadge';
 import { ProfilePane } from './profile';
 
 interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
@@ -175,6 +176,7 @@ export class Board {
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
     this.announce();
+    mountAccountBadge(() => this.toggle(true, 'profile'));
   }
 
   /** True when there is a release note this person has not opened. */

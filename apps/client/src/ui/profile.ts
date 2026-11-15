@@ -40,6 +40,26 @@ function saveSkipper(name: string): void {
   } catch { /* nothing to keep it in */ }
 }
 
+/**
+ * A signed-in player on a device that has no avatar yet takes up the one in their profile document.
+ * @returns true if one was taken up
+ */
+export async function adoptAvatar(): Promise<boolean> {
+  if (hasMyAvatar()) return false;
+  try {
+    const [db, user] = await Promise.all([askDb(), askUser()]);
+    const uid = await user?.id();
+    if (!db || !uid) return false;
+    const kept = (await db.doc(`profiles/${uid}`).get()).data()?.avatar;
+    if (typeof kept !== 'string' || hasMyAvatar()) return false;
+    setMyAvatar(readAvatar(kept));
+    window.dispatchEvent(new Event(PROFILE_CHANGED));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
 
@@ -53,7 +73,7 @@ export class ProfilePane {
   private readonly form = document.createElement('div');
 
   constructor(private readonly logbook: Logbook) {
-    this.el.className = 'profile';
+    this.el.className = 'profile-pane';
     this.stage.className = 'profile-stage';
     this.form.className = 'profile-form';
     this.el.append(this.stage, this.form);
@@ -66,23 +86,7 @@ export class ProfilePane {
         window.dispatchEvent(new Event(PROFILE_CHANGED));
       } else if (t.dataset.range) this.change({ [t.dataset.range]: Number(t.value) } as Partial<Avatar>, false);
     });
-    void this.adopt();
-  }
-
-  /**
-   * A signed-in player on a device that has no avatar yet takes up the one in their profile document.
-   */
-  private async adopt(): Promise<void> {
-    if (hasMyAvatar()) return;
-    try {
-      const [db, user] = await Promise.all([askDb(), askUser()]);
-      const uid = await user?.id();
-      if (!db || !uid) return;
-      const kept = (await db.doc(`profiles/${uid}`).get()).data()?.avatar;
-      if (typeof kept !== 'string' || hasMyAvatar()) return;
-      setMyAvatar(readAvatar(kept));
-      this.show();
-    } catch { /* stay as she is */ }
+    void adoptAvatar().then((took) => { if (took && this.el.isConnected) this.show(); });
   }
 
   /** Draw the panel and start the figure turning. Call each time the panel goes on the page. */

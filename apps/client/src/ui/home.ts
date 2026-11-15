@@ -5,7 +5,7 @@ import { eventWater, inText, nextEvent, whenText } from '../race/events';
 import type { CourseAbout } from '../world/loadCourse';
 import { figurePreview } from './figurePreview';
 import type { Choice, StartSpot } from './join';
-import { PROFILE_CHANGED, savedSkipper } from './profile';
+import { PROFILE_CHANGED, adoptAvatar, savedSkipper } from './profile';
 
 /**
  * The front page: the name, who you are, one button to go sailing, a line on who is out and any race fixed,
@@ -162,5 +162,7 @@ export function openHome(opts: HomeOptions): () => void {
 
   opts.show(opts.choice);
   render();
+  // Signed in on a new device: the figure made elsewhere comes too, and the card is drawn again when it does.
+  void adoptAvatar();
   return close;
 }

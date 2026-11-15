@@ -533,30 +533,50 @@ body.at-home .newsflash { left: auto; right: var(--edge-right); bottom: var(--ed
   body.at-home .newsflash { display: none; }
 }
 
-.profile { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
+.profile-pane { flex: none; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
 .profile-stage { position: sticky; top: 0; display: grid; gap: 10px; }
 .figure-preview { width: 100%; height: 380px; display: block; border-radius: 12px; background: linear-gradient(#86b9d3 0%, #3a7a94 62%, #23556b 100%); cursor: grab; touch-action: none; }
 .profile-dice { display: flex; gap: 8px; }
 .profile-dice button { flex: 1; }
 .profile-form { display: grid; gap: 14px; min-width: 0; }
-.profile .pick { display: grid; gap: 7px; }
-.profile .lab { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
-.profile input[type="text"] { font: inherit; font-size: 15px; color: var(--ink); background: rgba(238, 243, 244, 0.06); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 11px; width: 100%; }
-.profile input[type="range"] { width: 100%; accent-color: var(--amber); }
-.profile .ends { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); }
-.profile .soon { margin: 0; font-size: 12px; line-height: 1.45; color: var(--dim); }
+.profile-pane .pick { display: grid; gap: 7px; }
+.profile-pane .lab { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.profile-pane input[type="text"] { font: inherit; font-size: 15px; color: var(--ink); background: rgba(238, 243, 244, 0.06); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 11px; width: 100%; }
+.profile-pane input[type="range"] { width: 100%; accent-color: var(--amber); }
+.profile-pane .ends { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); }
+.profile-pane .soon { margin: 0; font-size: 12px; line-height: 1.45; color: var(--dim); }
 .profile-pages { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--edge); }
 .profile-picks { display: grid; gap: 14px; min-height: 236px; align-content: start; }
-.profile .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.profile .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
-.board .profile .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(238, 243, 244, 0.35); padding: 0; }
-.board .profile .swatch[aria-pressed="true"] { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255, 196, 107, 0.35); }
+.profile-pane .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.profile-pane .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.board .profile-pane .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(238, 243, 244, 0.35); padding: 0; }
+.board .profile-pane .swatch[aria-pressed="true"] { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255, 196, 107, 0.35); }
 .profile-log { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); font-variant-numeric: tabular-nums; }
 .profile-log [data-profile-rank]:not(:empty) { display: block; color: var(--ink); font-weight: 600; }
 @media (max-width: 640px) {
-  .profile { grid-template-columns: 1fr; gap: 12px; }
+  .profile-pane { grid-template-columns: 1fr; gap: 12px; }
   .profile-stage { position: static; grid-template-columns: 132px 1fr; align-items: end; }
   .figure-preview { height: 190px; }
   .profile-dice { flex-direction: column; }
   .profile-picks { min-height: 0; }
+}
+
+/* The account circle, on the website: bottom left while sailing, top right on the home screen and the way in. */
+.account { left: var(--edge-left); bottom: var(--edge-bottom); height: 34px; min-width: 34px; padding: 0 12px; border-radius: 17px; font: inherit; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); border-color: rgba(238, 243, 244, 0.5); cursor: pointer; overflow: hidden; display: grid; place-items: center; }
+.account.in { width: 34px; padding: 0; font-size: 15px; font-weight: 700; letter-spacing: 0; background: linear-gradient(#7fb3cf, #2f6d86); }
+.account img { width: 100%; height: 100%; display: block; transform: scale(1.45) translateY(4%); }
+.account:hover { border-color: var(--amber); }
+.account:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+body.has-account:not(.lobby) .boardlink { left: calc(var(--edge-left) + var(--account-w, 42px)); }
+body.has-account:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 46px); }
+body.lobby .account { display: grid; left: auto; bottom: auto; right: var(--edge-right); top: var(--edge-top); z-index: 5; }
+/* H hides the instruments, and this with them. */
+body:not(.lobby):has(#readout.hidden) .account { display: none; }
+body:not(.lobby):has(#readout.hidden) .boardlink { left: var(--edge-left); }
+@media (max-width: 560px) {
+  /* No room beside the roadmap link on a phone: the badge goes above it, and the hails above that. */
+  body:not(.lobby) .account { bottom: calc(var(--edge-bottom) + 40px); }
+  body.has-account:not(.lobby) .boardlink { left: var(--edge-left); }
+  body.has-account:not(.lobby) .hails { bottom: calc(var(--edge-bottom) + 86px); }
+  body.has-account:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 84px); }
 }
