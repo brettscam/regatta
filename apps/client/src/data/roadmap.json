@@ -195,6 +195,13 @@
           "area": "experience",
           "title": "Spinnaker, reefing and knockdowns",
           "text": "An asymmetric spinnaker for off the wind, a reef for when it blows, and a boat that goes over if you carry too much."
+        },
+        {
+          "id": "xp1",
+          "status": "shipped",
+          "area": "progress",
+          "title": "Experience points and ranks",
+          "text": "Points for good seamanship and for racing, and nine ranks to climb."
         }
       ],
       "theme": ""
@@ -395,9 +402,9 @@
       "items": [
         {
           "id": "xp",
-          "status": "later",
-          "title": "Logbook and experience",
-          "text": "Miles, night hours and heavy-weather hours earn experience, the way a real logbook does.",
+          "status": "next",
+          "title": "Points that show",
+          "text": "Your rank beside your name on the water, a season table, and a sound when you make a new rank.",
           "area": "progress"
         },
         {

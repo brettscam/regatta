@@ -66,6 +66,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
     [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
     [['C'], 'Coaching', 'Tips on or off.'],
+    [['Y'], 'Award lines', 'Show or hide the line that says when you earn points.'],
     [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
   ] },
   { title: 'Race and talk', rows: [
@@ -437,7 +438,7 @@ export class Board {
     return `<section class="xpcard">
       <div class="xphead"><b>${esc(rank.name)}</b><span>${t.xp.toLocaleString('en-GB')} ${t.xp === 1 ? 'point' : 'points'}</span><i>${to}</i></div>
       <div class="xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(rank.progress * 100)}" aria-label="Progress to the next rank"><i style="width:${(rank.progress * 100).toFixed(1)}%"></i></div>
-      <p class="lede">Points come from sailing her well: clean tacks and gybes, time in the groove (more with the wheel and sheets in your own hands), gusts handled, marks, races, and a little for anchoring, landings and the catch. Points will buy things for the boat later. Nothing is for sale yet. N switches the award lines on the screen off and on.</p>
+      <p class="lede">Points come from sailing her well: clean tacks and gybes, time in the groove (more with the wheel and sheets in your own hands), gusts handled, marks, races, and a little for anchoring, landings and the catch. Points will buy things for the boat later. Nothing is for sale yet. Y switches the award lines on the screen off and on.</p>
       ${top.length ? `<table class="xptable"><thead><tr><th>What has earned the most</th><th>Points</th></tr></thead><tbody>${rows}${lost}</tbody></table>` : ''}
     </section>`;
   }

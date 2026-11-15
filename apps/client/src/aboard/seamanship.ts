@@ -11,7 +11,7 @@ interface Line { label: string; points: number; rank?: boolean }
 /**
  * Experience points: the scoring in `xp/score.ts` fed from the sim, the race result turned into points, and one
  * short line on the screen for each award ("Clean tack +15"). The points themselves are kept by the logbook.
- * The line is words only and nothing on it can be pressed. N switches it off, and it hides with the instruments on H.
+ * The line is words only and nothing on it can be pressed. Y switches it off, and it hides with the instruments on H.
  */
 export class SeamanshipPoints implements Feature {
   readonly id = 'xp';
@@ -41,12 +41,12 @@ export class SeamanshipPoints implements Feature {
   }
 
   key(code: string): boolean {
-    if (code !== 'KeyN') return false;
+    if (code !== 'KeyY') return false;
     this.enabled = !this.enabled;
     try {
       localStorage.setItem(SAVED, this.enabled ? 'on' : 'off');
     } catch { /* nothing to remember it in */ }
-    this.ctx.say(this.enabled ? 'Award lines on' : 'Award lines off. Points are still earned. N turns the lines back on', 5);
+    this.ctx.say(this.enabled ? 'Award lines on' : 'Award lines off. Points are still earned. Y turns the lines back on', 5);
     return true;
   }
 

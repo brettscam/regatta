@@ -1,6 +1,18 @@
 {
   "notes": [
     {
+      "id": "v20",
+      "date": "2026-11-14",
+      "title": "Experience points and ranks",
+      "items": [
+        "Sail her well and you earn points: a clean tack or gybe, time in the groove with both sails trimmed and the boat near her best speed, a gust handled. Doing it with the wheel and sheets in your own hands earns several times what the autopilot does.",
+        "Racing pays most: points for each mark and for finishing, and a large award for a win, bigger for every boat you beat. People count for more than pace boats.",
+        "Small awards for anchoring cleanly, a night aboard, a first landing, a fish or crab, and a first sighting of an animal. Small penalties for a knockdown, a crash gybe or running aground.",
+        "Nine ranks from Deckhand to Admiral. Your rank, points and what earned them are on the Logbook tab. Y hides the award lines.",
+        "Nothing can be bought with points yet. That comes later."
+      ]
+    },
+    {
       "id": "v19",
       "date": "2026-11-14",
       "title": "One boat for the race, a spinnaker, and wind that bites",
