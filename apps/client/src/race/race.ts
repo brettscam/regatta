@@ -28,6 +28,11 @@ export interface RaceCall {
    * which every boat shares exactly, and `gun` is only that moment as it fell on the season clock when the call was made.
    */
   at?: number;
+  /**
+   * The class the race is sailed in: a boat id. Everyone who joins sails that boat, so it is the sailing that wins.
+   * A call without one (from an older copy of the game) leaves everyone in her own boat.
+   */
+  cls?: string;
 }
 export interface Standing {
   name: string;
@@ -42,6 +47,10 @@ export interface Standing {
 
 const ARRIVAL = 130;
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const CLASS_ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
+
+/** A class as it is spoken of: "the 38". */
+export const classText = (boat: YardBoat): string => (boat.lengthFt ? `the ${boat.lengthFt}` : boat.name);
 
 /** A race call as another page sent it. Nothing in it is trusted until it has been through here. */
 export function readCall(v: unknown): RaceCall | null {
@@ -54,7 +63,9 @@ export function readCall(v: unknown): RaceCall | null {
     if (!m || typeof m.name !== 'string' || !finite(m.x) || !finite(m.y) || Math.abs(m.x) > 40000 || Math.abs(m.y) > 40000) return null;
     marks.push({ name: m.name.slice(0, 28), x: Math.round(m.x), y: Math.round(m.y) });
   }
-  return { id: c.id, name: c.name.slice(0, 60), marks, gun: c.gun, host: typeof c.host === 'string' ? c.host.slice(0, 24) : 'Someone', pace: finite(c.pace) ? Math.max(0, Math.min(3, Math.round(c.pace))) : 0 };
+  const call: RaceCall = { id: c.id, name: c.name.slice(0, 60), marks, gun: c.gun, host: typeof c.host === 'string' ? c.host.slice(0, 24) : 'Someone', pace: finite(c.pace) ? Math.max(0, Math.min(3, Math.round(c.pace))) : 0 };
+  if (typeof c.cls === 'string' && CLASS_ID.test(c.cls)) call.cls = c.cls;
+  return call;
 }
 
 export const clockText = (seconds: number): string => {
@@ -70,7 +81,14 @@ export interface RaceContext {
   world: ReplayWorld;
   passage: Passage;
   fleet: Fleet;
-  spec: YardBoat;
+  /** The player's own boat, the one she chose on the way in. */
+  own: YardBoat;
+  /** The boat she is sailing now: her own, or the class of the race she is in. */
+  boat(): YardBoat;
+  /** The boats a race can be sailed in, by id. */
+  classes: Record<string, YardBoat>;
+  /** Put her in another boat where she lies, keeping her name and colours. */
+  setBoat(boat: YardBoat): void;
   scene: THREE.Scene;
   logbook: Logbook;
   skipper: string;
@@ -131,19 +149,34 @@ export class Race {
     return this.call?.marks[this.leg] ?? null;
   }
 
-  /** Call a race and enter it. Everyone on the water is told. */
-  callRace(course: { name: string; marks: RaceMark[] }, minutes: number, pace: number): void {
+  /** The boat a race is sailed in, or null when everyone sails her own (or it names a boat this copy of the game does not have). */
+  classOf(call: RaceCall | null): YardBoat | null {
+    return (call?.cls && this.ctx.classes[call.cls]) || null;
+  }
+
+  /**
+   * Call a race and enter it. Everyone on the water is told.
+   * @param cls the class it is sailed in: a boat id. The caller's own boat unless given
+   */
+  callRace(course: { name: string; marks: RaceMark[] }, minutes: number, pace: number, cls: string = this.ctx.own.id): void {
     const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e5).toString(36)}`;
     const call: RaceCall = {
       id, name: course.name.slice(0, 60), marks: course.marks.slice(0, 12).map((m) => ({ name: m.name.slice(0, 28), x: Math.round(m.x), y: Math.round(m.y) })),
       gun: Math.round(this.now + minutes * 60), host: this.ctx.skipper || this.ctx.boatName || 'A skipper', pace: Math.max(0, Math.min(3, pace)),
     };
+    if (this.ctx.classes[cls]) call.cls = cls;
     this.join(call, true);
   }
 
   join(call: RaceCall, mine = false): void {
-    this.leave(true);
-    const { sim, passage, world, spec, scene } = this.ctx;
+    this.leave(true, true);
+    const { sim, passage, world, scene } = this.ctx;
+    // One design: everyone sails the race's class, whatever she came in. Her own boat comes back when the race is left.
+    const cls = this.classOf(call);
+    const want = cls ?? this.ctx.own;
+    const changed = want.id !== this.ctx.boat().id;
+    if (changed) this.ctx.setBoat(want);
+    const spec = this.ctx.boat();
     this.call = call;
     this.mine = mine;
     this.started = false;
@@ -159,9 +192,11 @@ export class Race {
     const start = call.marks[0];
     const left = this.countdown;
     const when = left > 0 ? `Gun in ${clockText(left)}` : `It started ${clockText(-left)} ago`;
+    // Said when she is not in her own boat: everyone in this race sails the same one.
+    const inClass = cls && cls.id !== this.ctx.own.id ? `. You are racing ${classText(cls)} for this one` : '';
     this.ctx.say(towed
-      ? `${mine ? 'Race called' : 'Race joined'}: ${call.name}. You have been towed to the start area, just short of ${start.name}. ${when}. Pass ${start.name} after the gun`
-      : `${mine ? 'Race called' : 'Race joined'}: ${call.name}. ${when}. Be at ${start.name} when it goes`, 9);
+      ? `${mine ? 'Race called' : 'Race joined'}: ${call.name}. You have been towed to the start area, just short of ${start.name}. ${when}. Pass ${start.name} after the gun${inClass}`
+      : `${mine ? 'Race called' : 'Race joined'}: ${call.name}. ${when}. Be at ${start.name} when it goes${inClass}`, inClass ? 12 : 9);
     this.version++;
   }
 
@@ -171,7 +206,8 @@ export class Race {
    * @returns true if she was moved
    */
   private musterAtStart(call: RaceCall): boolean {
-    const { sim, world, spec, fleet } = this.ctx;
+    const { sim, world, fleet } = this.ctx;
+    const spec = this.ctx.boat();
     const s = sim.state;
     const start = call.marks[0];
     if (Math.hypot(start.x - s.x, start.y - s.y) < 450) return false;
@@ -209,16 +245,21 @@ export class Race {
     return false;
   }
 
-  /** Give the race up. The route stays on the chart. */
-  leave(quiet = false): void {
+  /**
+   * Give the race up. The route stays on the chart, and she is back in her own boat.
+   * @param keepBoat leave her in the boat she is in, because she is about to join another race
+   */
+  leave(quiet = false, keepBoat = false): void {
     if (!this.call) return;
+    const back = !keepBoat && this.ctx.boat().id !== this.ctx.own.id;
+    if (back) this.ctx.setBoat(this.ctx.own);
     for (const p of this.pacers) p.dispose();
     this.pacers = [];
     this.call = null;
     this.mine = false;
     this.started = false;
     this.finish = null;
-    if (!quiet) this.ctx.say('Out of the race');
+    if (!quiet || back) this.ctx.say(`${quiet ? 'The race is off' : 'Out of the race'}${back ? `. You are back in your own boat, the ${this.ctx.own.name}` : ''}`, back ? 8 : 5);
     this.version++;
   }
 
@@ -227,7 +268,7 @@ export class Race {
     return {
       rc: this.mine && this.call ? this.call : null,
       // A race fixed for a set time is passed from boat to boat, so those who never had the link hear of it.
-      ev: ((e) => (e ? { name: e.name, course: e.course, water: eventWater(e), at: Date.parse(e.at) } : null))(sharedEvent()),
+      ev: ((e) => (e ? { name: e.name, course: e.course, water: eventWater(e), at: Date.parse(e.at), ...(e.cls ? { cls: e.cls } : {}) } : null))(sharedEvent()),
       rj: this.call?.id ?? '',
       rp: this.leg,
       rd: Math.round(this.toGo),
@@ -326,7 +367,7 @@ export class Race {
       if (this.call?.id !== event.id) {
         const at = gunTime(event);
         if (!this.offers.has(event.id)) this.version++;
-        this.offers.set(event.id, { id: event.id, name: `${event.name}: ${course.name}`, marks: course.marks, gun: Math.round(now + (at - Date.now()) / 1000), host: 'The race committee', pace: 0, at });
+        this.offers.set(event.id, { id: event.id, name: `${event.name}: ${course.name}`, marks: course.marks, gun: Math.round(now + (at - Date.now()) / 1000), host: 'The race committee', pace: 0, at, ...(event.cls ? { cls: event.cls } : {}) });
         if (!this.told.has(event.id) && at > Date.now()) {
           this.told.add(event.id);
           this.ctx.invite('The race committee', `calls ${event.name}: ${course.name}. Gun at ${whenText(event)}, ${inText(event)}. Press R to join`);

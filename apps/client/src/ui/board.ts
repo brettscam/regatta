@@ -4,8 +4,11 @@ import { visited } from '../aboard/visited';
 import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
 import { sightings } from '../aboard/sightings';
 import type { Logbook } from '../net/logbook';
+import { KIND_NAMES, rankOf, topEarners } from '../xp/score';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
+import { mountAccountBadge } from './accountBadge';
+import { ProfilePane } from './profile';
 
 interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
 interface Release { id: string; name: string; theme: string; when: string; blurb: string; items: RoadmapItem[] }
@@ -36,7 +39,7 @@ const KINDS: Array<[string, string, string]> = [
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
-type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook';
+type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook' | 'profile';
 /**
  * Every control, in plain words, grouped by what the player is trying to do and in the order a newcomer needs them.
  * Each row: the keys (one string per key cap; "or" and "+" are joiners, anything else long is a gesture), what it is called, what it does.
@@ -50,6 +53,10 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['T'], 'Tack', 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.'],
     [['P'], 'Autopilot', 'On or off. While it is on the boat steers herself and the crew looks after the sails.'],
   ] },
+  { title: 'More sail, less sail', rows: [
+    [['N'], 'Spinnaker', 'The big coloured sail for when the wind is behind you. N puts it up or takes it down; while it is up, Q and E work its sheet. It will not go up with the wind ahead, must come down before a tack, and in more than about 20 knots it lays the boat over.'],
+    [['J'], 'Reef', 'Make the mainsail smaller when the wind gets up: the boat stands up straighter and steers again. Shift and J lets it back out.'],
+  ] },
   { title: 'Or use the mouse', rows: [
     [['Point and scroll'], 'Grab the boat', 'Point at the wheel, the boom (the pole along the bottom of the mainsail) or a winch, then scroll or drag to move it.'],
     [['Drag'], 'Look around', 'Drag anywhere else to swing the camera. Scroll to move in and out.'],
@@ -61,11 +68,17 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
     [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
     [['C'], 'Coaching', 'Tips on or off.'],
+    [['Y'], 'Award lines', 'Show or hide the line that says when you earn points.'],
     [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
   ] },
   { title: 'Race and talk', rows: [
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
     [['Enter'], 'Message', 'Type a message to the other boats.'],
+  ] },
+  { title: 'Under power', note: 'The engine, for when there is no wind or no room to sail. It is not allowed in a race.', rows: [
+    [['I'], 'Engine', 'Start it or stop it. It takes a second or two to fire, and starts out of gear.'],
+    [['.'], 'Throttle up', 'One step at a time: ahead slow, half, cruise, full. From astern it comes back through neutral.'],
+    [[','], 'Throttle down', 'One step back: down to neutral, then astern slow and astern full. Astern is weak, and she steers badly backwards.'],
   ] },
   { title: 'Stop for a while', rows: [
     [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
@@ -89,7 +102,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 /**
  * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the shared
  * database: the published claude.ai page's, or on the website the site's own, once the person has signed in with their
- * email address. The sign-in form is on the Logbook tab, on the website only. Where there is neither, each tab says so.
+ * email address. The sign-in form is on the Profile tab, on the website only. Where there is neither, each tab says so.
  */
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
@@ -117,6 +130,8 @@ export class Board {
   private signing: 'idle' | 'sending' | 'sent' | 'checking' = 'idle';
   private signNote = '';
   private unwatch: () => void = () => {};
+  /** The Profile tab's own panel: name and figure. It is kept between draws, so its 3D preview is not made again. */
+  private profile: ProfilePane | null = null;
 
   /** The places with somewhere to go ashore, for the bar-hop card. */
   places: Array<{ id: string; name: string; ashore?: { name: string; say: string } }> = [];
@@ -166,12 +181,13 @@ export class Board {
       // Arriving from the link in the sign-in email: say how it went.
       if (a.arrival) {
         this.signNote = a.arrival === 'expired' ? 'That sign-in link had run out or had already been used. Ask for a new one here.' : 'You are signed in.';
-        this.toggle(true, 'logbook');
+        this.toggle(true, 'profile');
       } else if (this.isOpen) this.render();
     }).catch(() => {});
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
     this.announce();
+    mountAccountBadge(() => this.toggle(true, 'profile'));
   }
 
   /** True when there is a release note this person has not opened. */
@@ -260,7 +276,7 @@ export class Board {
   private async castVote(item: string, value: number): Promise<void> {
     const next = this.store.vote(item) === value ? 0 : value;
     const ok = await this.store.setVote(item, next);
-    if (!ok) this.note = onWeb() ? 'Your vote could not be saved. Check your connection, and on the Logbook tab that you are still signed in.' : 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
+    if (!ok) this.note = onWeb() ? 'Your vote could not be saved. Check your connection, and on the Profile tab that you are still signed in.' : 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
     this.render();
   }
 
@@ -305,7 +321,7 @@ export class Board {
       this.draft = '';
       this.note = 'Sent. Thank you: it goes straight to the people building Regatta.';
     } else {
-      this.note = onWeb() ? 'This could not be sent. Check your connection, and on the Logbook tab that you are still signed in. Or copy it and pass it on.' : 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
+      this.note = onWeb() ? 'This could not be sent. Check your connection, and on the Profile tab that you are still signed in. Or copy it and pass it on.' : 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
     }
     this.render();
   }
@@ -355,7 +371,7 @@ export class Board {
       : onWeb()
         ? this.store.signedIn
           ? 'Your votes cannot be saved just now. Check your connection.'
-          : `${this.store.online ? 'You can read the votes. ' : ''}To cast one, sign in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.`
+          : `${this.store.online ? 'You can read the votes. ' : ''}To cast one, sign in with your email address: <button type="button" class="link" data-tab="profile">the form is on the Profile tab</button>.`
         : this.store.online
           ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
           : alone()
@@ -383,7 +399,7 @@ export class Board {
         <button type="button" data-act="copy">Copy it instead</button>
       </div>
       ${canSend ? '' : onWeb()
-        ? `<p class="note">${this.store.signedIn ? 'Sending is not working just now. Check your connection.' : 'Sending from here needs a sign-in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.'} Or copy your note and pass it on.</p>`
+        ? `<p class="note">${this.store.signedIn ? 'Sending is not working just now. Check your connection.' : 'Sending from here needs a sign-in with your email address: <button type="button" class="link" data-tab="profile">the form is on the Profile tab</button>.'} Or copy your note and pass it on.</p>`
         : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : alone() ? 'Feedback cannot be sent from this copy of the game.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on.</p>`}
       ${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       ${earlier}`;
@@ -421,6 +437,22 @@ export class Board {
     return `<h3>Seen on the water · ${n} of ${ANIMALS.length}</h3><p class="lede">The crew call out each animal the first time it comes in sight on a sail. Porpoise like the tide at the Gate, seals the quiet anchorages, and a whale needs the flood and some luck.</p><ul class="barhop seen">${cards}</ul>`;
   }
 
+  /** Experience: the rank, the points, how far to the next rank, and what has earned the most. */
+  private xpCard(): string {
+    const t = this.logbook.totals;
+    const rank = rankOf(t.xp);
+    const top = topEarners(t);
+    const to = rank.next ? `${(rank.next.at - t.xp).toLocaleString('en-GB')} more to ${esc(rank.next.name)}` : 'The top of the list';
+    const rows = top.map((e) => `<tr><td>${esc(e.name)}</td><td>${e.points.toLocaleString('en-GB')}</td></tr>`).join('');
+    const lost = t.xpBy.lost ? `<tr class="lost"><td>${esc(KIND_NAMES.lost)}</td><td>−${t.xpBy.lost.toLocaleString('en-GB')}</td></tr>` : '';
+    return `<section class="xpcard">
+      <div class="xphead"><b>${esc(rank.name)}</b><span>${t.xp.toLocaleString('en-GB')} ${t.xp === 1 ? 'point' : 'points'}</span><i>${to}</i></div>
+      <div class="xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(rank.progress * 100)}" aria-label="Progress to the next rank"><i style="width:${(rank.progress * 100).toFixed(1)}%"></i></div>
+      <p class="lede">Points come from sailing her well: clean tacks and gybes, time in the groove (more with the wheel and sheets in your own hands), gusts handled, marks, races, and a little for anchoring, landings and the catch. Points will buy things for the boat later. Nothing is for sale yet. Y switches the award lines on the screen off and on.</p>
+      ${top.length ? `<table class="xptable"><thead><tr><th>What has earned the most</th><th>Points</th></tr></thead><tbody>${rows}${lost}</tbody></table>` : ''}
+    </section>`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -430,18 +462,18 @@ export class Board {
       ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}
     </div>`;
     const fleet = this.logbook.fleet;
-    const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
+    const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.xp.toLocaleString('en-GB')}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
     const table = fleet.length
-      ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
+      ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Points</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
       : `<p class="lede">${this.store.online ? (onWeb() ? 'Nobody has logged a sail here yet. Sign in and yours is the first.' : 'Nobody else has logged a sail yet.') : onWeb() ? 'The fleet\'s logbooks could not be fetched just now.' : alone() ? 'The fleet\'s logbooks are not available in this copy of the game.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
     const kept = onWeb()
       ? this.account?.email()
         ? 'It is also kept with your sign-in, so it follows you to any device, and the fleet can see it below.'
-        : 'Sign in below and it is kept with your email address too, so it follows you to any device.'
+        : 'Sign in on the Profile tab and it is kept with your email address too, so it follows you to any device.'
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${this.seenCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */
@@ -483,11 +515,18 @@ export class Board {
       <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button><button type="button" data-tab="profile" aria-pressed="${this.tab === 'profile'}">Profile</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.tab === 'profile' ? `<div data-profile></div>${this.signInForm()}` : this.log()}</div>
       </div>`;
+    // The profile's panel goes in whole, where its place was left.
+    const slot = this.el.querySelector('[data-profile]');
+    if (slot) {
+      this.profile ??= new ProfilePane(this.logbook);
+      slot.replaceWith(this.profile.el);
+      this.profile.show();
+    }
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();
     if (typing && caret !== null) {

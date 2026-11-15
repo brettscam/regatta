@@ -18,6 +18,10 @@ export interface Livery {
   name?: string;
   /** Hailing port under the name. */
   homePort?: string;
+  /** Spinnaker colour, as a CSS hex colour. Left out, it is the hull's colour made bright. */
+  spinnaker?: string;
+  /** The skipper at the wheel. The default figure where none is given. */
+  avatar?: import('./avatar').Avatar;
 }
 
 /** Fields a boat file carries for the boat picker and for her default livery. The sim ignores them. */

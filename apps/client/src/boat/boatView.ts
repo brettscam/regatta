@@ -3,8 +3,9 @@ import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide
 import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './buildSloop';
 
 export type { BoatDisplay, Livery } from './buildSloop';
-import { Jib, Mainsail, type SailShape } from './sails';
+import { Jib, Mainsail, Spinnaker, spinnakerColour, type SailShape } from './sails';
 import { Crew } from './crew';
+import type { Avatar } from './avatar';
 
 const R2D = 180 / Math.PI;
 const KT = 0.514444;
@@ -62,11 +63,36 @@ class Telltale {
   }
 }
 
+/**
+ * The spinnaker in one small number, for telling other boats: tenths hoisted (0 to 10), plus 20 for each ninth of
+ * curl in the luff (0 to 9), plus 200 when it has collapsed.
+ */
+export function packSpin(state: SimState, out: SimOutputs): number {
+  const hoist = Math.round((state.spinHoist || 0) * 10);
+  return hoist ? hoist + 20 * Math.round(out.spin.luff * 9) + (out.spin.flogging ? 200 : 0) : 0;
+}
+
+/** Put a spinnaker another boat reported onto the state and outputs her view is drawn from. Call after her wind angle is set. */
+export function unpackSpin(sp: number, state: SimState, out: SimOutputs): void {
+  const n = Number.isFinite(sp) && sp > 0 ? Math.min(399, Math.round(sp)) : 0;
+  state.spinHoist = Math.min(10, n % 20) / 10;
+  state.spin = state.spinHoist > 0;
+  out.spin.flogging = n >= 200;
+  out.spin.luff = out.spin.flogging ? 1 : Math.floor((n % 200) / 20) / 9;
+  // Her sheet is not sent: the clew is drawn where a trimmed one would be for her wind.
+  const awa = Math.abs(out.awa);
+  state.spinAngle = -(out.awa >= 0 ? 1 : -1) * Math.min(awa, Math.max(0.24, 0.55 * awa - 0.14));
+}
+
 export class BoatView {
   readonly root: THREE.Group;
   readonly model: SloopModel;
   readonly main: Mainsail;
   readonly jib: Jib;
+  /** The spinnaker, in the boat's own colour. Hidden until it is hoisted. */
+  readonly spinnaker: Spinnaker;
+  private readonly spinSheet = new Rope(0xe9c23a, 0.008);
+  private readonly spinTackLine = new Rope(0xe9c23a, 0.008);
   /** Everything the pointer can land on. */
   readonly pickables: THREE.Object3D[] = [];
   /** Solid parts the camera keeps out of. */
@@ -122,8 +148,11 @@ export class BoatView {
     this.root.rotation.order = 'YXZ';
     this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38));
     this.jib = new Jib(this.model.geo);
-    this.root.add(this.main.mesh, this.jib.mesh);
+    this.spinnaker = new Spinnaker(this.model.geo, livery.spinnaker ?? spinnakerColour(livery.topsides ?? (spec as BoatSpec & { topsides?: string }).topsides));
+    this.root.add(this.main.mesh, this.jib.mesh, this.spinnaker.mesh, this.spinSheet.mesh, this.spinTackLine.mesh);
+    this.spinSheet.mesh.visible = this.spinTackLine.mesh.visible = false;
     this.crew = new Crew(this.model);
+    if (livery.avatar) this.crew.setAvatar(livery.avatar);
     this.model.nodes.main = this.main.mesh;
     this.model.nodes.jib = this.jib.mesh;
 
@@ -193,7 +222,7 @@ export class BoatView {
 
     this.pickables.push(...this.model.hitProxies, this.main.mesh, this.jib.mesh, this.model.nodes.hull, this.model.nodes.deck);
     this.solids = [this.model.nodes.hull, this.model.nodes.deck];
-    this.thin = [this.main.mesh, this.jib.mesh, ...this.model.solids.filter((s) => s !== this.model.nodes.hull && s !== this.model.nodes.deck)];
+    this.thin = [this.main.mesh, this.jib.mesh, this.spinnaker.mesh, ...this.model.solids.filter((s) => s !== this.model.nodes.hull && s !== this.model.nodes.deck)];
   }
 
   /** Which named part a pointer hit belongs to, and the control bound to it if there is one. */
@@ -296,7 +325,19 @@ export class BoatView {
     if (out.main.flogging) nodes.boom.rotation.y += Math.sin(time * 9.5) * 0.035 * Math.min(1.5, out.aws / 8);
 
     const jibShape: SailShape = { angle: pose.jib, luff: out.jib.luff, stall: out.jib.stall, flogging: out.jib.flogging, belly: this.belly, aws: out.aws };
-    this.jibStow = THREE.MathUtils.clamp(this.jibStow + (held ? dt : -dt) * 0.7, 0, 1);
+    // Under the spinnaker the jib is rolled away too, and comes back out when the spinnaker is down.
+    const kite = state.spinHoist || 0;
+    this.jibStow = THREE.MathUtils.clamp(this.jibStow + (held || state.spin || kite > 0.5 ? dt : -dt) * 0.7, 0, 1);
+    const spinShape: SailShape = { angle: state.spinAngle || 0, luff: out.spin.luff, stall: out.spin.stall, flogging: out.spin.flogging, belly: this.belly, aws: out.aws };
+    this.spinnaker.update(spinShape, held ? 0 : kite, time, dt);
+    const kiteUp = this.spinnaker.mesh.visible;
+    this.spinSheet.mesh.visible = this.spinTackLine.mesh.visible = kiteUp;
+    if (kiteUp) {
+      // The sheet leads aft to the leeward quarter, the tack line down to the stem.
+      const lee = this.spinnaker.clew.x <= 0 ? geo.winchPort : geo.winchStbd;
+      this.spinSheet.set(this.spinnaker.clew, this.v1.set(lee.x * 1.25, lee.y - 0.1, lee.z + 0.9));
+      this.spinTackLine.set(this.spinnaker.tack, geo.jibTack);
+    }
     const furl = state.furl * (1 - this.jibStow);
     this.jib.update(jibShape, furl, time);
 
@@ -466,6 +507,11 @@ export class BoatView {
    * Show the autopilot's state on its control head.
    * Redraws only when something changes.
    */
+  /** Dress the skipper at the wheel. */
+  setAvatar(avatar: Avatar): void {
+    this.crew.setAvatar(avatar);
+  }
+
   setPilot(info: { engaged: boolean; mode: 'heading' | 'wind' | 'route'; label: string }): void {
     const key = `${info.engaged}|${info.mode}|${info.label}`;
     if (key === this.pilotShown) return;

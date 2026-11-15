@@ -20,6 +20,7 @@ export interface AboardContext {
   stage: Stage;
   hud: Hud;
   passage: Passage;
+  /** The boat as drawn, and what she is. Both change when she changes boats for a one-design race, so read them when needed rather than keeping them. */
   boatView: BoatView;
   drone: DroneCamera;
   spec: YardBoat;
@@ -56,7 +57,7 @@ export interface Feature {
   readonly id: string;
   /**
    * A key was pressed that the game itself does not use. Return true if this feature took it.
-   * Taken already: Space P T H C M B R F G X Z K L O U Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
+   * Taken already: Space P T H C M B R F G X Z K L O U N J V Y I Comma Period Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */
@@ -72,5 +73,10 @@ export interface Feature {
   focus?(): { x: number; y: number; heading: number; height: number } | null;
   /** A few short fields to tell the other boats along with this boat's position. Keys of two or three letters. */
   wire?(): Record<string, unknown>;
+  /**
+   * She has changed boats where she lies, for a race sailed in one class. `ctx.boatView` and `ctx.spec` are already the new ones.
+   * Anything hung on the old boat's model has to be hung on the new one here.
+   */
+  reboat?(): void;
   dispose?(): void;
 }

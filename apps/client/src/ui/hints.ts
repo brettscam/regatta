@@ -6,6 +6,8 @@ export interface HintContext {
   nextMark(): { name: string; x: number; y: number } | null;
   /** True while something else has the player's attention: the lesson, the chart, the roadmap. */
   busy(): boolean;
+  /** True while she is in a race, where the engine may not be used. */
+  racing?(): boolean;
 }
 
 interface Rule {
@@ -51,7 +53,7 @@ export class Hints {
     },
     {
       id: 'irons', after: 8,
-      when: (c) => c.sim.out.inIrons && !c.sim.state.maneuver,
+      when: (c) => c.sim.out.inIrons && !c.sim.state.maneuver && !c.sim.state.engineOn,
       say: () => 'In irons: she is pointing too close to the wind to sail. Put the wheel over and hold it until the sails fill, about 45° off the wind.',
     },
     {
@@ -61,23 +63,35 @@ export class Hints {
     },
     {
       id: 'mainLuff', after: 12,
-      when: (c) => !c.sim.state.crewTrim && (c.sim.out.main.flogging || c.sim.out.main.luff > 0.4) && Math.abs(c.sim.out.twa) * R2D > 36,
+      when: (c) => !c.sim.out.underPower && !c.sim.state.crewTrim && (c.sim.out.main.flogging || c.sim.out.main.luff > 0.4) && Math.abs(c.sim.out.twa) * R2D > 36,
       say: () => 'The mainsail is luffing, so it is not pulling. Haul in the mainsheet until it stops (point at the boom and scroll up, or hold W).',
     },
     {
       id: 'jibLuff', after: 12,
-      when: (c) => !c.sim.state.crewTrim && c.sim.state.furl > 0.1 && c.sim.out.jib.backed === 0 && (c.sim.out.jib.flogging || c.sim.out.jib.luff > 0.4) && Math.abs(c.sim.out.twa) * R2D > 36,
+      when: (c) => !c.sim.out.underPower && !c.sim.state.crewTrim && c.sim.state.furl > 0.1 && c.sim.out.jib.backed === 0 && (c.sim.out.jib.flogging || c.sim.out.jib.luff > 0.4) && Math.abs(c.sim.out.twa) * R2D > 36,
       say: (c) => `The jib is luffing. Trim the ${c.sim.out.awa >= 0 ? 'port' : 'starboard'} winch until it stops (point at it and scroll up, or hold Q).`,
     },
     {
       id: 'mainStall', after: 20,
-      when: (c) => !c.sim.state.crewTrim && c.sim.out.main.stall > 0.35,
+      when: (c) => !c.sim.out.underPower && !c.sim.state.crewTrim && c.sim.out.main.stall > 0.35,
       say: () => 'The main is sheeted too hard for this course: it is stalled and slowing her. Ease it until it just starts to flutter, then bring it back a touch (hold S).',
     },
     {
       id: 'jibStall', after: 20,
-      when: (c) => !c.sim.state.crewTrim && c.sim.state.furl > 0.1 && c.sim.out.jib.backed === 0 && c.sim.out.jib.stall > 0.35,
+      when: (c) => !c.sim.out.underPower && !c.sim.state.crewTrim && c.sim.state.furl > 0.1 && c.sim.out.jib.backed === 0 && c.sim.out.jib.stall > 0.35,
       say: () => 'The jib is sheeted too hard for this course. Ease it until it just starts to flutter, then bring it back a touch (hold E).',
+    },
+    {
+      // Stuck for a good while: in irons, or lying becalmed. Outside a race the engine is the way out. Said after
+      // the plain in-irons hint has had its turn, and never while the engine is already running.
+      id: 'engine', after: 40,
+      when: (c) => {
+        const s = c.sim.state;
+        const o = c.sim.out;
+        if (!c.sim.boat.engine || s.engineOn || s.engineCrank > 0 || s.maneuver || o.aground || (c.racing?.() ?? false)) return false;
+        return o.inIrons || (o.tws < 3 * KT && Math.abs(s.speed) < 1 * KT);
+      },
+      say: (c) => `${c.sim.out.inIrons ? 'Still stuck head to wind' : 'There is not enough wind to sail'}. The engine will get her moving: press I to start it, then the full stop key to put her ahead.`,
     },
     {
       id: 'tack', after: 15,

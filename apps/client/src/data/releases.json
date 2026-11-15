@@ -1,6 +1,42 @@
 {
   "notes": [
     {
+      "id": "v21",
+      "date": "2026-11-15",
+      "title": "Home screen, your own skipper, and the engine",
+      "items": [
+        "A home screen: returning skippers cast off in one press with the boat and water they used last.",
+        "Build your skipper on the new Profile tab (B): ten outfits from foul-weather gear to a lobster suit, hats, hair, face and build, or Surprise me. Other players see your skipper at the helm.",
+        "On the website a circle in the corner shows who is signed in, and opens your profile. Signing in has moved from the Logbook tab to the Profile tab.",
+        "Every boat has an inboard diesel. I starts and stops it. Full stop steps the throttle up and comma steps it down, through neutral into astern.",
+        "A row under the instruments shows revs, fuel and battery while the engine runs. A dock refuels her. No engine in a race."
+      ]
+    },
+    {
+      "id": "v20",
+      "date": "2026-11-14",
+      "title": "Experience points and ranks",
+      "items": [
+        "Sail her well and you earn points: a clean tack or gybe, time in the groove with both sails trimmed and the boat near her best speed, a gust handled. Doing it with the wheel and sheets in your own hands earns several times what the autopilot does.",
+        "Racing pays most: points for each mark and for finishing, and a large award for a win, bigger for every boat you beat. People count for more than pace boats.",
+        "Small awards for anchoring cleanly, a night aboard, a first landing, a fish or crab, and a first sighting of an animal. Small penalties for a knockdown, a crash gybe or running aground.",
+        "Nine ranks from Deckhand to Admiral. Your rank, points and what earned them are on the Logbook tab. Y hides the award lines.",
+        "Nothing can be bought with points yet. That comes later."
+      ]
+    },
+    {
+      "id": "v19",
+      "date": "2026-11-14",
+      "title": "One boat for the race, a spinnaker, and wind that bites",
+      "items": [
+        "One-design racing. Whoever calls or fixes a race chooses the class, and everyone who joins sails that boat for the race, in their own name and colours. Pace boats too. You get your own boat back afterwards.",
+        "A spinnaker. N hoists and douses it once the wind is aft of the beam; Q and E work its sheet. It is worth up to a sixth more speed on a broad reach. Carry it too close to the wind or in too much breeze and she broaches. It has to come down before a tack.",
+        "Hard wind knocks her down. On the blowy afternoon, full sail with the sheets pinned in 24 knots and more lays her flat. Ease the main with S as the gust hits, or reef.",
+        "Reefing. J puts a reef in the mainsail, Shift and J shakes it out. One reef makes 20 to 25 knots sailable.",
+        "Pace boats set spinnakers downwind and reef when it blows."
+      ]
+    },
+    {
       "id": "v18",
       "date": "2026-11-14",
       "title": "A blowy afternoon",

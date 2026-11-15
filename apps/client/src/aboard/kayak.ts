@@ -1,3 +1,4 @@
+import { onMyAvatar } from '../boat/avatar';
 import * as THREE from 'three';
 import { VIEWS, type ViewPreset } from '../camera/drone';
 import type { Place } from '../session';
@@ -60,7 +61,9 @@ export class Kayak implements Feature {
   private readonly b = new THREE.Vector3();
 
   constructor(private readonly ctx: AboardContext) {
-    this.model = new KayakModel(ctx.livery.topsides);
+    this.model = new KayakModel(ctx.livery.topsides, ctx.livery.avatar);
+    // The skipper changed her kit on the profile: the paddler is the same person, and so is the figure at the yacht's wheel.
+    if (ctx.livery.avatar) onMyAvatar((a) => { this.model.setAvatar(a); ctx.boatView.setAvatar(a); });
     this.model.root.visible = false;
     ctx.stage.scene.add(this.model.root);
     this.painter = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 5), new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.9 }));

@@ -67,7 +67,7 @@ export class Controls {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly drone: DroneCamera,
-    private readonly boat: BoatView,
+    private boat: BoatView,
     private readonly sim: Sim,
     private readonly hud: Hud,
     private readonly sound: Sound,
@@ -90,6 +90,15 @@ export class Controls {
       this.pointers.clear();
       this.drag = null;
     });
+  }
+
+  /** She has changed boats: the parts to point at are the new boat's. */
+  setBoat(boat: BoatView): void {
+    this.boat = boat;
+    this.hover = null;
+    this.keyTag = null;
+    this.drag = this.drag?.kind === 'part' ? null : this.drag;
+    this.hud.hideTag();
   }
 
   // ---- picking --------------------------------------------------------------------------------
@@ -304,8 +313,13 @@ export class Controls {
       case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
       case 'KeyT':
         if (this.sim.state.hold !== 'none') this.host.announce(`She is ${this.sim.state.hold === 'anchor' ? 'at anchor' : 'made fast'}, so there is nothing to tack. X gets her under way`);
-        else this.host.announce(this.sim.tack() === 'tack' ? 'Ready about. Helm’s a-lee' : 'Stand by to gybe. Gybe-oh');
+        else {
+          const turn = this.sim.tack();
+          this.host.announce(turn === 'spinnaker' ? 'No tacking with the spinnaker up. N takes it down, then tack' : turn === 'tack' ? 'Ready about. Helm’s a-lee' : this.sim.spinnakerUp ? 'Stand by to gybe. Gybe-oh. The crew takes the spinnaker round' : 'Stand by to gybe. Gybe-oh');
+        }
         break;
+      case 'KeyN': this.spinnaker(); break;
+      case 'KeyJ': this.reef(e.shiftKey ? -1 : 1); break;
       case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
@@ -322,6 +336,35 @@ export class Controls {
         else if (this.host.featureKey(e.code, e.shiftKey)) e.preventDefault();
     }
   };
+
+  /** N: hoist the spinnaker, or take it down. */
+  private spinnaker(): void {
+    const sim = this.sim;
+    const kite = sim.boat.sails.spinnaker;
+    const twaDeg = Math.round(Math.abs(sim.out.twa) * R2D);
+    switch (sim.setSpinnaker()) {
+      case 'set':
+        this.host.announce(`Spinnaker going up and the jib rolled away. ${sim.state.crewTrim ? 'The crew has its sheet' : 'Q trims its sheet, E eases it'}. N takes it down${kite && sim.out.tws / 0.514444 > kite.maxTwsKt - 3 ? `. It is a lot of sail for this wind: over ${kite.maxTwsKt} kt it will lay her over` : ''}`);
+        break;
+      case 'doused': this.host.announce('Spinnaker coming down. The jib is unrolled again'); break;
+      case 'forward': this.host.announce(`The spinnaker stays in its bag: the wind is ${twaDeg}° off the bow and it wants ${kite?.minTwaDeg ?? 85}° or more. Bear away first`); break;
+      case 'held': this.host.announce('She is not under way, so the spinnaker stays in its bag'); break;
+      case 'none': this.host.announce('This boat carries no spinnaker'); break;
+    }
+  }
+
+  /** J puts in the next reef, Shift+J shakes one out. (V is the radio.) */
+  private reef(step: number): void {
+    const sim = this.sim;
+    const reefs = sim.boat.sails.main.reefs;
+    const now = sim.state.reef;
+    const next = Math.max(0, Math.min(reefs.length - 1, now + step));
+    if (sim.state.hold !== 'none') return this.host.announce('The main is stowed. Reef once she is under way');
+    if (next === now) return this.host.announce(step > 0 ? `${reefs[now].name} is as small as the main goes. Shift+J shakes a reef out` : 'Full main already. J puts a reef in');
+    sim.setControl('reef', next);
+    this.host.controlUsed('reef');
+    this.host.announce(next === 0 ? 'Reef shaken out. Full main' : step > 0 ? `${reefs[next].name} in: less sail, less heel. Shift+J shakes it out when the wind eases` : `Back to ${reefs[next].name.toLowerCase()}`);
+  }
 
   /** True while a key is down. */
   isHeld(code: string): boolean {
@@ -347,11 +390,24 @@ export class Controls {
         this.keyTag = { binding: b, ttl: 1.2 };
       }
       // Q trims the leeward jib sheet. E eases whichever jib sheet is holding the sail.
-      if (this.held.has('KeyQ')) {
+      // With the spinnaker up the jib is rolled away, and Q and E work the spinnaker sheet instead.
+      const kite = this.sim.state.spin;
+      const spinDir = kite ? (this.held.has('KeyE') ? 1 : 0) - (this.held.has('KeyQ') ? 1 : 0) : 0;
+      if (spinDir !== 0) {
+        const before = this.sim.getControl('spinsheet');
+        this.sim.nudgeControl('spinsheet', spinDir * (spinDir > 0 ? 30 : 16) * D2R * fast * dt);
+        const moved = this.sim.getControl('spinsheet') - before;
+        this.host.sheetsInHand();
+        if (moved !== 0) {
+          this.host.controlUsed('spinsheet');
+          this.sound.winch(moved * R2D, Math.min(1, this.sim.out.spin.loadKg / 400));
+        }
+      }
+      if (!kite && this.held.has('KeyQ')) {
         const b = this.bindingFor(this.sim.workingJibSheet());
         if (b) { this.nudge(b, -16 * D2R * fast * dt); this.keyTag = { binding: b, ttl: 1.2 }; }
       }
-      if (this.held.has('KeyE')) {
+      if (!kite && this.held.has('KeyE')) {
         const b = this.bindingFor(this.sim.loadedJibSheet());
         if (b) { this.nudge(b, 30 * D2R * fast * dt); this.keyTag = { binding: b, ttl: 1.2 }; }
       }
