@@ -148,7 +148,7 @@ export class Fishing implements Feature {
     this.stream = this.mode === 'still' ? 0 : 1;
     this.rest = BITE_SPELL;
     this.spell = Math.floor(this.ctx.seasonNow() / BITE_SPELL);
-    this.ctx.say(`Line out. ${fishingAdvice(w)}. L brings it in`, 7);
+    this.ctx.say(`Line out. ${fishingAdvice(w)}. L brings it in`, 9);
     return true;
   }
 

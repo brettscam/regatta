@@ -223,6 +223,7 @@ export class Session {
       company: () => this.fleet.boats,
       seasonNow: () => world.seasonTime(this.sim.state.t),
       held: (code) => this.controls.isHeld(code),
+      sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
     });
   }

@@ -18,7 +18,7 @@ export const FIELD_GUIDE: Record<Kind, { name: string; first: string }> = {
   },
   sealion: {
     name: 'California sea lion',
-    first: 'California sea lions. They took over the floats at Pier 39 in the winter of 1989. In July most are away south at the breeding islands, so the ones here are mostly young males',
+    first: 'California sea lions. They took over the floats at Pier 39 in the winter after the 1989 earthquake. In July most are away south at the Channel Islands rookeries, so the floats are thin',
   },
   seal: {
     name: 'Harbor seal',
@@ -38,7 +38,7 @@ export const FIELD_GUIDE: Record<Kind, { name: string; first: string }> = {
   },
   gull: {
     name: 'Western gull',
-    first: 'Western gulls, the big dark-backed gull of this coast. Alcatraz is one of their largest colonies. Where they gather over the water, something is feeding underneath',
+    first: 'Western gulls, the big dark-backed gull of this coast. Hundreds of pairs nest on Alcatraz. Where they gather over the water, something is feeding underneath',
   },
 };
 

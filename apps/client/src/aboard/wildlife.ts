@@ -221,6 +221,10 @@ export class Wildlife implements Feature {
   /** Kinds already remarked on, this sail. */
   private readonly met = new Set<Kind>();
   private quiet = 6;
+  /** Real seconds until the next bark may sound, and the sim tick last seen, to know when the game is paused. */
+  private bark = 0;
+  private lastTick = -1;
+  private barking = 0;
   private warned = false;
   private readonly dummy = new THREE.Object3D();
   private readonly local = new THREE.Matrix4();
@@ -328,6 +332,7 @@ export class Wildlife implements Feature {
 
     const found = lookAbout(this.courseId, now, sea, eye, boats, this.found);
     this.back.visible = this.fluke.visible = this.blow.visible = false;
+    this.barking = 0;
     let nearest: Kind | null = null;
     let where = '';
     for (let i = 0; i < found.count; i++) {
@@ -340,6 +345,15 @@ export class Wildlife implements Feature {
     }
     for (const f of this.flocks) f.done();
     for (const f of this.floats) f.mesh.position.y = ctx.stage.seaLevel(f.x, -f.y, seaTime, 3) + FLOAT_DECK - 0.25;
+
+    // Barking off the floats, while the clock is running.
+    this.bark -= dt;
+    const running = s.tick !== this.lastTick;
+    this.lastTick = s.tick;
+    if (this.barking > 0 && running && this.bark <= 0) {
+      ctx.sound.bark(this.barking * this.barking);
+      this.bark = 0.26 + 0.3 * frac(now * 0.37);
+    }
 
     // One remark for each kind, the first time on this sail, and one more sail counted for the logbook.
     this.quiet -= dt;
@@ -401,6 +415,8 @@ export class Wildlife implements Feature {
         if (a.pose === 'hauled') {
           const sea = stage.seaLevel(a.x, -a.y, seaTime, 3);
           i = this.place(this.sealion, a.x, sea + a.up, a.y, a.heading, 0.3 * a.phase, 0, size);
+          // One rearing up is one barking: the nearer, the louder, and nothing beyond a quarter of a mile.
+          if (a.phase > 0.15) this.barking = Math.max(this.barking, 1 - Math.hypot(a.x - this.eye.x, a.y - this.eye.y) / 400);
           wet = frac(a.x * 1.93) < 0.3;
         } else if (a.pose === 'leap') {
           const x = a.x + fx * 4 * a.phase;

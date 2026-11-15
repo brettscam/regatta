@@ -106,6 +106,28 @@ export class Sound {
     this.flog.gain.setTargetAtTime(quiet * 0.55 * loose * Math.min(1.3, 0.3 + awsKt / 18), now, 0.12);
   }
 
+  /** A sea lion's bark: one short, hoarse honk. `near` is 1 alongside, falling to 0 out of earshot. */
+  bark(near: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !(near > 0)) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(330, t);
+    osc.frequency.exponentialRampToValueAtTime(205, t + 0.17);
+    const throat = ctx.createBiquadFilter();
+    throat.type = 'bandpass';
+    throat.frequency.value = 720;
+    throat.Q.value = 1.3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2 * Math.min(1, near), t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.21);
+    osc.connect(throat).connect(g).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.23);
+  }
+
   /** Winch pawls: one click for each couple of degrees of sheet. */
   winch(amountDeg: number, loaded: number): void {
     const ctx = this.ctx;
