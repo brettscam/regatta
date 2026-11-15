@@ -3,7 +3,8 @@ import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide
 import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './buildSloop';
 
 export type { BoatDisplay, Livery } from './buildSloop';
-import { Jib, Mainsail, Spinnaker, spinnakerColour, type SailShape } from './sails';
+import { Jib, Mainsail, Spinnaker, spinnakerColour, sunCover, type SailShape } from './sails';
+import { clothOf, type SailStyle } from './sailStyle';
 import { Crew } from './crew';
 import type { Avatar } from './avatar';
 
@@ -42,24 +43,62 @@ class Rope {
   }
 }
 
+/**
+ * A telltale: a length of yarn on the sail that shows what the air is doing there. Drawn as a ribbon of a few
+ * joints, so it streams with a ripple running down it, lifts when the sail is starved and thrashes when it stalls.
+ */
 class Telltale {
   readonly mesh: THREE.Mesh;
-  private static readonly x = new THREE.Vector3(1, 0, 0);
-  private readonly dir = new THREE.Vector3();
-  constructor(color: number, length = 0.34) {
-    const g = new THREE.BoxGeometry(1, 0.022, 0.006).translate(0.5, 0, 0);
-    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color }));
-    this.mesh.scale.x = length;
+  private static readonly JOINTS = 6;
+  private readonly pos: Float32Array;
+  private readonly attr: THREE.BufferAttribute;
+  constructor(color: number, private readonly length = 0.42, private readonly width = 0.034) {
+    const n = Telltale.JOINTS;
+    this.pos = new Float32Array(n * 2 * 3);
+    this.attr = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', this.attr);
+    const idx: number[] = [];
+    for (let i = 0; i < n - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 2, i * 2 + 1, i * 2 + 3);
+    g.setIndex(idx);
+    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+    this.mesh.frustumCulled = false;
   }
-  /** Stream from `at` along `flow`. `lift` raises it toward vertical, `flutter` shakes it. */
+  /**
+   * Stream from `at` along `flow`, in the boat's frame. `lift` raises it toward vertical (negative: it droops),
+   * `flutter` shakes it: a little is a telltale flying true, a lot is one that has lost the flow.
+   */
   set(at: THREE.Vector3, flow: THREE.Vector3, lift: number, flutter: number, time: number, seed: number): void {
-    const wobble = flutter * (Math.sin(time * 21 + seed * 7) * 0.5 + Math.sin(time * 33 + seed * 3) * 0.3);
-    this.dir.copy(flow);
-    this.dir.y += lift + wobble;
-    this.dir.x += wobble * 0.4;
-    this.dir.normalize();
-    this.mesh.position.copy(at);
-    this.mesh.quaternion.setFromUnitVectors(Telltale.x, this.dir);
+    const n = Telltale.JOINTS;
+    let dx = flow.x;
+    let dy = flow.y + lift;
+    let dz = flow.z;
+    const dl = Math.hypot(dx, dy, dz) || 1;
+    dx /= dl; dy /= dl; dz /= dl;
+    // Sideways, square to the flow and level.
+    const hl = Math.hypot(dx, dz) || 1;
+    const sx = -dz / hl;
+    const sz = dx / hl;
+    const wild = Math.min(1.2, flutter);
+    for (let i = 0; i < n; i++) {
+      const k = i / (n - 1);
+      const whip = k * k;
+      const a = Math.sin(time * (16 + (seed % 4)) - k * 6.5 + seed * 2.1);
+      const b = Math.sin(time * 27 - k * 10 + seed * 5.3);
+      const up = (a * (0.05 + 0.34 * wild) + b * 0.16 * wild) * whip;
+      const out = (b * (0.03 + 0.2 * wild) + a * 0.1 * wild) * whip;
+      // Yarn that has lost the flow sags under its own weight.
+      const sag = -0.5 * wild * whip * (lift < 0 ? 1 : 0.35);
+      const L = this.length * k;
+      const x = at.x + (dx + sx * out) * L;
+      const y = at.y + (dy + up + sag) * L;
+      const z = at.z + (dz + sz * out) * L;
+      const half = this.width * 0.5 * (i === n - 1 ? 0.35 : 1);
+      const o = i * 6;
+      this.pos[o] = x; this.pos[o + 1] = y + half; this.pos[o + 2] = z;
+      this.pos[o + 3] = x; this.pos[o + 4] = y - half; this.pos[o + 5] = z;
+    }
+    this.attr.needsUpdate = true;
   }
 }
 
@@ -133,6 +172,11 @@ export class BoatView {
   /** At anchor or on a mooring: the main under its cover on the boom, the jib rolled on the forestay, and the line she lies to. */
   private readonly sailCover: THREE.Mesh;
   private readonly jibRoll = new Rope(0x1b2d4a, 0.042);
+  /** The part of the mainsail that is not up the mast, tied down along the boom: a reef's bunt, or the whole sail flaked. */
+  private readonly bunt: THREE.Mesh;
+  /** True while the main is lowered because she is lying head to wind under engine. Hoisted again when she pays off. */
+  private mainDown = false;
+  private sails: SailStyle | undefined;
   private readonly rode = new Rope(0xd9d3c2, 0.018);
   /** 0 with the jib as the furling line has it, 1 with it rolled right away for a stop. */
   private jibStow = 0;
@@ -146,9 +190,11 @@ export class BoatView {
     this.model = buildSloop(spec, livery);
     this.root = this.model.root;
     this.root.rotation.order = 'YXZ';
-    this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38));
-    this.jib = new Jib(this.model.geo);
-    this.spinnaker = new Spinnaker(this.model.geo, livery.spinnaker ?? spinnakerColour(livery.topsides ?? (spec as BoatSpec & { topsides?: string }).topsides));
+    this.sails = livery.sails;
+    const cloth = clothOf(this.sails);
+    this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38), cloth);
+    this.jib = new Jib(this.model.geo, cloth);
+    this.spinnaker = new Spinnaker(this.model.geo, this.kiteColour(), this.sails?.kite);
     this.root.add(this.main.mesh, this.jib.mesh, this.spinnaker.mesh, this.spinSheet.mesh, this.spinTackLine.mesh);
     this.spinSheet.mesh.visible = this.spinTackLine.mesh.visible = false;
     this.crew = new Crew(this.model);
@@ -186,6 +232,30 @@ export class BoatView {
     this.sailCover.visible = false;
     this.model.nodes.boom.add(this.sailCover);
     this.jibRoll.set(this.model.geo.jibTack, this.model.geo.jibHead);
+    (this.jibRoll.mesh.material as THREE.MeshStandardMaterial).color.setHex(sunCover(cloth));
+    // The bunt: sailcloth gathered on the boom in folds, with ties round it.
+    const buntLength = this.model.geo.boomLength - 0.45;
+    const folds = new THREE.CylinderGeometry(0.15, 0.24, buntLength, 12, 18).rotateX(Math.PI / 2);
+    const fp = folds.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < fp.count; i++) {
+      const z = fp.getZ(i);
+      const k = 1 + 0.15 * Math.sin(z * 11) + 0.07 * Math.sin(z * 23 + 1);
+      fp.setXY(i, fp.getX(i) * k, fp.getY(i) * k);
+    }
+    folds.computeVertexNormals();
+    this.bunt = new THREE.Mesh(folds, new THREE.MeshStandardMaterial({ color: cloth.base, roughness: 0.9 }));
+    this.bunt.position.set(0, 0.2, buntLength / 2 + 0.2);
+    this.bunt.castShadow = true;
+    this.bunt.visible = false;
+    const tie = new THREE.CylinderGeometry(0.2, 0.2, 0.035, 10).rotateX(Math.PI / 2);
+    const tieMat = new THREE.MeshStandardMaterial({ color: 0x1b2d4a, roughness: 0.9 });
+    for (let i = 0; i < 4; i++) {
+      const t = new THREE.Mesh(tie, tieMat);
+      t.position.z = (i / 3 - 0.5) * buntLength * 0.78;
+      t.scale.setScalar(1 + 0.12 * (1 - i / 3));
+      this.bunt.add(t);
+    }
+    this.model.nodes.boom.add(this.bunt);
     this.jibRoll.mesh.visible = false;
     this.rode.mesh.visible = false;
     this.rode.mesh.castShadow = false;
@@ -193,13 +263,13 @@ export class BoatView {
     this.sheetBlock.castShadow = true;
     this.root.add(this.sheetBlock);
     for (const v of [0.28, 0.5, 0.72]) {
-      const port = new Telltale(0xd8402f);
-      const stbd = new Telltale(0x35b56a);
+      const port = new Telltale(0xe2392a);
+      const stbd = new Telltale(0x2fc46c);
       this.root.add(port.mesh, stbd.mesh);
       this.jibTells.push({ v, port, stbd });
     }
     for (const v of [0.35, 0.6, 0.84]) {
-      const t = new Telltale(0xd8402f, 0.42);
+      const t = new Telltale(0xe2392a, 0.5);
       this.root.add(t.mesh);
       this.leechTells.push({ v, t });
     }
@@ -223,6 +293,26 @@ export class BoatView {
     this.pickables.push(...this.model.hitProxies, this.main.mesh, this.jib.mesh, this.model.nodes.hull, this.model.nodes.deck);
     this.solids = [this.model.nodes.hull, this.model.nodes.deck];
     this.thin = [this.main.mesh, this.jib.mesh, this.spinnaker.mesh, ...this.model.solids.filter((s) => s !== this.model.nodes.hull && s !== this.model.nodes.deck)];
+  }
+
+  /** The colour a plain spinnaker is cut in: the livery's, else the hull's made bright. */
+  private kiteColour(): string {
+    return this.livery.spinnaker ?? spinnakerColour(this.livery.topsides ?? (this.spec as BoatSpec & { topsides?: string }).topsides);
+  }
+
+  /**
+   * Change her sails: the cloth of the main and jib, and the spinnaker's design. For the player's own boat when the
+   * choice is made, and for another player's when her style arrives. Nothing is rebuilt but the pictures on the cloth,
+   * and those are shared between boats that wear the same.
+   */
+  setSailStyle(style: SailStyle | undefined): void {
+    this.sails = style;
+    const cloth = clothOf(style);
+    this.main.setCloth(cloth);
+    this.jib.setCloth(cloth);
+    this.spinnaker.setDesign(this.kiteColour(), style?.kite);
+    (this.bunt.material as THREE.MeshStandardMaterial).color.setHex(cloth.base);
+    (this.jibRoll.mesh.material as THREE.MeshStandardMaterial).color.setHex(sunCover(cloth));
   }
 
   /** Which named part a pointer hit belongs to, and the control bound to it if there is one. */
@@ -307,7 +397,16 @@ export class BoatView {
 
     nodes.wheel.rotation.z = -pose.rudder * WHEEL_RATIO;
     nodes.rudder.rotation.y = pose.rudder;
-    nodes.boom.rotation.y = pose.boom;
+
+    // Under engine with her head to the wind the mainsail does no work, and must not look as if it did.
+    // In gear, it is strapped amidships and shivers. Lying there in neutral, the crew get it down and flaked on the
+    // boom, and it goes up again when she pays off or the engine stops. The sim's sail is untouched either way.
+    const headToWind = state.engineOn && state.hold === 'none';
+    if (headToWind && state.throttle === 0 && Math.abs(out.awa) < 0.45 && state.speed < 1.2) this.mainDown = true;
+    else if (!headToWind || Math.abs(out.awa) > 0.7) this.mainDown = false;
+    const strapped = headToWind && !this.mainDown && state.throttle !== 0 && Math.abs(out.awa) < 0.5 ? 1 - Math.abs(out.awa) / 0.5 : 0;
+    const boom = pose.boom * (1 - 0.85 * Math.min(1, strapped * 2));
+    nodes.boom.rotation.y = boom;
 
     // The sails belly away from the wind. Crossing the wind they pass through flat.
     const windSide = out.awa >= 0 ? 1 : -1;
@@ -316,18 +415,34 @@ export class BoatView {
 
     // Held by an anchor or a mooring, the sails are not set: the main comes down onto the boom and the jib rolls away.
     const held = state.hold !== 'none';
-    const mainShape: SailShape = { angle: pose.boom, luff: out.main.luff, stall: out.main.stall, flogging: out.main.flogging, belly: this.belly, aws: out.aws };
-    this.main.update(mainShape, held ? 0 : this.spec.sails.main.reefs[state.reef].luff, time, dt);
-    const mainStowed = held && this.main.hoisted < 0.06;
-    this.main.mesh.visible = !mainStowed;
+    const lowered = held || this.mainDown;
+    const reefLuff = this.spec.sails.main.reefs[state.reef].luff;
+    // Coming down or going up, the sail is slack: it shakes all the way.
+    const halfUp = this.main.hoisted < reefLuff - 0.04;
+    const mainShape: SailShape = {
+      angle: boom,
+      luff: halfUp ? 1 : Math.max(out.main.luff, strapped * 0.8),
+      stall: out.main.stall,
+      flogging: (out.main.flogging && strapped < 0.2) || halfUp,
+      belly: this.belly, aws: out.aws,
+    };
+    // Reefing is quick work. Lowering and hoisting the whole sail takes a few seconds.
+    this.main.update(mainShape, lowered ? 0 : reefLuff, time, dt, lowered || halfUp ? 0.8 : 1.5);
+    const down = this.main.hoisted < 0.06;
+    const mainStowed = held && down;
+    this.main.mesh.visible = !down;
     this.sailCover.visible = mainStowed;
+    // What is not up the mast lies along the boom: a roll for a reef, the whole sail in folds when she is lowered.
+    const gathered = Math.sqrt(Math.max(0, 1 - this.main.hoisted));
+    this.bunt.visible = !mainStowed && gathered > 0.12;
+    this.bunt.scale.set(0.25 + 0.6 * gathered, 0.3 + 0.85 * gathered, 1);
     // A loose boom shakes with the sail.
-    if (out.main.flogging) nodes.boom.rotation.y += Math.sin(time * 9.5) * 0.035 * Math.min(1.5, out.aws / 8);
+    if (mainShape.flogging && !down) nodes.boom.rotation.y += Math.sin(time * 9.5) * 0.035 * Math.min(1.5, out.aws / 8);
 
-    const jibShape: SailShape = { angle: pose.jib, luff: out.jib.luff, stall: out.jib.stall, flogging: out.jib.flogging, belly: this.belly, aws: out.aws };
+    const jibShape: SailShape = { angle: pose.jib, luff: out.jib.luff, stall: out.jib.stall, flogging: out.jib.flogging, belly: this.belly, aws: out.aws, backed: out.jib.backed };
     // Under the spinnaker the jib is rolled away too, and comes back out when the spinnaker is down.
     const kite = state.spinHoist || 0;
-    this.jibStow = THREE.MathUtils.clamp(this.jibStow + (held || state.spin || kite > 0.5 ? dt : -dt) * 0.7, 0, 1);
+    this.jibStow = THREE.MathUtils.clamp(this.jibStow + (lowered || state.spin || kite > 0.5 ? dt : -dt) * 0.7, 0, 1);
     const spinShape: SailShape = { angle: state.spinAngle || 0, luff: out.spin.luff, stall: out.spin.stall, flogging: out.spin.flogging, belly: this.belly, aws: out.aws };
     this.spinnaker.update(spinShape, held ? 0 : kite, time, dt);
     const kiteUp = this.spinnaker.mesh.visible;
@@ -359,7 +474,10 @@ export class BoatView {
     this.vang.set(onBoom(geo.boomLength * 0.29, 0.08, this.v1), geo.vangBase);
     const clew = this.jib.clew;
     const jibUp = furl > 0.03;
-    this.jibRoll.mesh.visible = !jibUp;
+    // The roll on the forestay thickens as the sail goes round it.
+    const rolled = 1 - Math.max(0, furl);
+    this.jibRoll.mesh.visible = rolled > 0.04;
+    this.jibRoll.mesh.scale.x = this.jibRoll.mesh.scale.z = 0.28 + 0.72 * Math.sqrt(rolled);
     const leeIsPort = clew.x <= 0;
     const around = this.v2.set((leeIsPort ? -1 : 1) * 0.16, geo.jibClewY - 0.3, geo.mastZ - 0.24);
     const lead = (ropes: Rope[], car: THREE.Vector3, winch: THREE.Vector3, working: boolean) => {
@@ -411,8 +529,8 @@ export class BoatView {
     }
     for (let i = 0; i < this.leechTells.length; i++) {
       const lt = this.leechTells[i];
-      lt.t.mesh.visible = !mainStowed;
-      if (mainStowed) continue;
+      lt.t.mesh.visible = !down;
+      if (down) continue;
       const at = this.main.leechPoint(lt.v, this.v1);
       const a = boomA;
       flow.set(Math.sin(a), 0, Math.cos(a));

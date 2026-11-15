@@ -22,6 +22,8 @@ export interface Livery {
   spinnaker?: string;
   /** The skipper at the wheel. The default figure where none is given. */
   avatar?: import('./avatar').Avatar;
+  /** Sailcloth and spinnaker design (graphics sprint). Left out, white dacron and the plain spinnaker above. */
+  sails?: import('./sailStyle').SailStyle;
 }
 
 /** Fields a boat file carries for the boat picker and for her default livery. The sim ignores them. */
