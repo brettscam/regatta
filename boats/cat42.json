@@ -1,0 +1,377 @@
+{
+  "id": "cat42",
+  "name": "42 ft catamaran",
+  "lengthFt": 42,
+  "tagline": "Flat, roomy and quick on a reach. She will not point, tacks slowly and gives no warning before she is overpowered",
+  "role": "Cruising catamaran",
+  "difficulty": "Easy to sail, harder to sail well",
+  "defaultName": "Island Time",
+  "homePort": "Road Town",
+  "topsides": "#f1efe8",
+  "notes": "Generic 42 ft charter cruising catamaran. All figures approximate and open to tuning. She does not heel, so her limit is a number (see pressed): reef by the apparent wind on the placard. Stub keels and a wide bridgedeck: poor to windward, about five degrees of leeway, slow through a tack and easily caught in irons. No spinnaker.",
+  "model": "catamaran",
+  "dimensions": {
+    "loa": 12.8,
+    "lwl": 12.5,
+    "beam": 7.0,
+    "draft": 1.3,
+    "freeboard": 1.75,
+    "displacementKg": 12500,
+    "mastHeight": 20.0,
+    "boomLength": 5.9,
+    "boomHeight": 1.3,
+    "mastFromBow": 5.7,
+    "jibFoot": 4.3,
+    "forestayHeight": 16.8,
+    "hullBeam": 1.75,
+    "bridgedeckClearance": 0.75
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail, flat water",
+    "twa": [
+      0,
+      30,
+      38,
+      45,
+      52,
+      60,
+      75,
+      90,
+      110,
+      120,
+      135,
+      150,
+      165,
+      180
+    ],
+    "tws": [
+      0,
+      6,
+      10,
+      14,
+      20,
+      25,
+      30
+    ],
+    "speeds": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1.0,
+        2.4,
+        3.3,
+        3.8,
+        4.2,
+        4.4,
+        4.2,
+        3.9,
+        3.3,
+        2.7,
+        2.2,
+        1.9
+      ],
+      [
+        0,
+        0,
+        1.8,
+        4.0,
+        5.0,
+        5.7,
+        6.3,
+        6.6,
+        6.6,
+        6.3,
+        5.6,
+        4.6,
+        3.8,
+        3.3
+      ],
+      [
+        0,
+        0,
+        2.4,
+        5.05,
+        5.85,
+        6.6,
+        7.4,
+        7.9,
+        8.1,
+        8.0,
+        7.3,
+        6.1,
+        5.1,
+        4.5
+      ],
+      [
+        0,
+        0,
+        2.6,
+        5.4,
+        6.4,
+        7.3,
+        8.5,
+        9.3,
+        9.9,
+        10.0,
+        9.4,
+        8.1,
+        6.8,
+        6.1
+      ],
+      [
+        0,
+        0,
+        2.7,
+        5.5,
+        6.6,
+        7.6,
+        9.0,
+        10.0,
+        10.9,
+        11.3,
+        10.8,
+        9.5,
+        8.0,
+        7.2
+      ],
+      [
+        0,
+        0,
+        2.7,
+        5.5,
+        6.6,
+        7.6,
+        9.1,
+        10.2,
+        11.3,
+        11.9,
+        11.6,
+        10.4,
+        8.9,
+        8.0
+      ]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 58,
+      "squareTop": 0.3,
+      "reefs": [
+        {
+          "name": "Full main",
+          "drive": 1.0,
+          "heel": 1.0,
+          "luff": 1.0
+        },
+        {
+          "name": "Reef 1",
+          "drive": 0.8,
+          "heel": 0.5,
+          "luff": 0.8
+        },
+        {
+          "name": "Reef 2",
+          "drive": 0.62,
+          "heel": 0.2,
+          "luff": 0.62
+        }
+      ],
+      "sheetMinDeg": 3,
+      "sheetMaxDeg": 80
+    },
+    "jib": {
+      "areaM2": 32,
+      "sheetHardDeg": 10,
+      "sheetMaxSlackDeg": 80,
+      "selfTacking": true,
+      "backByHandDegS": 2
+    }
+  },
+  "heel": {
+    "comment": "She stands on her beam, not her ballast: a few degrees and no more. perKnot and offset give that. The sail shares also weigh the load against her pressed limit.",
+    "perKnot": 0.22,
+    "offset": 1.5,
+    "mainShare": 0.62,
+    "jibShare": 0.38,
+    "penaltyStartDeg": 20,
+    "penaltyPerDeg": 0.03,
+    "penaltyFloor": 0.55,
+    "rudderFadeStartDeg": 28,
+    "rudderFadeRangeDeg": 10,
+    "maxDeg": 5,
+    "overpowerDeg": 90
+  },
+  "pressed": {
+    "comment": "No heel to warn her crew. reefAwsKt is the placard: apparent wind for the first and second reef. limitAwsKt is what full sail sheeted in will take; past it a bow buries and she slows; capsizeOverKt beyond it, held for capsizeAfterS, she goes over and stays over for capsizeHoldS.",
+    "reefAwsKt": [
+      18,
+      25
+    ],
+    "limitAwsKt": 26,
+    "slowPerKt": 0.05,
+    "slowFloor": 0.5,
+    "capsizeOverKt": 9,
+    "capsizeAfterS": 4,
+    "capsizeHoldS": 120
+  },
+  "handling": {
+    "comment": "Quick to gather way. She carries it for carryS in carryAwsKt of apparent wind, longer in less and shorter in more. Stub keels make leeway. The pilot sails her no closer than closeHauledDeg and leaves pilotRestS between turns.",
+    "gatherS": 10,
+    "carryS": 14,
+    "leewayBaseDeg": 5.2,
+    "leewayPerHeelDeg": 0.12,
+    "closeHauledDeg": 50,
+    "leewayMaxDeg": 9,
+    "carryAwsKt": 16,
+    "pilotRestS": 60
+  },
+  "rightingCurve": {
+    "comment": "GZ in metres by heel angle. Unused by the phase 1 model. Enormous early, gone by 90: she does not come back.",
+    "deg": [
+      0,
+      5,
+      10,
+      20,
+      40,
+      60,
+      90
+    ],
+    "gz": [
+      0,
+      2.4,
+      3.0,
+      2.8,
+      2.0,
+      1.1,
+      0
+    ]
+  },
+  "helm": {
+    "maxRudderDeg": 35,
+    "turnGain": 0.1,
+    "rudderDrag": 0.05
+  },
+  "engine": {
+    "powerKw": 66,
+    "cruiseKt": 7.5,
+    "burnLph": 6.0,
+    "tankL": 600,
+    "batteryAh": 600,
+    "alternatorA": 120,
+    "windage": 0.04,
+    "twinPivotDegS": 9
+  },
+  "controls": [
+    {
+      "node": "wheel",
+      "control": "rudder",
+      "label": "Wheel",
+      "view": "helm",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyA",
+          "ArrowLeft"
+        ],
+        "inc": [
+          "KeyD",
+          "ArrowRight"
+        ]
+      }
+    },
+    {
+      "node": "boom",
+      "control": "mainsheet",
+      "label": "Mainsheet",
+      "view": "mast",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyW"
+        ],
+        "inc": [
+          "KeyS"
+        ]
+      }
+    },
+    {
+      "node": "winch_port",
+      "control": "jibsheet_port",
+      "label": "Port jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "winch_stbd",
+      "control": "jibsheet_stbd",
+      "label": "Starboard jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "autopilot",
+      "control": "pilot",
+      "label": "Autopilot",
+      "view": "helm",
+      "stepDeg": 1
+    }
+  ],
+  "views": {
+    "helm": {
+      "target": [
+        2.03,
+        3.75,
+        2.0
+      ],
+      "yaw": 0,
+      "pitch": 0.12,
+      "dist": 3.7
+    },
+    "mast": {
+      "target": [
+        0,
+        5.2,
+        0.6
+      ],
+      "yaw": 0.55,
+      "pitch": 0.36,
+      "dist": 9.5
+    },
+    "foredeck": {
+      "target": [
+        0,
+        2.8,
+        -4.4
+      ],
+      "yaw": 0.35,
+      "pitch": 0.4,
+      "dist": 8.5
+    },
+    "drone": {
+      "target": [
+        0,
+        5,
+        0
+      ],
+      "yaw": 0.62,
+      "pitch": 0.3,
+      "dist": 31
+    }
+  }
+}

@@ -74,6 +74,16 @@ export interface SloopGeometry {
   /** Fore and aft ends of the cockpit well. */
   cockpitFwdZ: number;
   cockpitAftZ: number;
+  /** Where the helm stands, when it is not the cockpit sole: a raised helm station. */
+  helmSoleY?: number;
+  /** How far off the centreline the trimmer's feet may go. 0.4, the width of a sloop's cockpit well, when left out. */
+  wellHalf?: number;
+  /** Width of the head of the mainsail, metres. 0.22, a pinhead, when left out; a square-top main is far wider. */
+  mainHeadWidth?: number;
+  /** Half the distance between the centrelines of her two hulls, metres. Left out, she has one hull. */
+  hullOffset?: number;
+  /** True when her jib is on a single sheet to a track ahead of the mast. Only the leeward lead is drawn. */
+  selfTackingJib?: boolean;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -83,7 +93,7 @@ const smooth = (e0: number, e1: number, x: number) => {
 };
 
 /** Smooth curve through points with ascending x. */
-function spline(points: Array<[number, number]>): (x: number) => number {
+export function spline(points: Array<[number, number]>): (x: number) => number {
   const n = points.length;
   const m: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -106,7 +116,7 @@ function spline(points: Array<[number, number]>): (x: number) => number {
   };
 }
 
-function bandTexture(bands: Array<[number, string]>, height = 512): THREE.CanvasTexture {
+export function bandTexture(bands: Array<[number, string]>, height = 512): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 4;
   c.height = height;
@@ -124,7 +134,7 @@ function bandTexture(bands: Array<[number, string]>, height = 512): THREE.Canvas
   return tex;
 }
 
-function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
+export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -145,7 +155,7 @@ function seeded(seed: number): () => number {
 }
 
 /** Laid teak: planks running fore and aft with dark caulking between them. One tile is 0.42 m square. */
-function teakTexture(): THREE.CanvasTexture {
+export function teakTexture(): THREE.CanvasTexture {
   const tex = canvasTexture(256, 256, (g, w, h) => {
     const rnd = seeded(7);
     const planks = 6;
@@ -171,7 +181,7 @@ function teakTexture(): THREE.CanvasTexture {
 }
 
 /** Moulded non-skid: a fine regular stipple. One tile is 0.25 m square. */
-function nonSkidTexture(): THREE.CanvasTexture {
+export function nonSkidTexture(): THREE.CanvasTexture {
   const tex = canvasTexture(128, 128, (g, w, h) => {
     g.fillStyle = '#c9c7bc';
     g.fillRect(0, 0, w, h);
@@ -189,7 +199,7 @@ function nonSkidTexture(): THREE.CanvasTexture {
 }
 
 /** Perceived brightness of a CSS hex colour, 0 to 1. */
-function brightness(hex: string): number {
+export function brightness(hex: string): number {
   const c = new THREE.Color(hex);
   return 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
 }

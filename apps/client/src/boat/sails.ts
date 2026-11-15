@@ -258,7 +258,7 @@ export class Mainsail {
   private chord(v: number): number {
     const foot = this.geo.mainFoot;
     // Roach in proportion to the foot, so a small main and a big one have the same shape.
-    return THREE.MathUtils.lerp(foot, 0.22, v) + 0.2135 * foot * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
+    return THREE.MathUtils.lerp(foot, this.geo.mainHeadWidth ?? 0.22, v) + 0.2135 * foot * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
   }
 
   update(shape: SailShape, hoistTarget: number, time: number, dt: number): void {

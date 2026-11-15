@@ -1,4 +1,4 @@
-import { Sim, D2R, type ControlName } from '../src';
+import { Sim, D2R, type BoatSpec, type ControlName } from '../src';
 import { boat, northWind } from './helpers';
 
 export type ScriptStep =
@@ -46,8 +46,8 @@ export interface TrackPoint {
   t: number; x: number; y: number; hdg: number; kt: number; heel: number;
 }
 
-export function runScript(script: typeof SCRIPT): { sim: Sim; track: TrackPoint[] } {
-  const sim = new Sim(boat, northWind(script.windKt), { headingDeg: script.headingDeg, speedKt: script.speedKt });
+export function runScript(script: typeof SCRIPT, spec: BoatSpec = boat): { sim: Sim; track: TrackPoint[] } {
+  const sim = new Sim(spec, northWind(script.windKt), { headingDeg: script.headingDeg, speedKt: script.speedKt });
   const steps = [...script.steps];
   const track: TrackPoint[] = [];
   const total = Math.round(script.seconds / sim.dt);
