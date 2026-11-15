@@ -50,6 +50,10 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['T'], 'Tack', 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.'],
     [['P'], 'Autopilot', 'On or off. While it is on the boat steers herself and the crew looks after the sails.'],
   ] },
+  { title: 'More sail, less sail', rows: [
+    [['N'], 'Spinnaker', 'The big coloured sail for when the wind is behind you. N puts it up or takes it down; while it is up, Q and E work its sheet. It will not go up with the wind ahead, must come down before a tack, and in more than about 20 knots it lays the boat over.'],
+    [['V'], 'Reef', 'Make the mainsail smaller when the wind gets up: the boat stands up straighter and steers again. Shift and V lets it back out.'],
+  ] },
   { title: 'Or use the mouse', rows: [
     [['Point and scroll'], 'Grab the boat', 'Point at the wheel, the boom (the pole along the bottom of the mainsail) or a winch, then scroll or drag to move it.'],
     [['Drag'], 'Look around', 'Drag anywhere else to swing the camera. Scroll to move in and out.'],

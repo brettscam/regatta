@@ -35,7 +35,13 @@ export class Passage {
   private lastFix = { x: NaN, y: NaN, t: -1e9 };
   private legStart: Point = { x: 0, y: 0 };
 
-  constructor(private readonly polar: PolarTable, private readonly weather: PlanWeather) {}
+  constructor(private polar: PolarTable, private readonly weather: PlanWeather) {}
+
+  /** Plan with another boat's speeds from here on: she has changed boats for a race. */
+  setPolar(polar: PolarTable, boat: Point, t: number): void {
+    this.polar = polar;
+    this.replan(boat, t);
+  }
 
   /** Where the leg now being sailed began. */
   get legOrigin(): Point {

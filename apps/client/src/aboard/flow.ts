@@ -280,6 +280,10 @@ export class FlowView implements Feature {
     this.card.innerHTML = html;
   }
 
+  reboat(): void {
+    this.ctx.boatView.root.add(this.group);
+  }
+
   dispose(): void {
     this.ctx.boatView.root.remove(this.group);
     this.card.remove();

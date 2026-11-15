@@ -16,6 +16,8 @@ export interface RaceEvent {
   spot?: string;
   /** ISO time of the gun, with its offset. */
   at: string;
+  /** The class everyone sails it in: a boat id from `boats/`. Left out, everyone races her own boat. */
+  cls?: string;
 }
 
 const events = (eventsJson as { events: RaceEvent[] }).events;
@@ -28,14 +30,19 @@ const events = (eventsJson as { events: RaceEvent[] }).events;
 const fixed = new Map<string, RaceEvent>();
 
 /** A race for a course at a time on the real clock. The same three facts always give the same id, so every page agrees. */
-export function makeEvent(water: string, course: string, atMs: number, name = 'Race'): RaceEvent {
+export function makeEvent(water: string, course: string, atMs: number, name = 'Race', cls?: string): RaceEvent {
   const minute = Math.round(atMs / 60e3);
-  return { id: `r-${water}-${course}-${minute}`.slice(0, 32), name: name.slice(0, 40), water, course, at: new Date(minute * 60e3).toISOString() };
+  const e: RaceEvent = { id: `r-${water}-${course}-${minute}`.slice(0, 32), name: name.slice(0, 40), water, course, at: new Date(minute * 60e3).toISOString() };
+  if (cls) e.cls = cls;
+  return e;
 }
 
 /** Take a player's race into the list. Returns true if it is new here. */
 export function addEvent(e: RaceEvent): boolean {
-  if (fixed.has(e.id)) return false;
+  const known = fixed.get(e.id);
+  // Heard first from a boat that could not pass the class on: take it from one that can.
+  if (known && !known.cls && e.cls) known.cls = e.cls;
+  if (known) return false;
   // Old ones are dropped as new ones come, so the list cannot grow without end.
   for (const [id, old] of fixed) if (Date.now() - Date.parse(old.at) > CLOSES_AFTER * 60e3) fixed.delete(id);
   if (fixed.size >= 12) return false;
@@ -54,13 +61,14 @@ export function readEvent(v: unknown): RaceEvent | null {
   const water = typeof o.water === 'string' && SAFE.test(o.water) ? o.water : 'sf-bay';
   // Nothing more than a week off, and nothing long gone.
   if (at - Date.now() > 7 * 86400e3 || Date.now() - at > 6 * 3600e3) return null;
-  return makeEvent(water, o.course, at, typeof o.name === 'string' && o.name.trim() ? o.name.replace(/[<>&"]/g, '').trim() : 'Race');
+  return makeEvent(water, o.course, at, typeof o.name === 'string' && o.name.trim() ? o.name.replace(/[<>&"]/g, '').trim() : 'Race', typeof o.cls === 'string' && SAFE.test(o.cls) ? o.cls : undefined);
 }
 
 /** The link that carries a race: open it and the race is there on the way in. */
 export function eventLink(e: RaceEvent): string {
   const q = new URLSearchParams({ race: e.course, at: String(Date.parse(e.at)), water: eventWater(e) });
   if (e.name && e.name !== 'Race') q.set('rn', e.name);
+  if (e.cls) q.set('cls', e.cls);
   return `${location.origin}${location.pathname}?${q.toString()}`;
 }
 
@@ -75,11 +83,11 @@ export function sharedEvent(now = Date.now()): RaceEvent | null {
   return best;
 }
 
-// A link to a race: ?race=<course id>&at=<milliseconds>&water=<water id>
+// A link to a race: ?race=<course id>&at=<milliseconds>&water=<water id>, and &cls=<boat id> when it is sailed in one class
 try {
   const q = new URLSearchParams(location.search);
   if (q.has('race')) {
-    const e = readEvent({ course: q.get('race'), at: q.get('at') ?? '', water: q.get('water') ?? undefined, name: q.get('rn') ?? undefined });
+    const e = readEvent({ course: q.get('race'), at: q.get('at') ?? '', water: q.get('water') ?? undefined, name: q.get('rn') ?? undefined, cls: q.get('cls') ?? undefined });
     if (e) fixed.set(e.id, e);
   }
 } catch { /* no address to read: no race from a link */ }

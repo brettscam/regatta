@@ -136,3 +136,38 @@ describe('the boats differ the way their sizes say', () => {
     expect(b38!.dimensions.draft).toBeLessThan(b45!.dimensions.draft);
   });
 });
+
+describe('changing boats where she lies, for a race sailed in one class', () => {
+  const small = boats.get('sloop30');
+  const big = boats.get('perf45');
+  const reaching = (boat: BoatSpec) => {
+    const sim = new Sim(boat, northWind(12), { headingDeg: 250, speedKt: 5 });
+    sim.setCrewTrim(true);
+    sim.trimForWind();
+    sim.setHelm('wind');
+    sim.advance(60);
+    return sim;
+  };
+
+  it.runIf(small && big)('she carries on from the same place and sails like the new boat', () => {
+    const swapped = reaching(small!);
+    const smallSpeed = swapped.state.speed;
+    const before = { x: swapped.state.x, y: swapped.state.y, heading: swapped.state.heading, t: swapped.state.t };
+    swapped.setBoat(big!);
+    expect(swapped.state).toMatchObject(before);
+    swapped.advance(300);
+    const native = reaching(big!);
+    native.advance(300);
+    // Once settled she is as fast as a 45 that was always a 45.
+    expect(swapped.state.speed / KT).toBeCloseTo(native.state.speed / KT, 1);
+    expect(swapped.state.speed).toBeGreaterThan(smallSpeed * 1.05);
+  });
+
+  it.runIf(small && big)('what was set beyond the new boat\'s limits comes inside them', () => {
+    const sim = reaching(big!);
+    sim.setControl('mainsheet', 999);
+    sim.setBoat({ ...small!, sails: { ...small!.sails, main: { ...small!.sails.main, sheetMaxDeg: 60, reefs: small!.sails.main.reefs.slice(0, 2) } } });
+    expect(sim.state.mainSheet).toBeCloseTo(60 * D2R, 9);
+    expect(sim.state.reef).toBeLessThanOrEqual(1);
+  });
+});

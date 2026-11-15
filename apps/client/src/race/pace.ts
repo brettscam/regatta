@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Sim, KT, type BoatSpec, type Environment } from '@slack-tide/sim';
+import { Sim, KT, type BoatSpec, type Environment, type SpinnakerSpec } from '@slack-tide/sim';
 import { trackFix } from '@slack-tide/nav';
 import { BoatView, type BoatPose } from '../boat/boatView';
 import type { Wave } from '../scene/waves';
@@ -7,6 +7,33 @@ import { waveHeight } from '../scene/waves';
 import type { RaceMark } from './race';
 
 const ARRIVAL = 130;
+const R2D = 180 / Math.PI;
+
+/**
+ * How much main a pace boat's crew carries for the wind: a reef at about 20 kt, a second at about 26, and each shaken out
+ * once the wind has dropped a few knots below where it went in, so they do not reef and unreef in every puff.
+ */
+export function paceReef(twsKt: number, now: number): number {
+  if (twsKt > 25.5) return 2;
+  if (twsKt > 19.5) return Math.max(1, twsKt < 22.5 ? 1 : now);
+  return twsKt < 16.5 ? 0 : Math.min(now, 1);
+}
+
+/**
+ * Whether a pace boat's crew wants the spinnaker up. They set it on a leg where the wind is well aft and not too strong,
+ * and have it down in good time before a mark whose next leg is to windward.
+ * @param legTwaDeg wind angle of the straight course to the next mark, degrees, unsigned
+ * @param nextTwaDeg the same for the leg after it, or null on the last leg
+ * @param toGo metres to the next mark
+ */
+export function paceSpinnaker(up: boolean, kite: SpinnakerSpec | undefined, twsKt: number, legTwaDeg: number, nextTwaDeg: number | null, toGo: number): boolean {
+  if (!kite) return false;
+  // Hysteresis both ways: more margin to set it than to keep it.
+  const windOk = twsKt < kite.maxTwsKt - (up ? 2 : 4);
+  const angleOk = legTwaDeg > (up ? 98 : 108);
+  const roomOk = nextTwaDeg === null || nextTwaDeg > 100 || toGo > (up ? 320 : 700);
+  return windOk && angleOk && roomOk;
+}
 /** Who the pace boats are. They sail the same class as the player, so it is a fair race. */
 export const PACERS = [
   { name: 'Wind Dancer', skipper: 'Marin', colour: '#1f4d7a', pace: 0.985 },
@@ -77,6 +104,8 @@ export class PaceBoat {
     if (this.finish !== null) return;
     const s = this.sim.state;
     const next = this.marks[this.leg];
+    // Once a second the crew looks at the wind and the leg and decides what sail to carry.
+    if (s.tick % 60 === 0) this.handleSails(next);
     const fix = trackFix(s, this.legStart, next);
     this.toGo = fix.toGo;
     const legLength = Math.hypot(next.x - this.legStart.x, next.y - this.legStart.y);
@@ -96,6 +125,23 @@ export class PaceBoat {
       this.sim.setRoute(next, this.legStart);
       this.sim.setCrewTrim(true);
     }
+  }
+
+  /** The crew reefs for the wind, and sets or douses the spinnaker for the leg. */
+  private handleSails(next: RaceMark): void {
+    const sim = this.sim;
+    const s = sim.state;
+    const o = sim.out;
+    const twsKt = o.tws / KT;
+    const reef = paceReef(twsKt, s.reef);
+    if (reef !== s.reef) sim.setControl('reef', reef);
+    const angleTo = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      const d = o.twd - Math.atan2(to.x - from.x, to.y - from.y);
+      return Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) * R2D;
+    };
+    const after = this.marks[this.leg + 1];
+    const want = !s.maneuver && paceSpinnaker(s.spin, sim.boat.sails.spinnaker, twsKt, angleTo(s, next), after ? angleTo(next, after) : null, this.toGo);
+    if (want !== s.spin) sim.setSpinnaker(want);
   }
 
   draw(seaTime: number, waves: Wave[], dt: number, camera: THREE.Camera, width: number, height: number): void {

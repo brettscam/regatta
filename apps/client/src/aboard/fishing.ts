@@ -250,6 +250,14 @@ export class Fishing implements Feature {
     return this.mode === 'still' ? 'Fishing' : '';
   }
 
+  reboat(): void {
+    // The rod goes to the same place on the new boat's stern rail.
+    const d = this.ctx.spec.dimensions;
+    this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
+    this.rod.position.copy(this.foot);
+    this.ctx.boatView.root.add(this.rig);
+  }
+
   dispose(): void {
     this.ctx.boatView.root.remove(this.rig);
     this.rig.traverse((o) => {

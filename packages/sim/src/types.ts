@@ -39,6 +39,25 @@ export interface ControlBinding {
   keys?: { dec: string[]; inc: string[] };
 }
 
+/** An asymmetric spinnaker: flown from the bow or a short sprit, for reaching and running. */
+export interface SpinnakerSpec {
+  areaM2: number;
+  /** The true wind has to be at least this far aft before it can be set, degrees. */
+  minTwaDeg: number;
+  /** True wind, knots, above which it starts to overpower her however it is trimmed. */
+  maxTwsKt: number;
+  /** The sheet as the widest clew angle off the centreline it allows, degrees. */
+  sheetMinDeg: number;
+  sheetMaxDeg: number;
+  /** Share of extra speed over the white-sail polar when set and trimmed, by true wind angle in degrees. */
+  gain: { twa: number[]; pct: number[] };
+  /** How much of that gain is left as the wind rises and she nears her top speed, by true wind in knots. */
+  fade: { tws: number[]; k: number[] };
+  /** Heel it adds: degrees = max(0, heelPerKnot * AWS - heelOffset), most on a tight reach, little on a run. */
+  heelPerKnot: number;
+  heelOffset: number;
+}
+
 export interface BoatSpec {
   id: string;
   name: string;
@@ -50,18 +69,25 @@ export interface BoatSpec {
   sails: {
     main: { areaM2: number; reefs: ReefSpec[]; sheetMinDeg: number; sheetMaxDeg: number };
     jib: { areaM2: number; sheetHardDeg: number; sheetMaxSlackDeg: number };
+    /** Left out, she has no spinnaker to set. */
+    spinnaker?: SpinnakerSpec;
   };
   heel: {
     perKnot: number; offset: number; mainShare: number; jibShare: number;
     penaltyStartDeg: number; penaltyPerDeg: number; penaltyFloor: number;
     rudderFadeStartDeg: number; rudderFadeRangeDeg: number; maxDeg: number;
+    /**
+     * Heel, in degrees by the law above, past which a hard wind overpowers her: the more she is pressed beyond it the
+     * faster she lies over. 20 when left out.
+     */
+    overpowerDeg?: number;
   };
   rightingCurve: { deg: number[]; gz: number[] };
   helm: { maxRudderDeg: number; turnGain: number; rudderDrag: number };
   controls: ControlBinding[];
 }
 
-export type ControlName = 'rudder' | 'mainsheet' | 'jibsheet_port' | 'jibsheet_stbd' | 'furl' | 'reef' | 'pilot';
+export type ControlName = 'rudder' | 'mainsheet' | 'jibsheet_port' | 'jibsheet_stbd' | 'furl' | 'reef' | 'pilot' | 'spinsheet';
 
 /** Who is steering: a hand on the wheel, or the pilot holding a heading, a wind angle, or a course to a mark. */
 export type HelmMode = 'hand' | 'heading' | 'wind' | 'route';
@@ -154,6 +180,26 @@ export interface SimState {
   holdY: number;
   /** Metres of rode or line between that point and the bow. */
   holdScope: number;
+  /** The spinnaker is wanted up. It takes a few seconds to go up and to come down: `spinHoist` is how far it has got. */
+  spin: boolean;
+  /** 0 in its bag, 1 set and flying. */
+  spinHoist: number;
+  /** Spinnaker sheet as the widest clew angle off the centreline it allows. */
+  spinSheet: number;
+  /** Spinnaker clew angle off the centreline, positive to starboard. */
+  spinAngle: number;
+  /** Seconds it stays collapsed: after a gybe, or a broach. */
+  spinCollapse: number;
+  /** Wrapped round the forestay. It does nothing until it has been taken down. */
+  spinWrapped: boolean;
+  /** How many times it has wrapped. */
+  spinWraps: number;
+  /** How many times the spinnaker has laid her over. Each one is counted in `knockdowns` too. */
+  broaches: number;
+  /** Seconds she has been pressed past the point of no return. A second of it and she is knocked down. */
+  gustTime: number;
+  /** How far the crew has let the mainsheet out beyond its best setting to spill a gust, radians. */
+  gustEase: number;
   maneuver: Maneuver | null;
 }
 
@@ -191,6 +237,10 @@ export interface SimOutputs {
   cog: number;
   main: SailReport;
   jib: SailReport;
+  /** The spinnaker. All zeros when it is not up. `flogging` means collapsed. */
+  spin: SailReport;
+  /** Degrees of heel load beyond what she can carry: 0 unless she is overpowered by a hard wind or by her spinnaker. */
+  overpower: number;
   /** Speed the boat is accelerating toward, m/s. */
   targetSpeed: number;
   /** Polar speed at this wind angle and speed with full sail and perfect trim, m/s. */

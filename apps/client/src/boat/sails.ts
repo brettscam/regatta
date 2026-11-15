@@ -127,7 +127,60 @@ function sailTexture(kind: SailKind, mark: string): THREE.CanvasTexture {
   return tex;
 }
 
-function makeSailMesh(nu: number, nv: number, kind: SailKind, mark: string): THREE.Mesh {
+/**
+ * Spinnaker cloth: light nylon in the boat's colour, cut in panels that fan out from the three corners,
+ * with a white band across the middle so the shape of the sail reads from a distance.
+ */
+function spinnakerTexture(colour: string): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 1024;
+  const g = c.getContext('2d')!;
+  const W = c.width;
+  const H = c.height;
+  const base = new THREE.Color(colour);
+  const dark = `#${base.clone().multiplyScalar(0.72).getHexString()}`;
+  g.fillStyle = `#${base.getHexString()}`;
+  g.fillRect(0, 0, W, H);
+  // A darker head and a white band below the shoulders.
+  g.fillStyle = dark;
+  g.fillRect(0, 0, W, H * 0.2);
+  g.fillStyle = '#f3f1ea';
+  g.fillRect(0, H * 0.42, W, H * 0.16);
+  g.fillStyle = dark;
+  g.fillRect(0, H * 0.9, W, H * 0.1);
+  // Seams: across the middle, and fanning from the head and from the two lower corners.
+  g.strokeStyle = 'rgba(20, 24, 30, 0.22)';
+  g.lineWidth = 1.5;
+  for (let i = 1; i < 8; i++) {
+    g.beginPath();
+    g.moveTo(W / 2, 0);
+    g.lineTo((W * i) / 8, H * 0.42);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(0, H);
+    g.lineTo((W * i) / 8, H * 0.58);
+    g.moveTo(W, H);
+    g.lineTo((W * i) / 8, H * 0.58);
+    g.stroke();
+  }
+  for (const y of [0.2, 0.42, 0.5, 0.58, 0.74, 0.9]) {
+    g.beginPath();
+    g.moveTo(0, H * y);
+    g.lineTo(W, H * y);
+    g.stroke();
+  }
+  // Tapes down the luff and the leech.
+  g.fillStyle = 'rgba(245, 243, 236, 0.85)';
+  g.fillRect(0, 0, 7, H);
+  g.fillRect(W - 7, 0, 7, H);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function makeSailMesh(nu: number, nv: number, kind: SailKind | THREE.CanvasTexture, mark: string): THREE.Mesh {
   const count = (nu + 1) * (nv + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -145,7 +198,7 @@ function makeSailMesh(nu: number, nv: number, kind: SailKind, mark: string): THR
   }
   g.setIndex(idx);
   const mat = new THREE.MeshStandardMaterial({
-    map: sailTexture(kind, mark), color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
+    map: typeof kind === 'string' ? sailTexture(kind, mark) : kind, color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
     emissive: 0x6f6a5c, emissiveIntensity: 0.1,
   });
   // Sailcloth lets light through. When the sun is behind the sail, the side you are looking at glows with it.
@@ -318,5 +371,111 @@ export class Jib {
     out.set(arr[k], arr[k + 1], arr[k + 2]);
     if (tangent) tangent.set(arr[k + 3] - arr[k], arr[k + 4] - arr[k + 1], arr[k + 5] - arr[k + 2]).normalize();
     return out;
+  }
+}
+
+/**
+ * A spinnaker colour to go with a hull: the hull's own hue made bright, since a spinnaker is the loudest thing on the water.
+ * A black, grey or white hull has no hue to speak of, so she flies red.
+ */
+export function spinnakerColour(topsides: string | undefined): string {
+  const c = new THREE.Color();
+  try {
+    c.setStyle(topsides ?? '');
+  } catch {
+    return '#d8402f';
+  }
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  if (!topsides || hsl.s < 0.18) return '#d8402f';
+  return `#${c.setHSL(hsl.h, Math.max(0.72, hsl.s), 0.5).getHexString()}`;
+}
+
+/**
+ * An asymmetric spinnaker: tacked down ahead of the bow, hoisted to the masthead, its clew flying out to leeward.
+ * Much fuller than the white sails. It curls at the luff when it is eased too far or she is sailed too high for it,
+ * and when it collapses it hangs and shakes.
+ */
+export class Spinnaker {
+  readonly mesh: THREE.Mesh;
+  readonly clew = new THREE.Vector3();
+  readonly tack = new THREE.Vector3();
+  private readonly head = new THREE.Vector3();
+  private readonly nu = 14;
+  private readonly nv = 20;
+  /** How full it is, eased toward what the sim reports so it fills and empties over a moment, not in one frame. */
+  private fill = 0;
+
+  constructor(private readonly geo: SloopGeometry, colour: string) {
+    this.mesh = makeSailMesh(this.nu, this.nv, spinnakerTexture(colour), '');
+    this.mesh.name = 'spinnaker';
+    const mat = this.mesh.material as THREE.MeshStandardMaterial;
+    mat.roughness = 0.7;
+    mat.emissive.set(colour);
+    mat.emissiveIntensity = 0.16;
+    this.mesh.visible = false;
+    // The tack is on a short sprit ahead of the stem, the head just under the masthead.
+    this.tack.set(0, geo.jibTack.y + 0.25, geo.jibTack.z - 0.85);
+    this.head.set(0, geo.mastTopY - 0.25, geo.mastZ - 0.3);
+  }
+
+  /** @param hoist 0 in its bag, 1 all the way up */
+  update(shape: SailShape, hoist: number, time: number, dt: number): void {
+    const { nu, nv, geo } = this;
+    this.mesh.visible = hoist > 0.02;
+    const drawing = shape.flogging ? 0 : 1;
+    this.fill += (drawing - this.fill) * Math.min(1, dt * 2.2);
+    if (!this.mesh.visible) return;
+    const pos = this.mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const arr = pos.array as Float32Array;
+    const T = this.tack;
+    // Going up, the head climbs the mast and the sail comes out of the bag behind it.
+    const hx = T.x + (this.head.x - T.x) * hoist;
+    const hy = T.y + (this.head.y - T.y) * hoist;
+    const hz = T.z + (this.head.z - T.z) * hoist;
+    const foot = geo.jibFoot * 1.75 * (0.35 + 0.65 * hoist);
+    const fill = this.fill;
+    // Empty, the clew drops and swings in toward the boat.
+    const a = shape.angle * (0.45 + 0.55 * fill);
+    const side = Math.sign(shape.belly || shape.angle || 1);
+    this.clew.set(Math.sin(a) * foot, geo.jibClewY + 0.5 + 0.5 * fill + (shape.flogging ? 0.15 * Math.sin(time * 13) : 0), T.z + Math.cos(a) * foot * (0.8 + 0.2 * fill));
+    const C = this.clew;
+    const luffLen = Math.hypot(hx - T.x, hy - T.y, hz - T.z);
+    const depth = 0.07 + 0.25 * fill * (1 - 0.35 * shape.luff);
+    let p = 0;
+    for (let j = 0; j <= nv; j++) {
+      const v = j / nv;
+      const arch = Math.sin(Math.PI * v);
+      // The luff stands forward and to leeward of the straight line from tack to head when the sail is full.
+      const lx = T.x + (hx - T.x) * v + side * arch * luffLen * 0.07 * fill;
+      const ly = T.y + (hy - T.y) * v;
+      const lz = T.z + (hz - T.z) * v - arch * luffLen * 0.06 * fill;
+      // The leech runs from the clew to the head, with shoulders that stand out wide of the straight line.
+      const shoulder = Math.sin(Math.PI * Math.min(1, v * 1.25)) * foot * 0.2 * (0.3 + 0.7 * fill);
+      const kx = C.x + (hx - C.x) * v + Math.sin(a) * shoulder;
+      const ky = C.y + (hy - C.y) * v - (1 - fill) * arch * luffLen * 0.05;
+      const kz = C.z + (hz - C.z) * v + Math.cos(a) * shoulder * 0.5;
+      const dx = kx - lx;
+      const dy = ky - ly;
+      const dz = kz - lz;
+      const c = Math.hypot(dx, dz) || 1e-6;
+      const nx = dz / c;
+      const nz = -dx / c;
+      const edge = Math.pow(Math.sin(Math.PI * Math.min(1, v * 0.96 + 0.04)), 0.6);
+      for (let i = 0; i <= nu; i++) {
+        const u = i / nu;
+        const belly = Math.sin(Math.PI * u) * (1 + 0.25 * (0.5 - u));
+        // The curl: the first third of the sail behind the luff folds back to windward and trembles.
+        const curl = shape.luff * fill * Math.max(0, 1 - u / 0.38) * Math.sin(Math.PI * Math.min(1, u / 0.38 + 0.25)) * (0.2 + 0.035 * Math.sin(time * 15 + v * 9));
+        const flap = shake(u, v, time, Math.max(shape.luff * 0.4, 1 - fill), fill < 0.4, shape.aws) * (0.5 + 0.5 * arch);
+        const off = (side * (depth * belly * edge - curl * arch) + flap) * c;
+        arr[p++] = lx + dx * u + nx * off;
+        // A full spinnaker lifts in the middle of its foot. Empty, the cloth sags.
+        arr[p++] = ly + dy * u + Math.sin(Math.PI * u) * ((1 - v) * 0.5 * fill - (1 - fill) * 0.9 * (1 - v) * hoist);
+        arr[p++] = lz + dz * u + nz * off;
+      }
+    }
+    pos.needsUpdate = true;
+    this.mesh.geometry.computeVertexNormals();
   }
 }
