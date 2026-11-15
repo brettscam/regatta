@@ -63,6 +63,8 @@ export interface RemoteBoat {
   status: string;
   /** A race she has called, if any, exactly as she sent it. Check it before use. */
   raceCall: unknown;
+  /** A race fixed for a set time that she knows of, exactly as she sent it. Check it before use. */
+  raceEvent: unknown;
   /** The race she is in, how many marks she has rounded, metres to her next one, and her time if she has finished. */
   raceId: string;
   raceLeg: number;
@@ -94,7 +96,7 @@ class Remote implements RemoteBoat {
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
-  status = ''; raceCall: unknown = null; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
+  status = ''; raceCall: unknown = null; raceEvent: unknown = null; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
   private placed = false;
@@ -135,6 +137,7 @@ class Remote implements RemoteBoat {
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.raceCall = v.rc ?? null;
+    this.raceEvent = v.ev ?? null;
     this.raceId = typeof v.rj === 'string' ? v.rj.slice(0, 32) : '';
     this.raceLeg = num(v.rp);
     this.raceToGo = num(v.rd);
