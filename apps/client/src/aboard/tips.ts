@@ -179,6 +179,7 @@ export class Tips implements Feature {
     this.left = tip.secs ?? TIP_SECONDS;
     this.upFor = 0;
     this.draw(tip);
+    this.place();
     if (!byHand) {
       this.picker.showed(tip);
       if (tip.list === 'news' && notes.length) {
@@ -200,6 +201,16 @@ export class Tips implements Feature {
     if (seen) this.picker.ended(this.snap);
     else this.picker.withdrew(tip);
     this.save();
+  }
+
+  /**
+   * On a phone the card goes straight under the instruments, however tall they are just now (the engine's and the
+   * damage's rows come and go). On a wide screen the stylesheet puts it on the right, under the clock.
+   */
+  private place(): void {
+    const readout = document.getElementById('readout');
+    const narrow = window.innerWidth <= 760;
+    this.el.style.top = narrow && readout ? `${Math.round(readout.getBoundingClientRect().bottom + 10)}px` : '';
   }
 
   private draw(tip: Tip): void {

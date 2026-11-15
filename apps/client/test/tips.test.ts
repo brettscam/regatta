@@ -133,7 +133,7 @@ describe('the right tip at the right moment', () => {
 
   it('keeps fishing and crab pots for a boat that has lain at anchor a while', () => {
     expect(offered(old({ hold: 'anchor', heldFor: 30, speedKt: 0 }), 20)).toBeUndefined();
-    expect(offered(old({ hold: 'anchor', heldFor: 90, speedKt: 0 }), 20)).toBe('catch');
+    expect(offered(old({ hold: 'anchor', heldFor: 90, speedKt: 0 }), 40)).toBe('catch');
     expect(offered(old({ hold: 'anchor', heldFor: 90, speedKt: 0, night: true }), 60)).toBe('sleep');
   });
 

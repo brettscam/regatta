@@ -194,7 +194,7 @@ export const TIPS: Tip[] = [
     done: ['KeyZ'],
   },
   {
-    id: 'catch', icon: 'fish', title: 'Catch supper', keys: ['L', 'K'], priority: 15, cooldown: 3 * DAY, max: 2,
+    id: 'catch', icon: 'fish', title: 'Catch supper', keys: ['L', 'K'], priority: 15, hold: 20, cooldown: 3 * DAY, max: 2,
     text: 'L puts a fishing line over: when the crew shout "Fish on", press L again quickly. K drops a crab pot with a buoy: come back in about an hour and press K beside it.',
     when: (s) => !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
     done: ['KeyL', 'KeyK'],
