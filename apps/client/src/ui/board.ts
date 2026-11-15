@@ -445,7 +445,8 @@ export class Board {
   /** The boats that live on each water, each marked once the player has met her. */
   private metCard(): string {
     const seen = met();
-    return residentWaters().filter((w) => w.file.boats.length).map((w) => {
+    const order = (id: string): number => { const i = COURSES.findIndex((c) => c.id === id); return i < 0 ? 99 : i; };
+    return residentWaters().filter((w) => w.file.boats.length).sort((a, b) => order(a.id) - order(b.id)).map((w) => {
       const boats = w.file.boats;
       const n = boats.filter((b) => seen.has(`${w.id}/${b.id}`)).length;
       const where = COURSES.find((c) => c.id === w.id)?.name ?? w.id;
