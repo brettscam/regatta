@@ -1,0 +1,295 @@
+{
+  "id": "jamaica-sloop",
+  "name": "Jamaica sloop",
+  "lengthFt": 60,
+  "tagline": "A rover's sloop of about 1715: one raking mast, a great gaff mainsail, six guns",
+  "role": "Expedition boat. Not in the Regatta lineup",
+  "defaultName": "Fortune's Favour",
+  "homePort": "Port Royal",
+  "topsides": "#2b2a27",
+  "expedition": true,
+  "notes": "A Jamaica-built sloop of the kind the rovers liked about 1715: red cedar, sharp, a mast raked well aft, a very long boom and bowsprit. About 60 ft on deck, 20 ft beam, 100 tons. Every figure is typical of the type as I remember it described, not any one vessel, and none was checked. The polar is a judgement: they were the fastest craft in the Indies, good for eleven knots reaching in a fresh trade wind, and would lie five points from the wind. The sim has one mainsail and one headsail: the square topsail and the flying squaresail such sloops set before the wind are not drawn, and their drive is counted in the polar, which is why she runs nearly as fast as she reaches. Rigging shot away is modelled by lowering the 'drive' of the sail plans on the session's own copy of this file.",
+  "dimensions": {
+    "loa": 18.5,
+    "lwl": 16.5,
+    "beam": 6.1,
+    "draft": 2.5,
+    "freeboard": 1.7,
+    "displacementKg": 100000,
+    "mastHeight": 22.5,
+    "boomLength": 13.5,
+    "boomHeight": 2.6,
+    "mastFromBow": 6.6,
+    "jibFoot": 8.5,
+    "forestayHeight": 17
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail",
+    "twa": [
+      0,
+      40,
+      50,
+      60,
+      75,
+      90,
+      110,
+      130,
+      150,
+      165,
+      180
+    ],
+    "tws": [
+      0,
+      6,
+      10,
+      14,
+      18,
+      22,
+      28,
+      36,
+      50
+    ],
+    "speeds": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0,
+        0,
+        2.6,
+        3.2,
+        3.8,
+        4.2,
+        4.3,
+        4.0,
+        4.0,
+        3.9,
+        3.8
+      ],
+      [
+        0,
+        0,
+        4.2,
+        5.2,
+        6.0,
+        6.6,
+        6.8,
+        6.4,
+        6.3,
+        6.2,
+        6.1
+      ],
+      [
+        0,
+        0,
+        5.3,
+        6.5,
+        7.5,
+        8.2,
+        8.6,
+        8.3,
+        8.2,
+        8.1,
+        7.9
+      ],
+      [
+        0,
+        0,
+        5.9,
+        7.2,
+        8.4,
+        9.3,
+        9.9,
+        9.8,
+        9.7,
+        9.5,
+        9.3
+      ],
+      [
+        0,
+        0,
+        6.2,
+        7.6,
+        8.9,
+        10.0,
+        10.8,
+        10.9,
+        10.8,
+        10.6,
+        10.4
+      ],
+      [
+        0,
+        0,
+        6.2,
+        7.7,
+        9.1,
+        10.4,
+        11.4,
+        11.8,
+        11.7,
+        11.4,
+        11.2
+      ],
+      [
+        0,
+        0,
+        6.2,
+        7.7,
+        9.1,
+        10.4,
+        11.4,
+        11.8,
+        11.7,
+        11.4,
+        11.2
+      ],
+      [
+        0,
+        0,
+        6.2,
+        7.7,
+        9.1,
+        10.4,
+        11.4,
+        11.8,
+        11.7,
+        11.4,
+        11.2
+      ]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 190,
+      "reefs": [
+        {
+          "name": "All plain sail",
+          "drive": 1.0,
+          "heel": 1.0,
+          "luff": 1.0
+        },
+        {
+          "name": "A reef in the main",
+          "drive": 0.72,
+          "heel": 0.72,
+          "luff": 0.82
+        },
+        {
+          "name": "Double-reefed, jib handed",
+          "drive": 0.42,
+          "heel": 0.5,
+          "luff": 0.64
+        }
+      ],
+      "sheetMinDeg": 6,
+      "sheetMaxDeg": 85
+    },
+    "jib": {
+      "areaM2": 70,
+      "sheetHardDeg": 12,
+      "sheetMaxSlackDeg": 80
+    }
+  },
+  "heel": {
+    "comment": "A hundred tons of sloop with a big rig: stiff in a trade wind, down to her gun ports when she is pressed in a squall.",
+    "perKnot": 0.85,
+    "offset": 7,
+    "mainShare": 0.7,
+    "jibShare": 0.3,
+    "penaltyStartDeg": 16,
+    "penaltyPerDeg": 0.022,
+    "penaltyFloor": 0.6,
+    "rudderFadeStartDeg": 28,
+    "rudderFadeRangeDeg": 12,
+    "maxDeg": 34
+  },
+  "rightingCurve": {
+    "comment": "Unused by the phase 1 model. A guess for a ballasted lifeboat.",
+    "deg": [
+      0,
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      90,
+      120
+    ],
+    "gz": [
+      0,
+      0.12,
+      0.22,
+      0.29,
+      0.32,
+      0.31,
+      0.27,
+      0.08,
+      -0.15
+    ]
+  },
+  "helm": {
+    "maxRudderDeg": 35,
+    "turnGain": 0.2,
+    "rudderDrag": 0.05
+  },
+  "controls": [
+    {
+      "node": "tiller",
+      "control": "rudder",
+      "label": "Tiller",
+      "view": "helm",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyA",
+          "ArrowLeft"
+        ],
+        "inc": [
+          "KeyD",
+          "ArrowRight"
+        ]
+      }
+    },
+    {
+      "node": "main_sheet",
+      "control": "mainsheet",
+      "label": "Mainsheet",
+      "view": "mast",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyW"
+        ],
+        "inc": [
+          "KeyS"
+        ]
+      }
+    },
+    {
+      "node": "jib_sheet_port",
+      "control": "jibsheet_port",
+      "label": "Port jib sheet",
+      "view": "foredeck",
+      "stepDeg": 2
+    },
+    {
+      "node": "jib_sheet_stbd",
+      "control": "jibsheet_stbd",
+      "label": "Starboard jib sheet",
+      "view": "foredeck",
+      "stepDeg": 2
+    }
+  ]
+}
