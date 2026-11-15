@@ -4,6 +4,7 @@ import { visited } from '../aboard/visited';
 import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
 import { sightings } from '../aboard/sightings';
 import type { Logbook } from '../net/logbook';
+import { KIND_NAMES, rankOf, topEarners } from '../xp/score';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 
@@ -421,6 +422,22 @@ export class Board {
     return `<h3>Seen on the water · ${n} of ${ANIMALS.length}</h3><p class="lede">The crew call out each animal the first time it comes in sight on a sail. Porpoise like the tide at the Gate, seals the quiet anchorages, and a whale needs the flood and some luck.</p><ul class="barhop seen">${cards}</ul>`;
   }
 
+  /** Experience: the rank, the points, how far to the next rank, and what has earned the most. */
+  private xpCard(): string {
+    const t = this.logbook.totals;
+    const rank = rankOf(t.xp);
+    const top = topEarners(t);
+    const to = rank.next ? `${(rank.next.at - t.xp).toLocaleString('en-GB')} more to ${esc(rank.next.name)}` : 'The top of the list';
+    const rows = top.map((e) => `<tr><td>${esc(e.name)}</td><td>${e.points.toLocaleString('en-GB')}</td></tr>`).join('');
+    const lost = t.xpBy.lost ? `<tr class="lost"><td>${esc(KIND_NAMES.lost)}</td><td>−${t.xpBy.lost.toLocaleString('en-GB')}</td></tr>` : '';
+    return `<section class="xpcard">
+      <div class="xphead"><b>${esc(rank.name)}</b><span>${t.xp.toLocaleString('en-GB')} ${t.xp === 1 ? 'point' : 'points'}</span><i>${to}</i></div>
+      <div class="xpbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(rank.progress * 100)}" aria-label="Progress to the next rank"><i style="width:${(rank.progress * 100).toFixed(1)}%"></i></div>
+      <p class="lede">Points come from sailing her well: clean tacks and gybes, time in the groove (more with the wheel and sheets in your own hands), gusts handled, marks, races, and a little for anchoring, landings and the catch. Points will buy things for the boat later. Nothing is for sale yet. N switches the award lines on the screen off and on.</p>
+      ${top.length ? `<table class="xptable"><thead><tr><th>What has earned the most</th><th>Points</th></tr></thead><tbody>${rows}${lost}</tbody></table>` : ''}
+    </section>`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -430,9 +447,9 @@ export class Board {
       ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}
     </div>`;
     const fleet = this.logbook.fleet;
-    const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
+    const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.xp.toLocaleString('en-GB')}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
     const table = fleet.length
-      ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
+      ? `<h3>The fleet</h3><table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Points</th><th>Miles</th><th>Hours</th><th>Marks</th></tr></thead><tbody>${rows}</tbody></table>`
       : `<p class="lede">${this.store.online ? (onWeb() ? 'Nobody has logged a sail here yet. Sign in and yours is the first.' : 'Nobody else has logged a sail yet.') : onWeb() ? 'The fleet\'s logbooks could not be fetched just now.' : alone() ? 'The fleet\'s logbooks are not available in this copy of the game.' : 'On the shared page, when you are signed in, the fleet\'s logbooks show here.'}</p>`;
     const kept = onWeb()
       ? this.account?.email()
@@ -441,7 +458,7 @@ export class Board {
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${this.seenCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.signInForm()}${this.barHop()}${this.seenCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */

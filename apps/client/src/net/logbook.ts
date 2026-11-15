@@ -4,6 +4,7 @@
  * person's own id, where the rest of the fleet can read it. On the website the same happens once the person has
  * signed in, and anyone can read the fleet's. This is the seed of experience points and accounts.
  */
+import { cleanLedger, counted, credit, type Award, type AwardKind, type Rank } from '../xp/score';
 import { account as askAccount, db as askDb, onWeb, user as askUser, type Db } from './platform';
 
 export interface LogTotals {
@@ -22,6 +23,11 @@ export interface LogTotals {
   fish: number;
   nights: number;
   ashore: number;
+  /** Kinds of animal seen for the first time. */
+  seen: number;
+  /** Experience points, and what earned them by kind. Books saved before there were points load as zero. */
+  xp: number;
+  xpBy: Partial<Record<AwardKind, number>>;
 }
 
 export interface Profile {
@@ -34,15 +40,16 @@ export interface Profile {
 }
 
 const SAVED = 'regatta.log';
-const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0 };
+const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0, seen: 0, xp: 0, xpBy: {} };
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
 const clean = (l: Partial<LogTotals> | undefined): LogTotals => ({
   miles: num(l?.miles), hours: num(l?.hours), sails: num(l?.sails), marks: num(l?.marks), tacks: num(l?.tacks), knockdowns: num(l?.knockdowns), topKt: num(l?.topKt),
-  races: num(l?.races), wins: num(l?.wins), crabs: num(l?.crabs), fish: num(l?.fish), nights: num(l?.nights), ashore: num(l?.ashore),
+  races: num(l?.races), wins: num(l?.wins), crabs: num(l?.crabs), fish: num(l?.fish), nights: num(l?.nights), ashore: num(l?.ashore), seen: num(l?.seen),
+  ...cleanLedger(l),
 });
 
 export class Logbook {
-  totals: LogTotals = { ...ZERO };
+  totals: LogTotals = clean({});
   /** Everyone's profiles, newest first, where the shared page provides them. */
   fleet: Array<Profile & { id: string; me: boolean }> = [];
   private db: Db | null = null;
@@ -52,6 +59,11 @@ export class Logbook {
   private saving = false;
   private sinceSave = 0;
   onFleet: () => void = () => {};
+  /** Told of every award as it is earned, and of the rank it gained if it gained one. */
+  onAward: (award: Award, rank: Rank | null) => void = () => {};
+  /** Seconds logged so far this visit, and when each counter last earned points, so a counter cannot be run up for them. */
+  private logged = 0;
+  private readonly earnedAt = new Map<string, number>();
 
   constructor() {
     try {
@@ -119,11 +131,24 @@ export class Logbook {
     if (speedKt > this.totals.topKt && speedKt < 40) this.totals.topKt = speedKt;
     this.dirty = true;
     this.sinceSave += seconds;
+    this.logged += seconds;
   }
 
-  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore', n = 1): void {
+  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore' | 'seen', n = 1): void {
     this.totals[what] += n;
     this.dirty = true;
+    // Some of what is counted here is seamanship, and earns points. The sizes are in `xp/score.ts`.
+    const award = counted(what, n, this.logged - (this.earnedAt.get(what) ?? -1e9));
+    if (!award) return;
+    this.earnedAt.set(what, this.logged);
+    this.earn(award);
+  }
+
+  /** Add experience points, or take a few away. They never go below zero. */
+  earn(award: Award): void {
+    const rank = credit(this.totals, award);
+    this.dirty = true;
+    this.onAward(award, rank);
   }
 
   private keep(): void {
@@ -145,7 +170,7 @@ export class Logbook {
     const t = this.totals;
     const body: Profile = {
       ...this.who,
-      log: { ...t, miles: r(t.miles, 100), hours: r(t.hours, 100), topKt: r(t.topKt, 10) },
+      log: { ...t, xpBy: { ...t.xpBy }, miles: r(t.miles, 100), hours: r(t.hours, 100), topKt: r(t.topKt, 10) },
       updated: new Date().toISOString(),
     };
     this.db.doc(`profiles/${this.uid}`).set(body as unknown as Record<string, unknown>).catch(() => { this.db = null; }).finally(() => { this.saving = false; this.dirty = false; });
