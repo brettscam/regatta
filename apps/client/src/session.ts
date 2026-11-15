@@ -20,6 +20,8 @@ import type { AboardContext, Feature } from './aboard/feature';
 import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
 import { Race, type RaceCourse } from './race/race';
+import { ShadedWind } from './race/shadow';
+import { damageNote } from './aboard/contactRules';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
 
@@ -70,6 +72,8 @@ const mixAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b 
 /** One sail: the boat, her instruments, the chart, the pilot, and anyone sailing in company. */
 export class Session {
   readonly sim: Sim;
+  /** The wind the sim is fed: the world's, less whatever another boat to windward is taking. `aboard/badair.ts` sets it. */
+  readonly air: ShadedWind;
   boatView: BoatView;
   readonly drone: DroneCamera;
   readonly hud = new Hud();
@@ -109,7 +113,9 @@ export class Session {
     const world = stage.world;
     this.spec = opts.spec;
     const wind = world.wind(opts.x, opts.y, 0);
-    this.sim = new Sim(opts.spec, world, { x: opts.x, y: opts.y, headingDeg: opts.headingDeg ?? wind.dir * R2D + 50, speedKt: 5 });
+    // The sim is not handed the world itself but the world as she feels it, so a wind shadow is just a lighter wind to it.
+    this.air = new ShadedWind(world);
+    this.sim = new Sim(opts.spec, this.air, { x: opts.x, y: opts.y, headingDeg: opts.headingDeg ?? wind.dir * R2D + 50, speedKt: 5 });
     this.sim.trimForWind();
     // Until the player takes the wheel, the boat holds her angle to the wind.
     this.sim.setHelm('wind');
@@ -176,7 +182,7 @@ export class Session {
       race: this.race,
       courses: opts.races,
       boats: () => this.fleet.boats,
-      me: () => ({ x: this.sim.state.x, y: this.sim.state.y, sog: this.sim.out.sog, name: opts.skipper, boatName: opts.livery.name ?? '', status: this.status() }),
+      me: () => ({ x: this.sim.state.x, y: this.sim.state.y, sog: this.sim.out.sog, name: opts.skipper, boatName: opts.livery.name ?? '', status: this.status() || damageNote(Math.round(this.sim.state.damage * 100)) }),
       chartRoute: () => this.passage.marks.map((m) => ({ name: m.name, x: m.x, y: m.y })),
       water: stage.course.id,
       classes: Object.values(opts.classes),
@@ -189,7 +195,8 @@ export class Session {
     this.hints = new Hints({
       sim: this.sim,
       nextMark: () => this.passage.marks[this.passage.nextIndex] ?? null,
-      busy: () => (this.coach?.active ?? false) || this.chart.isOpen || opts.boardOpen() || this.paused,
+      // In another boat's wind shadow the sails misbehave through no fault of the trim: nothing to coach.
+      busy: () => (this.coach?.active ?? false) || this.chart.isOpen || opts.boardOpen() || this.paused || this.air.factor < 0.93,
       racing: () => this.race.call !== null && this.race.finish === null,
     });
 
@@ -233,7 +240,7 @@ export class Session {
     });
 
     this.aboard = {
-      sim: this.sim, world, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
+      sim: this.sim, world, air: this.air, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
       spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       heard: (from, text) => this.heard(from, text),
@@ -285,6 +292,8 @@ export class Session {
 
   /** What this boat is doing when she is not simply sailing, in a few words, for the others to see. */
   status(): string {
+    // Holed comes before anything else she might be doing.
+    if (this.sim.state.damage >= 1) return 'Holed';
     for (const f of this.features) {
       const s = f.status?.();
       if (s) return s;
@@ -542,8 +551,11 @@ export class Session {
     const gust = this.gusts.update(paused ? 0 : dtReal);
     if (gust.alert) this.alarm(gust.alert);
     const doing = this.status();
-    if (doing) hud.setSail(doing, '', gust.line);
-    else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, gust.line);
+    // In bad air the line says so for as long as it lasts, beside any gust on the way.
+    const lostKt = Math.round((sim.out.tws / this.air.factor - sim.out.tws) / KT);
+    const airLine = [this.air.factor < 0.93 && lostKt >= 1 ? `bad air, ${lostKt} kt down` : '', gust.line].filter(Boolean).join(' · ');
+    if (doing) hud.setSail(doing, '', airLine);
+    else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, airLine);
     hud.setPilot(pilot.line());
     this.hints.update(paused ? 0 : dtReal);
     this.opts.logbook.update(dtReal);
@@ -570,7 +582,7 @@ export class Session {
       headingDeg: Math.round(s.heading * R2D), speedKt: r1(o.sog / KT), heelDeg: Math.round(s.heel * R2D),
       windKt: r1(o.tws / KT), windFromDeg: Math.round(o.twd * R2D), windAngleDeg: Math.round(o.twa * R2D),
       helm: s.helmMode, crewTrim: s.crewTrim, reef: s.reef,
-      aground: o.aground, knockdowns: s.knockdowns, boatsInCompany: this.fleet.boats.length,
+      aground: o.aground, knockdowns: s.knockdowns, hullDamage: Math.round(s.damage * 100), windShadow: Math.round((1 - this.air.factor) * 100), boatsInCompany: this.fleet.boats.length,
       screen: `${window.innerWidth}x${window.innerHeight}@${window.devicePixelRatio}`,
     };
   }

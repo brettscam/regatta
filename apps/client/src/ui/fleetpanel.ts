@@ -5,6 +5,7 @@ import { addEvent, eventLink, inText, isOpen, makeEvent, nextEvent, whenText, OP
 import { classText, clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
 import { HOW_A_RACE_WORKS, RING, marginText, shortRange } from '../race/startline';
 import type { YardBoat } from '../boat/yard';
+import { damageNote } from '../aboard/contactRules';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const HOW = `<h3>How a race works</h3><p class="lede">${HOW_A_RACE_WORKS.join(' ')}</p>`;
@@ -152,7 +153,9 @@ export class FleetPanel {
     const rows = this.ctx.boats().map((b) => {
       const d = Math.hypot(b.x - me.x, b.y - me.y);
       const brg = deg3(Math.atan2(b.x - me.x, b.y - me.y));
-      const doing = b.status || `${(b.sog / KT).toFixed(1)} kt`;
+      // What she is doing, and the state of her hull if it is not sound. Both are her own page's word.
+      const hull = damageNote(b.damage);
+      const doing = b.damage >= 100 ? hull : [b.status || `${(b.sog / KT).toFixed(1)} kt`, hull].filter(Boolean).join(' · ');
       return `<li><b>${esc(b.name || 'A skipper')}</b><span>${esc(b.boatName || 'Another boat')}</span><span>${esc(doing)}</span><span>${(d / 1852).toFixed(d < 1852 ? 2 : 1)} nm at ${brg}°</span></li>`;
     }).join('');
     const mine = `<li class="me"><b>${esc(me.name || 'You')}</b><span>${esc(me.boatName)}</span><span>${esc(me.status || `${(me.sog / KT).toFixed(1)} kt`)}</span><span>you</span></li>`;

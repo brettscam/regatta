@@ -39,7 +39,7 @@ export const KIND_NAMES: Record<AwardKind, string> = {
   fish: 'Fish landed',
   crabs: 'Crab landed',
   seen: 'First sightings',
-  lost: 'Lost to knockdowns, crash gybes and groundings',
+  lost: 'Lost to knockdowns, crash gybes, groundings and collisions',
 };
 const KINDS = Object.keys(KIND_NAMES) as AwardKind[];
 
@@ -60,6 +60,9 @@ export const POINTS = {
   knockdown: -15,
   crashGybe: -8,
   aground: -10,
+  /** Hitting another boat, and being holed by it. */
+  collision: -10,
+  holed: -25,
 } as const;
 
 export const TACK = { cooldown: 90, settled: 20, limit: 40, fast: 14, brisk: 22, irons: 3, aback: 4, recover: 0.8 } as const;
@@ -68,6 +71,8 @@ export const GROOVE = { every: 30, grace: 3, polar: 0.9, upwind: 60 } as const;
 export const GUST = { cooldown: 120, rise: 1.25, least: 2, floor: 6, shortest: 6, longest: 45, heel: 28 } as const;
 export const BERTH_COOLDOWN = 1200;
 export const AGROUND_COOLDOWN = 120;
+/** Seconds before another collision costs anything, and the closing speed, knots, under which one costs nothing. */
+export const COLLISION = { cooldown: 60, least: 1 } as const;
 
 const NONE: Award[] = [];
 
@@ -283,6 +288,20 @@ export class Seamanship {
     }
     return out;
   }
+}
+
+// ---- collisions --------------------------------------------------------------------------------------
+
+/**
+ * What hitting another boat costs. A touch under a knot costs nothing, and neither does a second hit within a minute
+ * of the last one that did. Being holed costs more, whenever it happens. Blame is not weighed: both boats pay.
+ * @param closingKt the speed they came together at, knots
+ * @param since seconds since a collision last cost anything
+ */
+export function collisionAward(closingKt: number, since: number, holed = false): Award | null {
+  if (holed) return { kind: 'lost', points: POINTS.holed, label: 'Holed' };
+  if (!(closingKt >= COLLISION.least) || since < COLLISION.cooldown) return null;
+  return { kind: 'lost', points: POINTS.collision, label: 'Collision' };
 }
 
 // ---- things the features count into the logbook ----------------------------------------------------

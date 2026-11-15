@@ -5,6 +5,7 @@ import { BoatView, type BoatPose } from '../boat/boatView';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 import type { RaceMark } from './race';
+import { ShadedWind } from './shadow';
 import { taken } from './startline';
 
 const R2D = 180 / Math.PI;
@@ -51,6 +52,8 @@ export class PaceBoat {
   readonly name: string;
   readonly skipper: string;
   readonly length: number;
+  /** Her own wind: the world's, less whatever shadow another boat throws on her. `aboard/badair.ts` sets it. */
+  readonly air: ShadedWind;
   /** Marks rounded, metres to the next one, and her time once she has finished. */
   leg = 0;
   toGo = 0;
@@ -76,7 +79,8 @@ export class PaceBoat {
     const y = start.y - Math.cos(along) * back - Math.sin(along) * side;
     // Each crew gets a little less out of the same boat than a perfect one would, and each by a different amount.
     const crewed = { ...spec, polar: { ...spec.polar, speeds: spec.polar.speeds.map((row) => row.map((kt) => kt * who.pace)) } };
-    this.sim = new Sim(crewed, env, { x, y, headingDeg: (along * 180) / Math.PI, speedKt: 0 });
+    this.air = new ShadedWind(env);
+    this.sim = new Sim(crewed, this.air, { x, y, headingDeg: (along * 180) / Math.PI, speedKt: 0 });
     this.legStart = { x, y };
     this.toGo = Math.hypot(start.x - x, start.y - y);
     this.view = new BoatView(spec, { topsides: who.colour, name: who.name });
