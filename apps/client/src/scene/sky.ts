@@ -227,6 +227,7 @@ export class SkySystem {
   private bakedOvercast = 0;
   private bakedAt = 0;
   private overcastMaterial: THREE.ShaderMaterial | null = null;
+  private readonly decks: THREE.Mesh[] = [];
   private readonly lit = new THREE.Color();
   private readonly shade = new THREE.Color();
 
@@ -351,8 +352,11 @@ export class SkySystem {
         deck.frustumCulled = false;
         deck.renderOrder = -4;
         parent.add(deck);
+        this.decks.push(deck);
       }
     }
+    // With no cloud asked for the deck is not drawn at all, so a water that never has any is as it was.
+    for (const deck of this.decks) deck.visible = cover > 0.001;
     this.overcast = cover;
     this.overcastMaterial.uniforms.uCover.value = cover;
     this.sunStrength = 1 - 0.88 * cover;

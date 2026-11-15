@@ -63,6 +63,8 @@ const PERF_TWS = [3, 6, 10, 14, 17.9, 18, 23, 27.9, 28, 34, 40, 47.9];
  * agrees with sailing her in real time. About half a second of work, once, when the voyage is made.
  */
 export function measurePerformance(spec: BoatSpec): Performance {
+  const known = measured.get(spec);
+  if (known) return known;
   const speed: number[][] = [];
   const leeway: number[][] = [];
   for (const tws of PERF_TWS) {
@@ -91,8 +93,13 @@ export function measurePerformance(spec: BoatSpec): Performance {
     speed.push(speeds);
     leeway.push(leeways);
   }
-  return { twa: PERF_TWA, tws: PERF_TWS, speed, leeway };
+  const perf = { twa: PERF_TWA, tws: PERF_TWS, speed, leeway };
+  measured.set(spec, perf);
+  return perf;
 }
+
+/** A boat is measured once: sailing the voyage again does not sail the table again. */
+const measured = new WeakMap<BoatSpec, Performance>();
 
 /** Speed through the water (m/s) and leeway (radians) at a wind angle and wind speed, read from the table. */
 export function performanceAt(p: Performance, twaDeg: number, twsKt: number): { speed: number; leeway: number } {
