@@ -7,6 +7,7 @@ import type { Logbook } from '../net/logbook';
 import type { RemoteBoat } from '../net/fleet';
 import type { Place } from '../session';
 import type { Stage } from '../stage';
+import type { Race } from '../race/race';
 import type { Hud } from '../ui/hud';
 import type { Passage } from '../ui/passage';
 
@@ -33,6 +34,8 @@ export interface AboardContext {
   sharing(): boolean;
   /** The other people's boats here now. */
   company(): RemoteBoat[];
+  /** The race this boat is in, if any, and its marks. */
+  race?: Race;
   /** Seconds into the recorded season, now. */
   seasonNow(): number;
   /** True while a key is held down, by its KeyboardEvent.code. */
@@ -50,7 +53,7 @@ export interface Feature {
   readonly id: string;
   /**
    * A key was pressed that the game itself does not use. Return true if this feature took it.
-   * Taken already: Space P T H C M B R F X Z K L O U Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
+   * Taken already: Space P T H C M B R F G X Z K L O U Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */

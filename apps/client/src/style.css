@@ -472,3 +472,6 @@ body.lobby .cheat { display: none; }
 .fleet-body .part { display: flex; flex-direction: column; gap: 10px; }
 .fleet-body .part:empty { display: none; }
 .fleetpanel { max-height: calc(100% - 110px); }
+
+/* The next mark's name and range, beside its column of light. */
+.mark-label { color: #1a1205; background: var(--amber); border-color: var(--amber); font-weight: 600; }

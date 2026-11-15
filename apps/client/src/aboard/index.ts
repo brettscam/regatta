@@ -4,6 +4,7 @@ import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
 import { FlowView } from './flow';
 import { Mooring } from './mooring';
+import { Guide } from './guide';
 import { Kayak } from './kayak';
 import { CrabPots } from './pots';
 import { Tow } from './tow';
@@ -23,6 +24,7 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new Mooring(ctx),
     new Tow(ctx),
     new FlowView(ctx),
+    new Guide(ctx),
     new CheatStrip(ctx),
   ];
 }
