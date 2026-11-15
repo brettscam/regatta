@@ -238,12 +238,14 @@ export class PaceSailor {
     const o = this.sim.out;
     if (o.aground) return true;
     const draft = this.sim.boat.dimensions.draft;
-    const near = Math.min(60, this.toGo);
-    const far = Math.min(130, this.toGo);
+    // Twenty-five seconds' sailing and fifty: time to turn her, however fast she is going.
+    const near = Math.min(clamp(o.sog * 25, 60, 110), this.toGo);
+    const far = Math.min(clamp(o.sog * 50, 130, 210), this.toGo);
     for (const h of o.sog > 0.5 ? [s.heading, o.cog] : [s.heading]) {
       const sin = Math.sin(h);
       const cos = Math.cos(h);
-      if (this.depth(s.x + sin * near, s.y + cos * near) < draft + 0.5 || this.depth(s.x + sin * far, s.y + cos * far) < draft + 0.2) return true;
+      // Every 25 m out to there: a rock is small enough to fall between two looks.
+      for (let d = 25; d <= far; d += 25) if (this.depth(s.x + sin * d, s.y + cos * d) < draft + (d <= near ? 0.5 : 0.2)) return true;
     }
     return false;
   }
@@ -259,13 +261,23 @@ export class PaceSailor {
     const twd = sim.out.twd;
     const need = sim.boat.dimensions.draft + 2;
     const brg = Math.atan2(next.x - s.x, next.y - s.y);
+    // Where a heading takes her over the ground, with the stream: in light air a strong tide decides it.
+    const here = this.air.sample(s.x, s.y, s.t);
+    const cx = here.currentX;
+    const cy = here.currentY;
+    const way = Math.max(2, s.speed);
     let best = NaN;
     let bestOff = Infinity;
     for (let k = 0; k < 24; k++) {
       const h = (k * Math.PI) / 12;
       if (Math.abs(wrapPi(twd - h)) < 55 * D2R) continue;
+      const gx = Math.sin(h) * way + cx;
+      const gy = Math.cos(h) * way + cy;
+      const g = Math.hypot(gx, gy) || 1;
       let clear = true;
-      for (const d of [50, 110, 180, 260, 340]) clear = clear && this.depth(s.x + Math.sin(h) * d, s.y + Math.cos(h) * d) >= need;
+      for (const d of [50, 110, 180, 260, 340]) clear = clear && this.depth(s.x + (gx / g) * d, s.y + (gy / g) * d) >= need && this.depth(s.x + Math.sin(h) * d * 0.5, s.y + Math.cos(h) * d * 0.5) >= need - 1;
+      // And not a course that scrapes along the shore: water a good way either side of it too.
+      for (const side of [-0.35, 0.35]) clear = clear && this.depth(s.x + Math.sin(h + side) * 120, s.y + Math.cos(h + side) * 120) >= need - 1;
       const off = Math.abs(wrapPi(h - brg));
       if (clear && off < bestOff) {
         best = h;
@@ -276,7 +288,9 @@ export class PaceSailor {
     this.escapes++;
     this.mode = 'escape';
     this.until = t + 30;
-    this.carefulTo = Math.max(this.carefulTo, t + 120);
+    // A fright like that and she is sailed properly for ten minutes: a slow boat near a shore in a tide is how it happened.
+    this.seriousTo = Math.max(this.seriousTo, t + 600);
+    this.carefulTo = Math.max(this.carefulTo, this.seriousTo);
     sim.setHelm('heading', best);
     sim.setCrewTrim(true);
     if (s.speed < 0.6) s.speed = 0.6;
@@ -630,7 +644,8 @@ export class PaceSailor {
     const need = sim.boat.dimensions.draft + 4;
     this.stuck = 0;
     this.tows++;
-    this.carefulTo = this.n / 60 + 180;
+    this.seriousTo = Math.max(this.seriousTo, this.n / 60 + 900);
+    this.carefulTo = Math.max(this.carefulTo, this.seriousTo);
     search: for (let r = 60; r <= 3000; r += 60) {
       const n = Math.max(12, Math.round((2 * Math.PI * r) / 80));
       for (let k = 0; k < n; k++) {

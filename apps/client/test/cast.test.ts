@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Banter, BANTER, lineFor, type BanterBoat } from '../src/race/banter';
 import { CAST, LEVELS, MAX_PACE, MIXES, drawEntrants, drift, entrantOf, hashText, readMix, readPace, type Mix } from '../src/race/cast';
+import { readCall } from '../src/race/race';
 import { BERTH_BACK, remainingBy, startBerths } from '../src/race/sailor';
 import { RING } from '../src/race/startline';
 import { berthClear } from '../src/race/trial';
@@ -80,6 +81,22 @@ describe('who turns out for a race', () => {
     expect(MIXES.map((m) => m.id)).toEqual(['beer', 'mixed', 'hot']);
     expect(drawEntrants('a', 99, 'nonsense' as Mix).length).toBe(MAX_PACE);
     expect(drawEntrants('a', NaN).length).toBe(0);
+  });
+
+  it('reads a race call for up to nine club boats and a mix, and nothing wilder', () => {
+    const marks = [{ name: 'A', x: 0, y: 0 }, { name: 'B', x: 0, y: 900 }];
+    const call = (over: Record<string, unknown>) => readCall({ id: 'abc', name: 'Race', gun: 100, marks, host: 'H', ...over });
+    expect(call({ pace: 9, mix: 'beer' })).toMatchObject({ pace: 9, mix: 'beer' });
+    expect(call({ pace: 500, mix: 'hot' })).toMatchObject({ pace: 9, mix: 'hot' });
+    expect(call({ pace: 4, mix: '<b>x</b>' })).toMatchObject({ pace: 4, mix: 'mixed' });
+    // An older copy of the game sends no mix: the whole club turns out.
+    const old = call({ pace: 3 })!;
+    expect(old.pace).toBe(3);
+    expect(old.mix).toBeUndefined();
+    expect(drawEntrants(old.id, old.pace, old.mix).length).toBe(3);
+    expect(call({ pace: 0, mix: 'hot' })!.mix).toBeUndefined();
+    expect(call({ pace: 'lots' })!.pace).toBe(0);
+    expect(call({ pace: -1 })!.pace).toBe(0);
   });
 
   it('gives each skipper luck that is fixed by the race', () => {
