@@ -189,13 +189,13 @@ describe('local knowledge', () => {
     expect(barWord(2, 2.5)).toMatch(/2\.5 knots/);
   });
 
-  it('finds the bar dangerous in the small hours of the second day, when the big ebb runs, and quiet on the flood', () => {
+  it('finds the bar lumpy or worse at low water on the first morning, when the ebb runs over it, and quiet on the afternoon flood', () => {
     const at = (hour: number) => {
       const c = world.current(-11500, -3000, hour * 3600, { x: 0, y: 0 });
       return barState(-c.x, world.wind(-11500, -3000, hour * 3600).speed / KT);
     };
-    expect(Math.max(at(17), at(18), at(19))).toBeGreaterThanOrEqual(1);
-    expect(at(10)).toBe(0);
+    expect(Math.max(at(0), at(1), at(2))).toBeGreaterThanOrEqual(1);
+    expect(at(7)).toBe(0);
   });
 
   it('notices a boat sailing in under the bridge, and not one sailing out or passing outside it', () => {
@@ -526,9 +526,11 @@ describe('places, starts and races', () => {
     }
   });
 
-  it('offers start times through the day and night, one of them the default, one with more wind than the record', () => {
+  it('offers start times through the day and night, one of them the default, all with the wind as it was', () => {
     expect(times.filter((t) => t.default).length).toBe(1);
-    expect(times.some((t) => (t.boost ?? 1) > 1)).toBe(true);
+    // The afternoon here already blows 20 knots at the Gate. Nothing is offered with more than the record.
+    expect(times.every((t) => (t.boost ?? 1) === 1)).toBe(true);
+    expect(times.length).toBeGreaterThanOrEqual(5);
     for (const t of times) {
       expect(t.hours).toBeGreaterThanOrEqual(0);
       expect(t.hours).toBeLessThan(course.season.hours - 6);
@@ -538,28 +540,36 @@ describe('places, starts and races', () => {
 });
 
 describe('the sea', () => {
-  it('declares a July north-west swell for the sea-state model', () => {
+  it('declares a north-west swell for the sea-state model: the one the wave model had for these 36 hours', () => {
     const main = sea.swell[0];
-    expect(main.height).toBeGreaterThanOrEqual(1.5);
+    expect(main.height).toBeGreaterThanOrEqual(0.8);
     expect(main.height).toBeLessThanOrEqual(2.5);
-    expect(main.period).toBeGreaterThanOrEqual(9);
+    expect(main.period).toBeGreaterThanOrEqual(7);
     expect(main.period).toBeLessThanOrEqual(12);
     expect(main.from).toBeGreaterThan(280);
     expect(main.from).toBeLessThan(330);
     expect(sea.shelter!.fullWestOf).toBeLessThan(sea.shelter!.noneEastOf);
+    // The declared height is the recorded sea's, give or take: the mean of the combined sea over the season.
+    const mean = sea.recorded!.height.reduce((a, b) => a + b, 0) / sea.recorded!.height.length;
+    expect(Math.abs(main.height - mean)).toBeLessThan(0.3);
+    // And a typical July day is kept beside it, for a model that wants more ocean: 1.5 to 2.5 m at 9 to 12 seconds.
+    const typical = sea.typical![0];
+    expect(typical.height).toBeGreaterThanOrEqual(1.5);
+    expect(typical.height).toBeLessThanOrEqual(2.5);
+    expect(typical.period).toBeGreaterThanOrEqual(9);
+    expect(typical.period).toBeLessThanOrEqual(12);
   });
 
-  it('carries the sea as a wave model recorded it for the season, hour by hour, and says it was a quiet one', () => {
+  it('carries the sea as a wave model recorded it for the season, hour by hour', () => {
     const r = sea.recorded!;
     expect(r.start).toBe(course.season.start);
     expect(r.height.length).toBe(course.season.hours + 1);
     expect(r.swell1.length).toBe(r.height.length);
     for (const h of r.height) {
-      expect(h).toBeGreaterThan(0.3);
-      expect(h).toBeLessThan(1.5);
+      expect(h).toBeGreaterThan(0.5);
+      expect(h).toBeLessThan(2);
     }
     expect(r.source).toMatch(/WAVEWATCH/);
-    expect(sea.note).toMatch(/quiet/);
   });
 });
 

@@ -9,12 +9,12 @@
     "pieces": ["golden-gate-bridge", "san-francisco"]
   },
   "layers": {
-    "wind": "Recorded. NOAA HRRR 3 km analyses, one an hour, 08:00 PDT 14 July 2024 for 36 hours: the same hours as San Francisco Bay. Baked on a 4 km grid over the whole water.",
+    "wind": "Recorded. NOAA HRRR 3 km analyses, one an hour, 08:00 PDT 26 July 2024 for 36 hours. Not the Bay's day: on 14 and 15 July the ocean was nearly calm, and this water wants its north-wester. Baked on a 4 km grid over the whole water.",
     "stream": "Recorded. NOAA SFBOFS from the Golden Gate out to about 45 km and north to Point Reyes; beyond it (the Farallones, Bodega, the south-west corner) NOAA WCOFS, the 4 km West Coast model, mixed in over the last 5 km of the finer model's water. 1 km grid, with a 250 m inset over the Gate and the bar.",
-    "tide": "Recorded. SFBOFS water level at San Francisco (Presidio), the same series as the Bay's. One tide for the whole water: Bodega and Point Reyes are really about half an hour ahead of it.",
+    "tide": "Recorded. SFBOFS water level at San Francisco (Presidio), the Bay's own station. One tide for the whole water: Bodega and Point Reyes are really about half an hour ahead of it.",
     "depth": "SFBOFS model depths where it has water, Terrarium elevation tiles elsewhere. 200 m grid, with finer insets over the Gate and bar (100 m), Bodega Harbour (25 m), Southeast Farallon, Pillar Point and Bolinas (50 m). Two dredged channels are cut in by rule: the main ship channel over the bar at its charted 55 feet, and Bodega Harbour's, deeper and wider than life.",
     "land": "Terrarium elevation tiles. 200 m grid, with 80 m insets over the Golden Gate, Bodega Head, Point Reyes and Pillar Point and 40 m over Southeast Farallon.",
-    "swell": "Declared, not replayed: sea.json gives a typical July north-west swell, with the quiet sea NOAA's wave model recorded for the day itself beside it.",
+    "swell": "Recorded, as a declaration: sea.json gives the north-west sea and the southerly swell NOAA's GFS wave model had off the Gate for these 36 hours, averaged, with the model's hourly figures and a typical July swell beside them.",
     "fog": "Not drawn. The Bay draws a fixed bank of marine layer where this water is sailed, so that piece is left off here. features.json says what this water wants of the fog."
   }
 }

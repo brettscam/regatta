@@ -4,8 +4,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ReplayWorld, type CourseData } from '../src';
 
-// Sanity checks on the baked Gulf of the Farallones: the ocean outside the Golden Gate. It shares the Bay's origin and its
-// 36 hours, is baked from two tide models, and is the first water with insets: finer grids over the Gate and the harbours.
+// Sanity checks on the baked Gulf of the Farallones: the ocean outside the Golden Gate. It shares the Bay's origin, is baked
+// from two tide models, and is the first water with insets: finer grids over the Gate and the harbours.
+// Its 36 hours are its own, 26 and 27 July 2024: on the Bay's day the ocean was all but calm.
 const here = dirname(fileURLToPath(import.meta.url));
 const dir = resolve(here, '../../../courses/farallones');
 const course = JSON.parse(readFileSync(resolve(dir, 'course.json'), 'utf8')) as CourseData;
@@ -34,20 +35,21 @@ const PILLAR_POINT_HARBOR: [number, number] = [-3100, -36900];
 const OPEN_OCEAN: [number, number] = [-58000, 20000];
 const MOUNT_TAMALPAIS = at(37.9235, -122.5965);
 
-describe('Gulf of the Farallones replay, 14 and 15 July 2024', () => {
+describe('Gulf of the Farallones replay, 26 and 27 July 2024', () => {
   const world = new ReplayWorld(data, 0);
 
-  it('is the same 36 hours as the Bay, from the same origin', () => {
+  it('starts at 08:00 Pacific on 26 July 2024 and holds 36 hours, from the Bay\'s own origin', () => {
     const bay = JSON.parse(readFileSync(resolve(here, '../../../courses/sf-bay/course.json'), 'utf8')) as CourseData;
     expect(course.id).toBe('farallones');
-    expect(course.season.start).toBe(bay.season.start);
+    expect(world.dateAt(0).toISOString()).toBe('2024-07-26T15:00:00.000Z');
     expect(course.season.hours).toBe(bay.season.hours);
+    expect(world.seasonLength).toBe(36 * 3600);
+    expect(course.wind.truth.length).toBe(37);
+    expect(course.tide.truth.length).toBe(37);
+    // A position here is the same position on the Bay's chart, the bridge included, and the tide is read at the same station.
     expect(course.origin).toEqual(bay.origin);
     expect(course.bridge).toEqual(bay.bridge);
-    expect(world.dateAt(0).toISOString()).toBe('2024-07-14T15:00:00.000Z');
-    expect(course.wind.truth.length).toBe(37);
-    // One tide for both: the Presidio's.
-    expect(course.tide.truth).toEqual(bay.tide.truth);
+    expect(course.tide.station).toBe(bay.tide.station);
   });
 
   it('reaches from inside the Golden Gate to the Farallones, Bodega and Pillar Point', () => {
@@ -95,8 +97,8 @@ describe('Gulf of the Farallones replay, 14 and 15 July 2024', () => {
   });
 
   it('runs out of the Gate on the ebb and in on the flood, as the Bay does', () => {
-    const ebb = world.current(...GATE, clock(10), { x: 0, y: 0 });
-    const flood = world.current(...GATE, clock(17), { x: 0, y: 0 });
+    const ebb = world.current(...GATE, clock(9), { x: 0, y: 0 });
+    const flood = world.current(...GATE, clock(15), { x: 0, y: 0 });
     expect(ebb.x / KT).toBeLessThan(-1.2);
     expect(flood.x / KT).toBeGreaterThan(1);
     let fastest = 0;
@@ -132,9 +134,8 @@ describe('Gulf of the Farallones replay, 14 and 15 July 2024', () => {
     expect(worst).toBeLessThan(0.05);
   });
 
-  it('carries the ebb out over the bar, and runs harder there at night than the Gate does', () => {
-    // The big ebb of the season is in the small hours of the second day.
-    const bar = world.current(...SHIP_CHANNEL, clock(26), { x: 0, y: 0 });
+  it('carries the ebb out over the bar at low water on the first morning', () => {
+    const bar = world.current(...SHIP_CHANNEL, clock(9), { x: 0, y: 0 });
     expect(bar.x / KT).toBeLessThan(-1.5);
     expect(Math.hypot(bar.x, bar.y) / KT).toBeLessThan(5);
   });
@@ -168,21 +169,32 @@ describe('Gulf of the Farallones replay, 14 and 15 July 2024', () => {
   });
 
   it('has the tide of the day: half a metre below the datum to nearly a metre above', () => {
+    // Low water is about nine on the first morning, high water late in the afternoon.
+    expect(world.tide(clock(9.5))).toBeLessThan(-0.5);
+    expect(world.tide(clock(16.5))).toBeGreaterThan(0.85);
     const levels = Array.from({ length: 37 }, (_, h) => world.tide(h * 3600));
     expect(Math.min(...levels)).toBeLessThan(-0.3);
     expect(Math.max(...levels)).toBeGreaterThan(0.7);
     expect(Math.max(...levels) - Math.min(...levels)).toBeLessThan(2);
   });
 
-  it('blows the afternoon sea breeze through the Gate and is lighter offshore, as it was that day', () => {
+  it('blows the afternoon sea breeze through the Gate, and a north-wester over the open ocean day and night', () => {
     const gate = world.wind(...GATE, clock(16));
-    const offshore = world.wind(...OPEN_OCEAN, clock(16));
-    expect(gate.speed / KT).toBeGreaterThan(10);
+    expect(gate.speed / KT).toBeGreaterThan(15);
     expect(gate.speed / KT).toBeLessThan(25);
     const from = (gate.dir * 180) / Math.PI;
     expect(from).toBeGreaterThan(220);
     expect(from).toBeLessThan(300);
-    expect(offshore.speed).toBeLessThan(gate.speed);
+    // Off the Farallones: 10 to 20 knots between west and north-north-west through the first day and night.
+    for (const hour of [9, 12, 15, 18, 21, 24, 27]) {
+      const w = world.wind(SE_FARALLON[0] + 2500, SE_FARALLON[1], clock(hour));
+      expect(w.speed / KT, `at ${hour}`).toBeGreaterThan(9);
+      expect(w.speed / KT, `at ${hour}`).toBeLessThan(21);
+      expect((w.dir * 180) / Math.PI, `at ${hour}`).toBeGreaterThan(260);
+      expect((w.dir * 180) / Math.PI, `at ${hour}`).toBeLessThan(330);
+    }
+    // Drakes Bay lies in the lee of Point Reyes and has less.
+    expect(world.wind(...DRAKES_BAY, clock(15)).speed).toBeLessThan(world.wind(SE_FARALLON[0] + 2500, SE_FARALLON[1], clock(15)).speed);
   });
 
   it('keeps every wind and gust on the grid within what a summer day can do', () => {

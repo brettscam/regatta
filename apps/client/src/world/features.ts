@@ -73,11 +73,13 @@ export interface Swell {
 /**
  * A water's sea state, for the sea-state model. `swell` is the declaration to use: the ocean swell that runs here
  * whatever the local wind is doing. The wind sea is not in it: that comes from the wind of the hour, as on every water.
- * `recorded` is what a wave model said of the replayed day itself, hour by hour, for whoever wants the real thing.
+ * `recorded` is what a wave model said of the replayed season itself, hour by hour, for whoever wants every hour of it.
  */
 export interface SeaSpec {
   note?: string;
   swell: Swell[];
+  /** What a typical day brings, where the replayed day was not typical. For a model that wants it. */
+  typical?: Swell[];
   /** Where the open-ocean swell is cut off: east of this line (inside the Gate) it is not felt. */
   shelter?: { say: string; fullWestOf: number; noneEastOf: number };
   recorded?: {
