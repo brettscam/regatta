@@ -12,6 +12,7 @@ import { Kayak } from './kayak';
 import { SeamanshipPoints } from './seamanship';
 import { CrabPots } from './pots';
 import { Radio } from './radio';
+import { Tips } from './tips';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
 
@@ -40,5 +41,7 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new BadAir(ctx),
     new Contact(ctx),
     new SeamanshipPoints(ctx),
+    // The pop-up tips and the radio's light. Last: they watch everything, take no keys and give no status.
+    new Tips(ctx),
   ];
 }
