@@ -40,7 +40,7 @@ export interface RadioCall {
 }
 
 /** Scheduled calls are never closer together than this, seconds. */
-export const CALL_GAP = 300;
+export const CALL_GAP = 420;
 /** A ship reports this long before she reaches her gate. */
 const GATE_LEAD = 90;
 /** What the coast station is called when the traffic file does not say. */
@@ -54,7 +54,8 @@ function seed(text: string): number {
 }
 
 /** How a vessel names herself on the air. */
-export function callSign(route: { name: string; kind: string }): string {
+export function callSign(route: { name: string; kind: string; sign?: string }): string {
+  if (route.sign) return route.sign;
   return route.kind === 'ship' ? `the motor vessel ${route.name}` : `the ${route.name}`;
 }
 
@@ -88,8 +89,8 @@ export function gateText(who: string, kind: TrafficRoute['kind'], way: string, g
 /**
  * Every scheduled call in one run of the season, in order.
  * @param seasonLength seconds of recorded weather; calls are listed from 0 to there
- * @param gap the least time between two calls. A ship's call is kept over a broadcast, a broadcast over a ferry, and
- *   any of them over a yacht's radio check.
+ * @param gap the least time between two calls. The station's broadcast goes out on time whatever else is due; a
+ *   ship's call is kept over a ferry's, and any of them over a yacht's radio check.
  * @param broadcasts the coast station's, from `broadcasts`
  * @param checks the residents', from `checkCalls`
  */
@@ -117,11 +118,12 @@ export function schedule(spec: TrafficSpec, seasonLength: number, gap = CALL_GAP
       };
       // Leaving a berth. A vessel that is off the chart at an end has no berth there to leave.
       if (r.ends) {
-        if (r.hideAtEnds !== true) add(t0, leavingText(who, r.ends[0], r.ends[1], hash01(own, k, 1)));
-        if (!r.hideAtEnds) add(t0 + back, leavingText(who, r.ends[1], r.ends[0], hash01(own, k, 2)));
+        if (!r.hideAtEnds || r.hideAtEnds === 'last') add(t0, leavingText(who, r.ends[0], r.ends[1], hash01(own, k, 1)));
+        if (!r.hideAtEnds || r.hideAtEnds === 'first') add(t0 + back, leavingText(who, r.ends[1], r.ends[0], hash01(own, k, 2)));
       }
       if (r.gate) {
         const s = track.along(r.gate.at);
+        // A ship coming in from sea is inbound; a tug or a pilot boat, like a ferry, is just coming up to the place.
         const ship = r.kind === 'ship';
         add(t0 + track.runTime(s) - GATE_LEAD, gateText(who, r.kind, ship ? 'inbound' : 'approaching', r.gate.name, r.ends?.[1], about, hash01(own, k, 3)));
         add(t0 + back + track.runTime(track.length - s) - GATE_LEAD, gateText(who, r.kind, ship ? 'outbound' : 'approaching', r.gate.name, r.ends?.[0], about, hash01(own, k, 4)));
@@ -130,7 +132,7 @@ export function schedule(spec: TrafficSpec, seasonLength: number, gap = CALL_GAP
   }
   const kept: RadioCall[] = [];
   const clear = (c: RadioCall) => kept.every((k) => Math.abs(k.t - c.t) >= gap);
-  for (const list of [ships, broadcasts.slice(), ferries]) {
+  for (const list of [broadcasts.slice(), ships, ferries]) {
     list.sort((a, b) => a.t - b.t);
     for (const c of list) if (c.t >= 0 && c.t < seasonLength && clear(c)) kept.push(c);
   }

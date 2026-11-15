@@ -20,7 +20,7 @@ describe('the ferries and ships on channel 16', () => {
     expect(schedule(spec, SEASON)).toEqual(calls);
   });
 
-  it('is occasional: in order, never two within five minutes, a few an hour', () => {
+  it('is occasional: in order, never two within seven minutes, a few an hour', () => {
     expect(calls.length).toBeGreaterThan(36 * 3);
     expect(calls.length).toBeLessThanOrEqual(SEASON / CALL_GAP);
     for (let i = 1; i < calls.length; i++) expect(calls[i].t - calls[i - 1].t).toBeGreaterThanOrEqual(CALL_GAP);
@@ -262,17 +262,17 @@ describe('better calls', () => {
     expect(new Set(checks.map((c) => c.text.replace(/Boat \d/g, 'X'))).size).toBeGreaterThan(1);
   });
 
-  it('keeps the whole channel occasional: nothing within five minutes of anything else, and a ship before a broadcast before a ferry before a yacht', () => {
+  it('keeps the whole channel occasional: nothing within seven minutes of anything else, and the broadcast before a ship before a ferry before a yacht', () => {
     const news = broadcasts('Bay Radio', SEASON, 8);
     const checks = checkCalls('Bay Radio', leaving);
     const all = schedule(spec, SEASON, CALL_GAP, news, checks);
     for (let i = 1; i < all.length; i++) expect(all[i].t - all[i - 1].t).toBeGreaterThanOrEqual(CALL_GAP);
     expect(all.length).toBeLessThanOrEqual(SEASON / CALL_GAP);
-    expect(all.filter((c) => c.kind === 'bulletin').length).toBeGreaterThanOrEqual(10);
+    expect(all.filter((c) => c.kind === 'bulletin').length).toBe(news.length);
     expect(all.filter((c) => c.kind === 'check').length).toBeGreaterThan(2);
-    // Every ship call that was there without them is still there.
+    // Nearly every ship call that was there without them is still there.
     const ships = schedule(spec, SEASON).filter((c) => c.role === 'pilot');
-    expect(all.filter((c) => c.role === 'pilot')).toEqual(ships);
+    expect(all.filter((c) => c.role === 'pilot').length).toBeGreaterThan(ships.length * 0.8);
     // About five an hour at the most, over the day.
     expect(all.length / 36).toBeLessThan(7);
   });

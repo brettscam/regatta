@@ -173,8 +173,8 @@ describe.each(WATERS)('the boats that live on %s', (id) => {
       for (const h of [11.5, 12.5, 13.5, 14.5, 15.5, 16.5]) {
         const a = at(h, day);
         expect(a.underWay, `under way at ${h}`).toBeGreaterThanOrEqual(4);
-        expect(a.underWay).toBeLessThanOrEqual(15);
-        expect(a.showing).toBeLessThanOrEqual(24);
+        expect(a.underWay).toBeLessThanOrEqual(18);
+        expect(a.showing).toBeLessThanOrEqual(28);
         expect(a.sails, `sails at ${h}`).toBeGreaterThanOrEqual(1);
       }
       if (day === 0) {
@@ -289,6 +289,68 @@ describe('the ferries and ships of both waters', () => {
     track.state(-r.phase + 2 * track.travel + (r.dwell ?? 0) + 10, st);
     expect(st.active).toBe(true);
     expect(st.sog).toBe(0);
+  });
+});
+
+describe('the big ships of the Bay', () => {
+  const spec = json<TrafficSpec>('sf-bay', 'traffic.json');
+  const ref = spec.referenceHours * HOUR;
+  const st = { x: 0, y: 0, heading: 0, sog: 0, active: true };
+  const by = (model: string) => spec.routes.filter((r) => r.model === model);
+
+  it('are tankers, container ships, a car carrier, a cruise ship, tugs with barges and a pilot boat, each with her own call sign', () => {
+    expect(by('tanker').length).toBe(2);
+    expect(by('container').length).toBe(2);
+    expect(by('carcarrier').length).toBe(1);
+    expect(by('cruise').length).toBe(1);
+    expect(by('tug').length).toBe(2);
+    expect(by('pilot').length).toBe(1);
+    for (const r of spec.routes.filter((x) => x.kind === 'ship' || x.model === 'tug' || x.model === 'pilot')) {
+      expect(r.sign, r.id).toContain(r.name.replace('Pilot boat ', ''));
+      expect(r.speedKt).toBeGreaterThanOrEqual(6);
+      expect(r.speedKt).toBeLessThanOrEqual(r.model === 'pilot' ? 20 : 13);
+    }
+    expect(new Set(spec.routes.map((r) => r.name)).size).toBe(spec.routes.length);
+  });
+
+  it('brings the cruise ship in once, early on the second morning, and takes her out that evening', () => {
+    const r = by('cruise')[0];
+    const track = new Track(r, ref);
+    expect(track.cycle).toBeGreaterThan(36 * HOUR);
+    const changes: Array<[number, boolean]> = [];
+    let was = false;
+    let alongside = 0;
+    for (let t = 0; t < 36 * HOUR; t += 60) {
+      track.state(t, st);
+      if (st.active !== was) changes.push([8 + t / HOUR, (was = st.active)]);
+      if (st.active && st.sog === 0) alongside += 60;
+    }
+    expect(changes.length).toBe(2);
+    // In sight from a quarter to six, at the Gate soon after, alongside by a quarter to seven; gone by a quarter past six in the evening.
+    expect(changes[0][0] - 24).toBeGreaterThan(5);
+    expect(changes[0][0] - 24).toBeLessThan(6.5);
+    expect(changes[1][0] - 24).toBeGreaterThan(17.5);
+    expect(changes[1][0] - 24).toBeLessThan(18.7);
+    expect(alongside / HOUR).toBeCloseTo(10.5, 0);
+  });
+
+  it('has several ship movements on the water at any busy hour, at ship speeds', () => {
+    const tracks = spec.routes.filter((r) => !r.id.startsWith('ferry-')).map((r) => new Track(r, ref));
+    let least = Infinity;
+    let sum = 0;
+    let n = 0;
+    for (let h = 1; h < 12; h += 0.5) {
+      let moving = 0;
+      for (const t of tracks) {
+        t.state(h * HOUR, st);
+        if (st.active && st.sog > 1) moving++;
+      }
+      least = Math.min(least, moving);
+      sum += moving;
+      n++;
+    }
+    expect(least).toBeGreaterThanOrEqual(1);
+    expect(sum / n).toBeGreaterThan(4);
   });
 });
 

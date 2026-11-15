@@ -77,8 +77,8 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   ] },
   { title: 'Race and talk', note: `How a race works. ${HOW_A_RACE_WORKS.join(' ')}`, rows: [
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
-    [['Enter'], 'Message', 'Type a message to the other boats.'],
-    [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the ferry and ship calls off or on.'],
+    [['Enter'], 'Hail', 'Type a message to the other boats. A boat that lives here answers too, when she is within a few hundred metres: who she is, then the wind, the tide, a place to lie, the fishing.'],
+    [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the spoken calls from ferries, ships, the coast station and other boats off or on.'],
   ] },
   { title: 'Under power', note: 'The engine, for when there is no wind or no room to sail. It is not allowed in a race.', rows: [
     [['I'], 'Engine', 'Start it or stop it. It takes a second or two to fire, and starts out of gear.'],

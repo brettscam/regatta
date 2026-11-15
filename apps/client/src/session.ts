@@ -110,6 +110,7 @@ export class Session {
   private aboard!: AboardContext;
   /** The boats that live on this water, as other vessels. See `aboard/residents.ts`. */
   private residents: Residents | null = null;
+  private readonly elsewhere: TrafficVessel[] = [];
   private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0 };
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
@@ -369,8 +370,17 @@ export class Session {
   /** Every other vessel on the water: the course's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
     // The boats that live on this water are vessels like any other: on the chart, and with a wake.
-    const locals = this.residents?.vessels ?? [];
-    const traffic = this.race.pacers.length || locals.length ? [...this.stage.traffic.vessels, ...locals, ...this.race.vessels()] : this.stage.traffic.vessels;
+    // One list, filled again each time it is asked for, so nothing is made every frame.
+    const locals = this.residents?.vessels;
+    let traffic = this.stage.traffic.vessels;
+    if (locals?.length || this.race.pacers.length) {
+      const all = this.elsewhere;
+      all.length = 0;
+      for (const v of traffic) all.push(v);
+      if (locals) for (const v of locals) all.push(v);
+      if (this.race.pacers.length) for (const v of this.race.vessels()) all.push(v);
+      traffic = all;
+    }
     if (!this.fleet.boats.length) return traffic;
     const company: TrafficVessel[] = this.fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.boatName || b.name || 'Another boat', kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: b.length, beam: b.length / 3 }));
     return [...traffic, ...company];

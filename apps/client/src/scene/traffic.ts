@@ -18,6 +18,8 @@ export interface TrafficVessel {
   sog: number;
   length: number;
   beam: number;
+  /** How she names herself on the radio, when it is not simply her name: "the tanker Cape Lookout". */
+  sign?: string;
 }
 
 export interface TrafficRoute {
@@ -25,7 +27,7 @@ export interface TrafficRoute {
   name: string;
   kind: 'ferry' | 'ship' | 'sail';
   /** Which model to build. */
-  model: 'catamaran' | 'ferry' | 'carferry' | 'container' | 'sloop';
+  model: 'catamaran' | 'ferry' | 'carferry' | 'container' | 'sloop' | 'tanker' | 'cruise' | 'carcarrier' | 'tug' | 'pilot';
   length: number;
   beam: number;
   speedKt: number;
@@ -33,8 +35,12 @@ export interface TrafficRoute {
   mode: 'shuttle' | 'loop';
   /** Seconds stopped at each end of a shuttle. */
   dwell?: number;
-  /** A vessel that leaves the chart is not shown while it is stopped at the far ends. `last` hides her at the last way point only: her first is a berth on the chart. */
-  hideAtEnds?: boolean | 'last';
+  /** Seconds stopped at her first way point, when that is not the same as at her last. A ship that calls once in the season is given a long one. */
+  dwellHome?: number;
+  /** How she names herself on the radio, when it is not simply her name: "the tanker Cape Lookout". See `aboard/radioCalls.ts`. */
+  sign?: string;
+  /** A vessel that leaves the chart is not shown while it is stopped at the far ends. `last` hides her at the last way point only (her first is a berth on the chart), `first` at the first only. */
+  hideAtEnds?: boolean | 'last' | 'first';
   /** Seconds into its cycle at the traffic file's reference time. */
   phase: number;
   /** Hull or stripe colour: "#1f5fa8". */
@@ -100,7 +106,7 @@ export class Track {
     // Shuttles ease away from the dock and ease in to it.
     this.ramp = closed ? 0 : Math.min(45, (total / this.speed) * 0.25);
     this.travel = total / this.speed + this.ramp;
-    this.cycle = closed ? total / this.speed : 2 * (this.travel + (route.dwell ?? 0));
+    this.cycle = closed ? total / this.speed : 2 * this.travel + (route.dwell ?? 0) + (route.dwellHome ?? route.dwell ?? 0);
   }
 
   /** Position at a distance along the line. */
@@ -180,7 +186,7 @@ export class Track {
       this.point(this.length, out);
       out.heading = turn(this.bearing(this.length - 1), (tau - T) / dwell);
       out.sog = 0;
-      out.active = !r.hideAtEnds;
+      out.active = !r.hideAtEnds || r.hideAtEnds === 'first';
     } else if (tau < 2 * T + dwell) {
       const { s, v } = this.run(tau - T - dwell);
       this.point(this.length - s, out);
@@ -188,9 +194,9 @@ export class Track {
       out.sog = v;
     } else {
       this.point(0, out);
-      out.heading = turn(this.bearing(1) + Math.PI, (tau - 2 * T - dwell) / dwell);
+      out.heading = turn(this.bearing(1) + Math.PI, (tau - 2 * T - dwell) / ((r.dwellHome ?? dwell) || 1));
       out.sog = 0;
-      out.active = r.hideAtEnds !== true;
+      out.active = !r.hideAtEnds || r.hideAtEnds === 'last';
     }
   }
 }
@@ -344,6 +350,119 @@ function buildContainerShip(r: TrafficRoute): THREE.Group {
   return g;
 }
 
+// ---- more big ships: tankers, a cruise ship, a car carrier, tugs with barges, the pilot boat ---------
+// Each is made to be told from the others at a distance by its outline alone.
+
+/** A tanker: a long low hull with a flat deck, pipes down the middle, and everything else right aft. */
+function buildTanker(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const B = r.beam;
+  g.add(hull(L, B, -8, 5, mat(r.color, 0.75), 0.09, 0.92));
+  g.add(hull(L * 1.002, B * 1.01, -1.2, 1.2, mat(0x8a2a22, 0.8), 0.09, 0.92));
+  box(g, mat(0x7c3b2e, 0.9), B * 0.94, 0.4, L * 0.9, 0, 5.2, 0);
+  // Pipes and the catwalk over them, and the manifold amidships.
+  box(g, mat(0x9aa0a4, 0.6), 2.6, 1.6, L * 0.68, 0, 6.2, -L * 0.06);
+  box(g, mat(0x9aa0a4, 0.6), B * 0.8, 2.2, 5, 0, 6.5, -L * 0.04);
+  for (const z of [-0.3, -0.12, 0.08]) box(g, DARK, 0.5, 9, 0.5, B * 0.2, 9.6, L * z);
+  const house = mat(0xe9e7e0, 0.6);
+  const hz = L * 0.39;
+  box(g, house, B * 0.8, 15, L * 0.08, 0, 12.9, hz);
+  box(g, GLASS, B * 0.81, 1.2, L * 0.081, 0, 18.6, hz);
+  box(g, house, B * 1.04, 2.8, L * 0.05, 0, 21.8, hz - L * 0.012);
+  box(g, GLASS, B * 1.05, 1.1, L * 0.051, 0, 22.2, hz - L * 0.012);
+  box(g, mat(0xc7532a, 0.6), 6, 10, 7, 0, 22, hz + L * 0.055);
+  box(g, DARK, 0.5, 8, 0.5, 0, 9.2, -L * 0.45);
+  return g;
+}
+
+/** A cruise ship: white, and tier upon tier of it, with a raked funnel. */
+function buildCruiseShip(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const B = r.beam;
+  const white = mat(0xf4f3ee, 0.55);
+  g.add(hull(L, B, -7, 9, white, 0.16, 0.86));
+  g.add(hull(L * 1.002, B * 1.01, -1, 1.2, mat(r.color, 0.7), 0.16, 0.86));
+  // Decks of cabins, each a little shorter than the one below, with a band of glass to each.
+  for (let k = 0; k < 6; k++) {
+    const len = L * (0.82 - k * 0.045);
+    const y = 10.4 + k * 3;
+    box(g, white, B * (0.98 - k * 0.02), 2.9, len, 0, y, L * 0.01 + k * L * 0.008);
+    box(g, GLASS, B * (0.985 - k * 0.02), 1.0, len * 0.96, 0, y + 0.2, L * 0.01 + k * L * 0.008);
+  }
+  // The bridge forward, wider than the ship, and the funnel.
+  box(g, white, B * 1.08, 3, L * 0.05, 0, 28.5, -L * 0.3);
+  box(g, GLASS, B * 1.09, 1.2, L * 0.051, 0, 28.9, -L * 0.3);
+  const funnel = box(g, mat(r.color, 0.6), 9, 12, 16, 0, 34, L * 0.2);
+  funnel.rotation.x = -0.22;
+  box(g, DARK, 0.5, 10, 0.5, 0, 35, -L * 0.24);
+  return g;
+}
+
+/** A car carrier: one tall slab from end to end, with a small bridge on top at the bows. */
+function buildCarCarrier(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const B = r.beam;
+  g.add(hull(L, B, -8, 6, mat(r.color, 0.7), 0.13, 0.95));
+  g.add(hull(L * 1.002, B * 1.01, -1.2, 1.2, mat(0x8a2a22, 0.8), 0.13, 0.95));
+  box(g, mat(0xe6e8e9, 0.65), B, 22, L * 0.86, 0, 17, L * 0.05);
+  box(g, mat(r.color, 0.7), B * 1.005, 5, L * 0.86, 0, 8.6, L * 0.05);
+  box(g, mat(0xe6e8e9, 0.65), B * 1.06, 3, L * 0.06, 0, 29.5, -L * 0.33);
+  box(g, GLASS, B * 1.07, 1.2, L * 0.061, 0, 29.9, -L * 0.33);
+  box(g, DARK, 5, 6, 7, 0, 31, L * 0.36);
+  // The stern ramp, stowed upright.
+  box(g, mat(0x9aa0a4, 0.7), 8, 16, 1, B * 0.2, 14, L * 0.49);
+  return g;
+}
+
+/** A tug with a barge in tow: the tug ahead, the towline, and the barge behind her with its load. The length is of the whole tow. */
+function buildTugAndBarge(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const tugL = Math.min(30, L * 0.32);
+  const bargeL = L * 0.5;
+  const tugZ = -L / 2 + tugL / 2;
+  const bargeZ = L / 2 - bargeL / 2;
+  const tug = hull(tugL, tugL * 0.33, -2.5, 2.2, mat(r.color, 0.6), 0.3, 0.9);
+  tug.position.z = tugZ;
+  g.add(tug);
+  box(g, WHITE, tugL * 0.24, 3, tugL * 0.36, 0, 3.7, tugZ - tugL * 0.08);
+  box(g, GLASS, tugL * 0.245, 1, tugL * 0.33, 0, 4.4, tugZ - tugL * 0.08);
+  box(g, WHITE, tugL * 0.18, 2.4, tugL * 0.2, 0, 6.4, tugZ - tugL * 0.12);
+  box(g, GLASS, tugL * 0.185, 1, tugL * 0.205, 0, 6.8, tugZ - tugL * 0.12);
+  box(g, DARK, 1.3, 3.4, 1.6, 0, 6.6, tugZ + tugL * 0.1);
+  box(g, DARK, 0.25, 5, 0.25, 0, 10, tugZ - tugL * 0.12);
+  // The towline, and the barge: a box with a flat deck, loaded with sand.
+  const towFrom = tugZ + tugL * 0.4;
+  const towTo = bargeZ - bargeL / 2;
+  box(g, DARK, 0.12, 0.12, towTo - towFrom, 0, 1.8, (towFrom + towTo) / 2).castShadow = false;
+  const barge = hull(bargeL, r.beam, -2, 2.6, mat(0x4a4f55, 0.85), 0.05, 1);
+  barge.position.z = bargeZ;
+  g.add(barge);
+  for (const k of [-0.28, 0, 0.28]) {
+    const pile = new THREE.Mesh(new THREE.ConeGeometry(r.beam * 0.42, 4.2, 10), mat(0xc9b78c, 0.95));
+    pile.position.set(0, 4.6, bargeZ + bargeL * k);
+    pile.castShadow = true;
+    g.add(pile);
+  }
+  return g;
+}
+
+/** The pilot boat: small, fast, and painted so nobody can miss her. */
+function buildPilotBoat(r: TrafficRoute): THREE.Group {
+  const g = new THREE.Group();
+  const L = r.length;
+  const B = r.beam;
+  g.add(hull(L, B, -1.2, 1.7, mat(r.color, 0.5), 0.36, 0.9));
+  box(g, mat(0xf2f0ea, 0.6), B * 0.7, 2.2, L * 0.4, 0, 2.8, -L * 0.06);
+  box(g, GLASS, B * 0.71, 0.9, L * 0.36, 0, 3.2, -L * 0.06);
+  box(g, DARK, B * 0.9, 0.3, L * 0.9, 0, 1.75, 0);
+  box(g, DARK, 0.2, 3, 0.2, 0, 5.3, -L * 0.02);
+  return g;
+}
+
 /** A triangle of cloth with some belly, lying in the YZ plane with its luff up the Y axis and its foot along +Z. */
 export function sailCloth(luff: number, foot: number, belly: number, m: THREE.Material): THREE.Mesh {
   const NU = 5;
@@ -458,6 +577,11 @@ export class Traffic {
       else if (r.model === 'ferry') group = buildFerry(r);
       else if (r.model === 'carferry') group = buildCarFerry(r);
       else if (r.model === 'container') group = buildContainerShip(r);
+      else if (r.model === 'tanker') group = buildTanker(r);
+      else if (r.model === 'cruise') group = buildCruiseShip(r);
+      else if (r.model === 'carcarrier') group = buildCarCarrier(r);
+      else if (r.model === 'tug') group = buildTugAndBarge(r);
+      else if (r.model === 'pilot') group = buildPilotBoat(r);
       else ({ group, parts: sails } = buildSloopModel(r));
       group.name = r.id;
       group.rotation.order = 'YXZ';
@@ -476,7 +600,7 @@ export class Traffic {
       }
       this.actors.push({
         track,
-        vessel: { id: r.id, name: r.name, kind: r.kind, x: 0, y: 0, heading: 0, sog: 0, length: r.length, beam: r.beam },
+        vessel: { id: r.id, name: r.name, kind: r.kind, x: 0, y: 0, heading: 0, sog: 0, length: r.length, beam: r.beam, sign: r.sign },
         group,
         sails,
       });

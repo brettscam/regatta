@@ -247,7 +247,8 @@ export class Residents implements Feature {
         roll = Math.sin(seaTime * 1.1 + i) * 0.02;
       }
       if (view.sails) {
-        const set = st.mode === 'sail';
+        // Stopped out on the water for a few minutes she is hove to, not stowed: only a boat lying to something puts her sails away.
+        const set = st.mode === 'sail' || (st.mode === 'berth' && st.lie === 'drift');
         const side = this.twa[i] >= 0 ? 1 : -1;
         const off = Math.abs(this.twa[i]) / D2R;
         // Slowed to let the player by, she has luffed: sails eased and upright.
