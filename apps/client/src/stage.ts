@@ -6,6 +6,7 @@ import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
+import { setCityNight } from './scene/massing';
 import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
 
@@ -83,7 +84,7 @@ export class Stage {
     const land = new THREE.Group();
     land.name = 'course';
     land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
-    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain));
+    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
@@ -168,6 +169,8 @@ export class Stage {
     const el = this.sky.elevation;
     const up = THREE.MathUtils.clamp(Math.sin(el) * 3, 0, 1);
     this.haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(el) * 6 + 0.3, 0, 1));
+    // The lights of the shore come on as the sun goes down: first at two degrees up, all of them by four below.
+    setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
     this.ocean.setSun(this.sky.sunDir, this.sky.sunColor);
     this.ocean.setShips(ships);
     this.ocean.update(seaTime, camera, boat);
