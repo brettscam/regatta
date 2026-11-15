@@ -5,8 +5,8 @@ import { BoatView, type BoatPose } from '../boat/boatView';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 import type { RaceMark } from './race';
+import { taken } from './startline';
 
-const ARRIVAL = 130;
 const R2D = 180 / Math.PI;
 
 /**
@@ -108,8 +108,8 @@ export class PaceBoat {
     if (s.tick % 60 === 0) this.handleSails(next);
     const fix = trackFix(s, this.legStart, next);
     this.toGo = fix.toGo;
-    const legLength = Math.hypot(next.x - this.legStart.x, next.y - this.legStart.y);
-    if (fix.toGo < ARRIVAL || (fix.along > legLength && fix.toGo < ARRIVAL * 4)) {
+    // The pace boats are judged by the same rule as the player.
+    if (taken(fix.toGo, fix.along, Math.hypot(next.x - this.legStart.x, next.y - this.legStart.y))) {
       this.leg++;
       this.legStart = { x: next.x, y: next.y };
       const after = this.marks[this.leg];
