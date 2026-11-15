@@ -5,6 +5,7 @@ import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
 import { alone, onWeb } from '../net/platform';
 import type { CourseAbout } from '../world/loadCourse';
 import { inText, nextEvent, whenText } from '../race/events';
+import { TENDERS, carries, saveTender, savedTender, tenderFor } from '../aboard/tenders'; // tender
 
 export interface StartSpot {
   id: string;
@@ -143,6 +144,7 @@ export class JoinFlow {
       this.choice.boat = d.boat;
       if (!this.named) this.choice.name = this.defaultName(d.boat);
     } else if (d.colour) this.choice.colour = d.colour;
+    else if (d.tender) saveTender(d.tender); // tender: kept on the device by itself, not in the choice
     else return;
     // Show it first, so the conditions on the cards are for the time just picked.
     this.opts.onPreview(this.choice, this.step);
@@ -255,6 +257,14 @@ export class JoinFlow {
     const coming = yard.length ? `<p class="soon">Still in the yard: ${yard.map((e) => esc(e.name ?? e.id)).join(' and ')}.</p>` : '';
     const swatches = TOPSIDES.map((c) =>
       `<button type="button" class="swatch" data-colour="${c.hex}" aria-pressed="${c.hex === this.choice.colour}" aria-label="${c.name} topsides" title="${c.name}" style="background:${c.hex}"></button>`).join('');
+    // ---- tender: which one she carries. The table says which yachts carry which, and the choice is kept on the device.
+    const feet = this.opts.boats[this.choice.boat]?.lengthFt ?? 0;
+    const mine = tenderFor(savedTender(), feet);
+    const tenders = TENDERS.map((t) => {
+      const can = carries(feet, t);
+      const speed = `${t.drive === 'paddle' ? t.cruiseKt : t.topKt} kt`;
+      return `<button type="button" class="chip" data-tender="${t.id}" aria-pressed="${t.id === mine.id}"${can ? '' : ' disabled'} title="${esc(can ? t.say : `Only on yachts of ${t.minLengthFt} ft and up`)}"><b>${esc(t.name)}</b>${esc(can ? speed : `${t.minLengthFt} ft and up`)}</button>`;
+    }).join('');
     return `<h2>Choose your boat</h2><div class="cards">${cards}</div>${coming}
       <div class="fit">
         <label for="join-skipper">Skipper</label>
@@ -262,6 +272,7 @@ export class JoinFlow {
         <label for="join-boat-name">Name on the transom</label>
         <input id="join-boat-name" type="text" maxlength="18" autocomplete="off" spellcheck="false" value="${esc(this.choice.name)}">
         <span class="lab">Topsides</span><div class="swatches">${swatches}</div>
+        <span class="lab">Tender</span><div class="when tenders" role="group" aria-label="Tender" title="${esc(mine.say)}. O launches her once you have stopped; Shift+O changes her aboard">${tenders}</div>
       </div>`;
   }
 

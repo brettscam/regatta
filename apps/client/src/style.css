@@ -650,3 +650,8 @@ body:not(.lobby):has(#readout.hidden) .boardlink { left: var(--edge-left); }
 /* ---- the weather level on the way in ---- */
 .join .when.weather { align-items: center; margin-top: 10px; }
 .join .when.weather .k { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-right: 6px; }
+
+/* ---- the tender chosen on the way in ---- */
+.join .when.tenders .chip { min-width: 0; padding: 5px 8px; }
+.join .when.tenders .chip b { font-size: 13px; }
+.join .chip:disabled { opacity: 0.42; cursor: default; }
