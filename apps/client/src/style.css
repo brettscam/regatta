@@ -495,9 +495,9 @@ body.lobby .cheat { display: none; }
 .readout .engine .k { display: block; }
 .readout .engine .revs b { display: block; font-size: 15px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
 .readout .engine .revs small { font-size: 11px; color: var(--dim); white-space: nowrap; }
-.readout .engine .gauge { min-width: 86px; }
-.readout .engine .gauge .n { float: right; font-size: 11px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.readout .engine .gauge .bar { clear: both; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(238, 243, 244, 0.14); overflow: hidden; }
+.readout .engine .gauge { min-width: 86px; display: grid; grid-template-columns: 1fr auto; align-items: baseline; }
+.readout .engine .gauge .n { font-size: 11px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readout .engine .gauge .bar { grid-column: 1 / -1; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(238, 243, 244, 0.14); overflow: hidden; }
 .readout .engine .gauge .bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: rgba(238, 243, 244, 0.8); }
 .readout .engine .gauge.low .bar i { background: var(--amber); }
 .readout .engine .gauge.low .n { color: var(--amber); }

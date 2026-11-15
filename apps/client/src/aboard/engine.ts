@@ -311,10 +311,11 @@ export class Engine implements Feature {
   status(): string {
     const { sim } = this.ctx;
     if (!sim.underPower) return '';
+    if (sim.state.throttle < 0) return 'Under power, going astern';
     const o = sim.out;
     // With a sail full and pulling as well, she is motor-sailing.
-    const sailing = (!o.main.flogging && o.main.eff > 0.6 && Math.abs(o.twa) > 0.6) && o.tws > 4 * KT;
-    return sailing ? 'Motor-sailing' : sim.state.throttle < 0 ? 'Under power, going astern' : 'Under power';
+    const sailing = !o.main.flogging && o.main.eff > 0.6 && Math.abs(o.twa) > 0.6 && o.tws > 4 * KT;
+    return sailing ? 'Motor-sailing' : 'Under power';
   }
 
   wire(): Record<string, unknown> {
