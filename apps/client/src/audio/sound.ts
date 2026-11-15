@@ -175,6 +175,36 @@ export class Sound {
     m.gain.gain.setTargetAtTime(on ? (cranking ? 0.2 : 0.16 + 0.2 * load) : 0, now, on ? 0.15 : 0.35);
   }
 
+  /** One hull hitting another: a low thump and the crunch after it. `hard` is 0 for a touch, 1 for a ramming. */
+  thud(hard: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const k = Math.min(1, Math.max(0, hard));
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(95 - 25 * k, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.28);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35 + 0.55 * k, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34 + 0.2 * k);
+    osc.connect(g).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.6);
+    const crunch = ctx.createBufferSource();
+    crunch.buffer = this.noiseBuffer(ctx, 0.35);
+    const body = ctx.createBiquadFilter();
+    body.type = 'lowpass';
+    body.frequency.value = 500 + 900 * k;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.0001, t);
+    cg.gain.exponentialRampToValueAtTime(0.25 + 0.6 * k, t + 0.008);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.16 + 0.16 * k);
+    crunch.connect(body).connect(cg).connect(this.master);
+    crunch.start(t);
+  }
+
   /** A sea lion's bark: one short, hoarse honk. `near` is 1 alongside, falling to 0 out of earshot. */
   bark(near: number): void {
     const ctx = this.ctx;

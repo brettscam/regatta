@@ -161,8 +161,21 @@ export function initialState(init: InitialConditions = {}): SimState {
     batteryUsed: 0,
     engineStops: 0,
     batteryTrips: 0,
+    damage: 0,
     maneuver: null,
   };
+}
+
+/** The most a damaged hull takes off her speed, as a share, just short of holed. */
+export const DAMAGE_DRAG = 0.3;
+
+/**
+ * What hull damage leaves of her speed: 1 when sound, falling in a straight line to 0.7 as the damage nears 1, and 0 holed.
+ * @param damage 0 sound to 1 holed
+ */
+export function damageSpeed(damage: number): number {
+  if (!(damage > 0)) return 1;
+  return damage >= 1 ? 0 : 1 - DAMAGE_DRAG * damage;
 }
 
 /**
@@ -560,6 +573,37 @@ export class Sim {
     return kind;
   }
 
+  // ---- pushed from outside ---------------------------------------------------------------------
+
+  /**
+   * A push from outside the sim: another hull. She is moved bodily, her velocity through the water changes (both given
+   * east and north), and her head may be knocked round. Nothing else is touched, so the next step carries on from
+   * where this leaves her.
+   * @param dx metres east
+   * @param dy metres north
+   * @param dvx change of velocity, m/s east
+   * @param dvy change of velocity, m/s north
+   * @param turn change of heading, radians, positive to starboard. Her velocity keeps its direction over the water.
+   */
+  shove(dx: number, dy: number, dvx = 0, dvy = 0, turn = 0): void {
+    if (!Number.isFinite(dx + dy + dvx + dvy + turn)) return;
+    const s = this.state;
+    s.x += dx;
+    s.y += dy;
+    // Her velocity over the water, east and north, with the push added. It is put back on her new heading.
+    let sinH = Math.sin(s.heading);
+    let cosH = Math.cos(s.heading);
+    const vx = s.speed * sinH + s.lateral * cosH + dvx;
+    const vy = s.speed * cosH - s.lateral * sinH + dvy;
+    if (turn !== 0) {
+      s.heading = wrapTau(s.heading + turn);
+      sinH = Math.sin(s.heading);
+      cosH = Math.cos(s.heading);
+    }
+    s.speed = vx * sinH + vy * cosH;
+    s.lateral = vx * cosH - vy * sinH;
+  }
+
   // ---- stepping -------------------------------------------------------------------------------
 
   /** Advance by whole fixed steps covering at least `seconds`. */
@@ -683,6 +727,11 @@ export class Sim {
       o.targetSpeed = v;
       // The propeller gets her moving, and stops her, quicker than the sails do.
       if (spill >= 0.5) tau = Math.abs(v) > Math.abs(s.speed) && v * s.speed >= 0 ? 9 : 14;
+    }
+    // A damaged hull drags, under sail or power. Holed, she stops in a few lengths.
+    if (s.damage > 0) {
+      o.targetSpeed *= damageSpeed(s.damage);
+      if (s.damage >= 1) tau = 3;
     }
     s.speed += (o.targetSpeed - s.speed) * (1 - Math.exp(-dt / tau));
     const sinR = Math.sin(s.rudder);
@@ -1189,6 +1238,7 @@ export class Sim {
     if (Number.isFinite(state.spinHoist)) this.state.spinHoist = clamp(state.spinHoist, 0, 1);
     if (Number.isFinite(state.spinAngle)) this.state.spinAngle = state.spinAngle;
     if (!this.boat.engine) { this.state.engineOn = false; this.state.engineCrank = 0; }
+    this.state.damage = clamp(this.state.damage, 0, 1);
     this.state.throttle = this.state.engineOn ? clamp(Math.round(this.state.throttle), THROTTLE_MIN, THROTTLE_MAX) : 0;
     this.engineReadout();
   }

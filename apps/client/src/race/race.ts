@@ -10,6 +10,7 @@ import type { TrafficVessel } from '../scene/traffic';
 import type { Passage } from '../ui/passage';
 import { CLOSES_AFTER, addEvent, eventWater, gunTime, inText, isOpen, nextEvent, readEvent, sharedEvent, whenText } from './events';
 import { PaceBoat } from './pace';
+import { CALLS, RING, bearing3, dueCall, gunOutsideCall, inRingCall, preStart, preStartCall, preStartLine, shortRange, spokenRange, taken, takenCall, type Onward, type PreStart } from './startline';
 
 export interface RaceMark { name: string; x: number; y: number }
 export interface RaceCourse { id: string; name: string; blurb: string; marks: RaceMark[] }
@@ -45,7 +46,8 @@ export interface Standing {
   finish: number | null;
 }
 
-const ARRIVAL = 130;
+/** As near the wind as a towed boat is left pointing, radians. */
+const CLOSE_HAULED = (50 * Math.PI) / 180;
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const CLASS_ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 
@@ -124,6 +126,10 @@ export class Race {
   private legStart = { x: 0, y: 0 };
   private readonly told = new Set<string>();
   private readonly called = new Set<number>();
+  /** Whether the calls before the gun carry advice, or only the time. The course guide sets it: hiding the guide hides the coaching. */
+  coach = true;
+  /** She has been told once that she is in the start ring. */
+  private ringTold = false;
 
   constructor(private readonly ctx: RaceContext) {}
 
@@ -187,16 +193,27 @@ export class Race {
     this.offers.delete(call.id);
     const towed = this.musterAtStart(call);
     this.legStart = { x: sim.state.x, y: sim.state.y };
-    passage.setRoute(call.marks, sim.state, sim.state.t);
-    for (let i = 0; i < call.pace; i++) this.pacers.push(new PaceBoat(i, spec, world, scene, call.marks));
     const start = call.marks[0];
     const left = this.countdown;
+    // Until the gun the chart's route, and the pilot's, goes to the start and no further. The course goes on at the gun.
+    passage.setRoute(left > 0 ? [start] : call.marks, sim.state, sim.state.t);
+    for (let i = 0; i < call.pace; i++) this.pacers.push(new PaceBoat(i, spec, world, scene, call.marks));
+    // A call due in the moment of joining would wipe out what is said on joining, which says more.
+    for (const c of CALLS) if (left <= c + 1 && left > c - 12) this.called.add(c);
     const when = left > 0 ? `Gun in ${clockText(left)}` : `It started ${clockText(-left)} ago`;
     // Said when she is not in her own boat: everyone in this race sails the same one.
     const inClass = cls && cls.id !== this.ctx.own.id ? `. You are racing ${classText(cls)} for this one` : '';
-    this.ctx.say(towed
-      ? `${mine ? 'Race called' : 'Race joined'}: ${call.name}. You have been towed to the start area, just short of ${start.name}. ${when}. Pass ${start.name} after the gun${inClass}`
-      : `${mine ? 'Race called' : 'Race joined'}: ${call.name}. ${when}. Be at ${start.name} when it goes${inClass}`, inClass ? 12 : 9);
+    // Where the start is from here, and the one thing to do about it.
+    const toMark = Math.hypot(start.x - sim.state.x, start.y - sim.state.y);
+    const inside = toMark < RING;
+    this.ringTold = inside;
+    const ring = inside
+      ? `You are in the start ring round ${start.name}`
+      : `The start ring round ${start.name} is ${spokenRange(toMark - RING)} off, bearing ${bearing3(Math.atan2(start.x - sim.state.x, start.y - sim.state.y))}°`;
+    const todo = left <= 0 ? (inside ? '' : '. Sail into it to begin')
+      : inside ? '. Stay in it or close by: inside it at the gun you start at once'
+        : '. Be inside it when the gun goes, or sail into it after';
+    this.ctx.say(`${mine ? 'Race called' : 'Race joined'}: ${call.name}. ${towed ? 'You have been towed to the start area. ' : ''}${when}. ${ring}${todo}${inClass}`, inClass ? 14 : 11);
     this.version++;
   }
 
@@ -228,8 +245,12 @@ export class Race {
       if (s.hold !== 'none') sim.release();
       s.x = x;
       s.y = y;
-      // Lying head to wind with a little way on, ready to bear away for the mark.
-      s.heading = world.wind(x, y, s.t).dir;
+      // Pointed at the start mark with a little way on and the sails set for it. With the mark to windward
+      // she lies close-hauled on the tack that looks at it more nearly: never head to wind, where she would sit in irons.
+      const from = world.wind(x, y, s.t).dir;
+      const brg = Math.atan2(start.x - x, start.y - y);
+      const off = Math.atan2(Math.sin(brg - from), Math.cos(brg - from));
+      s.heading = Math.abs(off) >= CLOSE_HAULED ? brg : from + (off < 0 ? -CLOSE_HAULED : CLOSE_HAULED);
       s.speed = 0.8;
       s.lateral = 0;
       s.yawRate = 0;
@@ -240,6 +261,7 @@ export class Race {
       s.maneuver = null;
       sim.setHelm('hand');
       sim.setCrewTrim(true);
+      sim.trimForWind();
       return true;
     }
     return false;
@@ -292,46 +314,73 @@ export class Race {
     const left = this.countdown;
     // A gun more than half an hour off means the clock has been moved under the race. Call it off.
     if (left > 1800) return this.leave();
+    // True on the frame of the gun itself. A boat that joins a race already under way gets no gun.
+    let atGun = false;
     if (!this.started) {
-      for (const mark of [300, 120, 60, 30, 10]) {
-        if (left <= mark && left > mark - 5 && !this.called.has(mark)) {
-          this.called.add(mark);
-          this.ctx.say(mark >= 60 ? `${mark / 60} minute${mark > 60 ? 's' : ''} to the gun` : `${mark} seconds`);
-        }
+      const start = call.marks[0];
+      this.toGo = Math.hypot(start.x - sim.state.x, start.y - sim.state.y);
+      const pre = this.preStart()!;
+      const due = dueCall(left, this.called);
+      if (due !== null) {
+        this.called.add(due);
+        this.ctx.say(preStartCall(due, pre, this.coach), this.coach && due > 10 ? 8 : 5);
+      } else if (pre.state === 'inside' && !this.ringTold && this.coach && left > 15) {
+        this.ctx.say(inRingCall(left), 8);
       }
-      this.toGo = Math.hypot(call.marks[0].x - sim.state.x, call.marks[0].y - sim.state.y);
-      if (left <= 0) {
-        this.started = true;
-        this.leg = 0;
-        this.legStart = { x: sim.state.x, y: sim.state.y };
-        // The course goes back on the chart from here, so the start mark has to be passed after the gun.
-        passage.setRoute(call.marks, sim.state, sim.state.t);
-        for (const p of this.pacers) p.start(sim.state.tick);
-        this.ctx.alarm(this.toGo < 400 ? `Gun! Racing. First mark ${call.marks[0].name}` : `Gun! You are ${(this.toGo / 1852).toFixed(1)} miles from the start mark, ${call.marks[0].name}. Pass it to begin`);
-        this.version++;
-      }
-      return;
+      // Told once, and only on the way in: a boat that drifts out and back is not told again.
+      if (pre.state === 'inside') this.ringTold = true;
+      if (left > 0) return;
+      this.started = true;
+      this.leg = 0;
+      this.legStart = { x: sim.state.x, y: sim.state.y };
+      // The whole course goes on the chart from here. The start ring is its first mark: a boat inside it is given it below, at once.
+      passage.setRoute(call.marks, sim.state, sim.state.t);
+      for (const p of this.pacers) p.start(sim.state.tick);
+      atGun = left > -5;
+      this.version++;
     }
     if (this.finish !== null) return;
     const next = call.marks[this.leg];
     const fix = trackFix(sim.state, this.legStart, next);
     this.toGo = fix.toGo;
-    const legLength = Math.hypot(next.x - this.legStart.x, next.y - this.legStart.y);
-    if (fix.toGo < ARRIVAL || (fix.along > legLength && fix.toGo < ARRIVAL * 4)) {
-      this.leg++;
-      this.legStart = { x: next.x, y: next.y };
-      this.version++;
-      if (this.leg >= call.marks.length) {
-        this.finish = this.elapsed;
-        this.toGo = 0;
-        const table = this.standings();
-        this.place = table.findIndex((s) => s.me) + 1;
-        this.ctx.logbook.count('races');
-        if (this.place === 1 && table.length > 1) this.ctx.logbook.count('wins');
-        this.ctx.alarm(`Finished ${call.name} in ${clockText(this.finish)}. ${table.length > 1 ? `${ORDINAL[this.place - 1] ?? `${this.place}th`} of ${table.length}` : 'A time to beat'}`);
-        this.ctx.finished();
-      }
+    const how = taken(fix.toGo, fix.along, Math.hypot(next.x - this.legStart.x, next.y - this.legStart.y));
+    if (!how) {
+      if (atGun) this.ctx.alarm(gunOutsideCall(next.name, fix.toGo, fix.bearing));
+      return;
     }
+    this.leg++;
+    this.legStart = { x: next.x, y: next.y };
+    this.version++;
+    // The chart's route judges by the same rule from its own leg, and can differ by a moment. The race's word is the one that counts.
+    const charted = passage.marks[passage.nextIndex];
+    if (charted && charted.x === next.x && charted.y === next.y) {
+      charted.reachedAt = sim.state.t;
+      passage.version++;
+    }
+    const after = call.marks[this.leg];
+    if (after) {
+      const range = Math.hypot(after.x - sim.state.x, after.y - sim.state.y);
+      const onward: Onward = { name: after.name, metres: Math.max(0, range - RING), bearing: Math.atan2(after.x - sim.state.x, after.y - sim.state.y), last: this.leg === call.marks.length - 1 };
+      this.toGo = range;
+      this.ctx.alarm(takenCall(next.name, this.leg - 1, how, fix.toGo, onward, atGun));
+      return;
+    }
+    this.finish = this.elapsed;
+    this.toGo = 0;
+    const table = this.standings();
+    this.place = table.findIndex((s) => s.me) + 1;
+    this.ctx.logbook.count('races');
+    if (this.place === 1 && table.length > 1) this.ctx.logbook.count('wins');
+    this.ctx.alarm(`Finished ${call.name} in ${clockText(this.finish)}. ${table.length > 1 ? `${ORDINAL[this.place - 1] ?? `${this.place}th`} of ${table.length}` : 'A time to beat'}`);
+    this.ctx.finished();
+  }
+
+  /** How she stands against the gun: distance to the start ring, and early or late at her present speed. Null once it has gone. */
+  preStart(): PreStart | null {
+    const call = this.call;
+    if (!call || this.started) return null;
+    const { sim } = this.ctx;
+    return preStart(Math.hypot(call.marks[0].x - sim.state.x, call.marks[0].y - sim.state.y), sim.out.sog, this.countdown);
   }
 
   /** Hear what races the other boats have called. */
@@ -412,12 +461,13 @@ export class Race {
       const course = event && this.ctx.courses.find((c) => c.id === event.course);
       return event && course ? `${event.name} · ${course.name} · gun at ${whenText(event)}, ${inText(event)}` : '';
     }
-    if (!this.started) return `Race · gun in ${clockText(this.countdown)} · start at ${call.marks[0].name}`;
+    if (!this.started) return `Race · ${preStartLine(this.preStart()!, call.marks[0].name)}`;
     const table = this.standings();
     const place = table.findIndex((s) => s.me) + 1;
     const pos = table.length > 1 ? ` · ${ORDINAL[place - 1] ?? place} of ${table.length}` : '';
     if (this.finish !== null) return `Finished in ${clockText(this.finish)}${pos}`;
-    return `Racing ${clockText(this.elapsed)}${pos} · next ${this.nextMark?.name ?? ''}`;
+    const what = this.leg === 0 ? 'start ring at' : this.leg === call.marks.length - 1 ? 'finish at' : 'next';
+    return `Racing ${clockText(this.elapsed)}${pos} · ${what} ${this.nextMark?.name ?? ''} ${shortRange(Math.max(0, this.toGo - RING))}`;
   }
 
   /** The pace boats, for the chart and the collision watch. */

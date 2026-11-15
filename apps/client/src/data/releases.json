@@ -1,6 +1,39 @@
 {
   "notes": [
     {
+      "id": "v25",
+      "date": "2026-11-15",
+      "title": "Choose your weather",
+      "items": [
+        "On the way in, under the time of day, choose how hard it blows: Lighter, As it was, or Extreme.",
+        "Lighter is about two thirds of the recorded wind: gentle and forgiving for a first sail.",
+        "Extreme is half as much again, 20 knots and more with hard gusts. She can be knocked flat or gybe by accident. Reef early with J.",
+        "Boats sailing together share one wind: the strongest anyone chose."
+      ]
+    },
+    {
+      "id": "v24",
+      "date": "2026-11-15",
+      "title": "Wind shadow and collisions",
+      "items": [
+        "Boats now take each other's wind. Sail close to leeward of another boat and you lose up to a third of your breeze. The instruments show it and a line tells you whose shadow you are in. Pace boats feel yours too.",
+        "Boats no longer pass through each other. A collision stops you against the other hull and costs hull damage that grows with the closing speed: a scuff at one knot, a third of the hull at four.",
+        "A damaged hull is slower, up to 30 percent. Lie alongside a dock to repair her, or she mends slowly at anchor outside a race.",
+        "Hit hard enough and she is holed: you are out of the race and put back afloat nearby a few seconds later. Ferries and ships hit harder."
+      ]
+    },
+    {
+      "id": "v23",
+      "date": "2026-11-15",
+      "title": "A start you can aim at",
+      "items": [
+        "Every race mark now has a ring on the water at its true distance, 130 metres. Sail into the ring and the mark is yours, with a chime and a line giving the bearing and distance to the next one.",
+        "Before the gun, the line under the clock shows how far the start ring is and whether you would reach it early or late at your present speed. The crew call it at five, two and one minutes.",
+        "Inside the start ring when the gun goes, you have started. Otherwise sail into it.",
+        "A boat towed to the start is now left sailing toward the start mark, not head to wind. G hides the rings and the coaching."
+      ]
+    },
+    {
       "id": "v22",
       "date": "2026-11-15",
       "title": "The radio: channel 16",

@@ -233,6 +233,11 @@ export interface SimState {
   engineStops: number;
   /** How many times the pilot has dropped out because the battery was too low. */
   batteryTrips: number;
+  /**
+   * Hull damage, 0 sound to 1 holed. It slows her (see `damageSpeed`), and holed she stops. The sim only honours it:
+   * whoever knows about collisions and repairs sets it.
+   */
+  damage: number;
   maneuver: Maneuver | null;
 }
 

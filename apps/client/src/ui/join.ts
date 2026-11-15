@@ -28,12 +28,22 @@ export interface StartTime {
   default?: boolean;
 }
 
+export type Weather = 'light' | 'normal' | 'heavy';
+/** The weather levels offered on the way in: a multiplier on the recorded wind, and what to tell the skipper. */
+export const WEATHER: { id: Weather; name: string; factor: number; say: string }[] = [
+  { id: 'light', name: 'Lighter', factor: 0.6, say: 'Lighter: about two thirds of the recorded wind. Gentle, forgiving, good for a first sail. If other boats are out in more, you get their wind' },
+  { id: 'normal', name: 'As it was', factor: 1, say: 'As it was: the wind of the real day' },
+  { id: 'heavy', name: 'Extreme', factor: 1.5, say: 'Extreme: half as much wind again, 20 knots and more with hard gusts. She can be knocked flat or gybe by accident. Reef early (J) and it will teach you fast' },
+];
+
 /** What the player picked on the way in. */
 export interface Choice {
   /** Which water: a course id. */
   water: string;
   spot: string;
   time: string;
+  /** How hard it blows against the record: lighter, as it was, or heavy. Left out means as it was. */
+  weather?: Weather;
   boat: string;
   colour: string;
   name: string;
@@ -127,6 +137,7 @@ export class JoinFlow {
     if (d.step) { this.step = Number(d.step); }
     else if (d.spot) this.choice.spot = d.spot;
     else if (d.time) this.choice.time = d.time;
+    else if (d.weather) this.choice.weather = d.weather as Weather;
     else if (d.tutorial) this.choice.tutorial = d.tutorial === '1';
     else if (d.boat) {
       this.choice.boat = d.boat;
@@ -201,6 +212,9 @@ export class JoinFlow {
     const when = this.water.times.map((t) =>
       `<button type="button" class="chip" data-time="${t.id}" aria-pressed="${t.id === this.choice.time}" title="${esc(t.say)}"><b>${clock.format(new Date(start + t.hours * 3600000))}</b>${esc(t.name)}</button>`).join('');
     const picked = this.water.times.find((t) => t.id === this.choice.time);
+    const level = WEATHER.find((k) => k.id === (this.choice.weather ?? 'normal')) ?? WEATHER[1];
+    const weather = WEATHER.map((k) =>
+      `<button type="button" class="chip" data-weather="${k.id}" aria-pressed="${k.id === level.id}" title="${esc(k.say)}">${esc(k.name)}</button>`).join('');
     // A race fixed for later today: tell everyone on the way in where to start from.
     const event = alone() ? null : nextEvent(this.choice.water);
     const from = event && this.water.spots.find((sp) => sp.id === event.spot);
@@ -212,6 +226,8 @@ export class JoinFlow {
       ${waters}
       <div class="when" role="group" aria-label="Time to cast off">${when}</div>
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
+      <div class="when weather" role="group" aria-label="How hard it blows"><span class="k">Wind</span>${weather}</div>
+      <p class="soon">${esc(level.say)}.</p>
       <div class="cards">${cards}</div>
       <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii and the BVI.</p>`;
   }

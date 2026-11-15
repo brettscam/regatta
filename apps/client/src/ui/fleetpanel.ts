@@ -3,9 +3,12 @@ import type { RemoteBoat } from '../net/fleet';
 import { alone as noHost, onWeb } from '../net/platform';
 import { addEvent, eventLink, inText, isOpen, makeEvent, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
 import { classText, clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
+import { HOW_A_RACE_WORKS, RING, marginText, shortRange } from '../race/startline';
 import type { YardBoat } from '../boat/yard';
+import { damageNote } from '../aboard/contactRules';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+const HOW = `<h3>How a race works</h3><p class="lede">${HOW_A_RACE_WORKS.join(' ')}</p>`;
 const deg3 = (rad: number) => String(Math.round(((rad * R2D) % 360 + 360) % 360) % 360).padStart(3, '0');
 
 export interface FleetPanelContext {
@@ -150,7 +153,9 @@ export class FleetPanel {
     const rows = this.ctx.boats().map((b) => {
       const d = Math.hypot(b.x - me.x, b.y - me.y);
       const brg = deg3(Math.atan2(b.x - me.x, b.y - me.y));
-      const doing = b.status || `${(b.sog / KT).toFixed(1)} kt`;
+      // What she is doing, and the state of her hull if it is not sound. Both are her own page's word.
+      const hull = damageNote(b.damage);
+      const doing = b.damage >= 100 ? hull : [b.status || `${(b.sog / KT).toFixed(1)} kt`, hull].filter(Boolean).join(' · ');
       return `<li><b>${esc(b.name || 'A skipper')}</b><span>${esc(b.boatName || 'Another boat')}</span><span>${esc(doing)}</span><span>${(d / 1852).toFixed(d < 1852 ? 2 : 1)} nm at ${brg}°</span></li>`;
     }).join('');
     const mine = `<li class="me"><b>${esc(me.name || 'You')}</b><span>${esc(me.boatName)}</span><span>${esc(me.status || `${(me.sog / KT).toFixed(1)} kt`)}</span><span>you</span></li>`;
@@ -188,12 +193,13 @@ export class FleetPanel {
       <p class="lede">One design: everyone who joins races the ${esc(own.name)}, whatever boat she came in, and has her own back afterwards.</p>
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
       ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
-      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the race's class; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
+      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the race's class; with friends racing, leave them at 0 so everyone sees the same race.</p>
       <button type="button" class="primary" data-act="call">Call the race</button>
       <h3>Or fix a time and send a link</h3>
       <div class="fixrow"><label for="race-at">Gun at</label><input id="race-at" type="time" value="${esc(this.atTime)}"><button type="button" data-act="fix">Fix the race</button></div>
       <p class="lede">For a race later today: choose the course above, type the time, and you get a link to send. It opens for joining ${OPENS_BEFORE} minutes before the gun.</p>
-      ${this.fixNote ? `<p class="lede note">${esc(this.fixNote)}</p>` : ''}` };
+      ${this.fixNote ? `<p class="lede note">${esc(this.fixNote)}</p>` : ''}
+      ${HOW}` };
   }
 
   /** In a race: the clock and the standings, which tick, and the way out, which does not. */
@@ -207,16 +213,18 @@ export class FleetPanel {
       return `<tr class="${s.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(s.name)}${s.pace ? ' <i>pace</i>' : ''}</td><td>${esc(s.boat)}</td><td>${s.finish !== null ? 'Finished' : `${s.leg} of ${call.marks.length}`}</td><td>${where}</td></tr>`;
     }).join('');
     const start = call.marks[0];
-    const d = Math.hypot(start.x - me.x, start.y - me.y);
-    const head = !race.started
-      ? `<p class="count">${clockText(race.countdown)}</p><p class="lede">to the gun. Be at <b>${esc(start.name)}</b> (${(d / 1852).toFixed(2)} nm at ${deg3(Math.atan2(start.x - me.x, start.y - me.y))}°) when it goes, and pass it after. The course is on your chart, and the pilot will steer it (Shift+P to route, then P).</p>`
+    const pre = race.preStart();
+    const head = pre
+      ? `<p class="count">${clockText(race.countdown)}</p><p class="lede">to the gun. ${pre.state === 'inside'
+        ? `You are in the start ring round <b>${esc(start.name)}</b>: stay in it or close by, and you start as the gun goes.`
+        : `The start ring round <b>${esc(start.name)}</b> is ${esc(shortRange(pre.dist))} off at ${deg3(Math.atan2(start.x - me.x, start.y - me.y))}°, and at this speed you are <b>${esc(marginText(pre))}</b>. Be inside it when the gun goes, or sail into it after.`} The way to it is on your chart and on the water. The course goes on the chart at the gun, and the pilot will steer it (Shift+P to route, then P).</p>`
       : race.finish !== null
         ? `<p class="count">${clockText(race.finish)}</p><p class="lede">Your time. ${table.length > 1 ? `You placed ${race.place} of ${table.length}.` : ''}</p>`
-        : `<p class="count">${clockText(race.elapsed)}</p><p class="lede">Racing. Next mark <b>${esc(race.nextMark?.name ?? '')}</b>.</p>`;
+        : `<p class="count">${clockText(race.elapsed)}</p><p class="lede">Racing. ${race.leg === 0 ? 'Sail into the start ring round' : 'Next ring:'} <b>${esc(race.nextMark?.name ?? '')}</b>, ${esc(shortRange(Math.max(0, race.toGo - RING)))}.</p>`;
     const cls = race.classOf(call);
     return { live: `<h3>${esc(call.name)}${cls ? ` · one design, ${esc(cls.name)}` : ''}</h3>${head}
       <table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Marks</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>`, form: `<button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>` };
+      <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>`, form: `<button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>${race.finish !== null ? '' : HOW}` };
   }
 
   /**

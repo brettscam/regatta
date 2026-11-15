@@ -1,4 +1,6 @@
+import { BadAir } from './badair';
 import { CheatStrip } from './cheat';
+import { Contact } from './contact';
 import { Dockside } from './dock';
 import { Engine } from './engine';
 import type { AboardContext, Feature } from './feature';
@@ -34,6 +36,9 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new CheatStrip(ctx),
     new Radio(ctx),
     new Wildlife(ctx),
+    // Wind shadow and collisions watch the other boats and take no keys. A holed boat's status is given by the session before any other.
+    new BadAir(ctx),
+    new Contact(ctx),
     new SeamanshipPoints(ctx),
   ];
 }

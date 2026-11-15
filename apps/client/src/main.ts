@@ -9,7 +9,7 @@ import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
 import { myAvatar } from './boat/avatar';
 import { openHome } from './ui/home';
-import { JoinFlow, type Choice, type WaterView } from './ui/join';
+import { JoinFlow, WEATHER, type Choice, type WaterView } from './ui/join';
 import { COURSES, DEFAULT_COURSE, hasCourse, loadCourse } from './world/loadCourse';
 
 // Regatta. The world is a real past day on real water, replayed: NOAA's models of the wind, tidal stream and tide.
@@ -65,6 +65,7 @@ function settle(c: Partial<Choice>): Choice {
     water: data.about.id,
     spot: spots.some((s) => s.id === c.spot) ? c.spot! : spots[0].id,
     time: times.some((t) => t.id === c.time) ? c.time! : (times.find((t) => t.default) ?? times.find((t) => t.id === DEFAULT_TIME) ?? times[0]).id,
+    weather: WEATHER.some((k) => k.id === c.weather) ? c.weather : 'normal',
     boat,
     colour: TOPSIDES.some((t) => t.hex === c.colour) ? c.colour! : BOATS[boat].topsides ?? TOPSIDES[0].hex,
     name: (c.name ?? '').slice(0, 18) || BOATS[boat].defaultName || 'Slack Tide',
@@ -79,14 +80,15 @@ function raceNight(c: Choice): Choice {
   if (!event || eventWater(event) !== data.about.id) return c;
   // Everyone in the afternoon breeze, and at the race's start if it names one.
   const spot = event.spot;
-  return { ...c, spot: spot && data.starts.some((s) => s.id === spot) ? spot : c.spot, time: DEFAULT_TIME };
+  return { ...c, spot: spot && data.starts.some((s) => s.id === spot) ? spot : c.spot, time: DEFAULT_TIME, weather: 'normal' };
 }
 
 /** Put the world's clock at the chosen time of day. ?start=hours overrides it for play testing. */
 function setClock(choice: Choice): void {
   const t = data.times.find((k) => k.id === choice.time) ?? data.times[0];
   world.startOffset = num('start', t.hours) * 3600;
-  world.windBoost = Math.min(2, Math.max(1, num('boost', t.boost ?? 1)));
+  const level = WEATHER.find((k) => k.id === choice.weather)?.factor ?? 1;
+  world.windBoost = Math.min(2, Math.max(0.5, num('boost', (t.boost ?? 1) * level)));
 }
 setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);

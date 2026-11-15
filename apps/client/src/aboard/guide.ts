@@ -1,10 +1,65 @@
 import * as THREE from 'three';
+import type { Sound } from '../audio/sound';
+import { RING, marginText, shortRange } from '../race/startline';
 import type { AboardContext, Feature } from './feature';
 
 interface Mark { name: string; x: number; y: number }
 
 const MAX_MARKS = 12;
 const AMBER = 0xffc46b;
+const GREEN = 0x8dffb4;
+/** How high the ring's wall of light stands off the water, metres: enough to be seen edge-on from the cockpit. */
+const WALL = 7;
+/** Seconds the ring of a mark just taken flashes for. */
+const FLASH = 2.2;
+
+/** The wall of a ring: bright at the water, gone at the top, with posts of light round it so its curve reads from low down. */
+function curtain(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  const fade = g.createLinearGradient(0, 64, 0, 0);
+  fade.addColorStop(0, 'rgba(255,255,255,0.85)');
+  fade.addColorStop(0.35, 'rgba(255,255,255,0.32)');
+  fade.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = fade;
+  g.fillRect(0, 0, 64, 64);
+  const post = g.createLinearGradient(0, 64, 0, 0);
+  post.addColorStop(0, 'rgba(255,255,255,1)');
+  post.addColorStop(1, 'rgba(255,255,255,0.15)');
+  g.fillStyle = post;
+  g.fillRect(29, 0, 6, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  t.repeat.set(48, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** A few notes through the game's own sound: a horn for the gun, a rising chime for a mark, a longer one for the finish. */
+function notes(sound: Sound, shape: OscillatorType, tones: Array<[hz: number, at: number, len: number]>, level: number): void {
+  const out = sound.output();
+  if (!out) return;
+  const t0 = out.ctx.currentTime + 0.02;
+  for (const [hz, at, len] of tones) {
+    const osc = out.ctx.createOscillator();
+    osc.type = shape;
+    osc.frequency.setValueAtTime(hz, t0 + at);
+    const g = out.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0 + at);
+    g.gain.exponentialRampToValueAtTime(level, t0 + at + 0.03);
+    g.gain.setValueAtTime(level, t0 + at + len * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len);
+    const soft = out.ctx.createBiquadFilter();
+    soft.type = 'lowpass';
+    soft.frequency.value = shape === 'sine' ? 6000 : 900;
+    osc.connect(soft).connect(g).connect(out.node);
+    osc.start(t0 + at);
+    osc.stop(t0 + at + len + 0.05);
+  }
+}
 
 /** A strip of arrowheads to lay along the water, pointing the way. */
 function chevrons(): THREE.CanvasTexture {
@@ -31,9 +86,13 @@ function chevrons(): THREE.CanvasTexture {
 
 /**
  * What a race committee lays, and what a chartplotter would draw if it could draw on the sea:
- * a big inflatable mark at every mark still to round, a column of light over the next one so it can be found from
- * a mile off, its name and range beside it, and a line of arrowheads on the water from the bow to the mark and on down the next leg.
+ * a big inflatable mark at every mark still to round, a ring on the water round each at the distance that counts as taking it
+ * (bright on the next, faint on the rest), a column of light over the next one so it can be found from a mile off,
+ * its name and range beside it, and a line of arrowheads on the water from the bow to the ring and on down the next leg.
+ * Before the gun the next mark is the start, and its label carries the time-on-distance figure.
  * In a race it is on by itself. Following a plain route it is off until asked for. G turns it on and off.
+ *
+ * It also sounds the race: a horn at the gun, a chime as each mark is taken. Those are not hidden by G.
  */
 export class Guide implements Feature {
   readonly id = 'guide';
@@ -46,6 +105,14 @@ export class Guide implements Feature {
   private readonly tex = chevrons();
   private readonly label = document.createElement('div');
   private readonly pos = new THREE.Vector3();
+  private readonly rings: THREE.Group[] = [];
+  private readonly wallTex = curtain();
+  private readonly bright: { band: THREE.MeshBasicMaterial; wall: THREE.MeshBasicMaterial };
+  /** The ring of the mark just taken, flashing out. */
+  private readonly flash: THREE.Mesh;
+  private flashFor = 0;
+  /** What the race was doing last frame, to hear it change. */
+  private seen = { id: '', started: false, leg: 0, finished: false };
 
   constructor(private readonly ctx: AboardContext) {
     const orange = new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.55 });
@@ -80,6 +147,31 @@ export class Guide implements Feature {
     );
     this.beacon.visible = false;
     this.group.add(this.beacon);
+    // The rings. Flat on the water for the view from above, and a low wall of light for the view from the cockpit.
+    const bandGeo = new THREE.RingGeometry(RING - 3, RING + 3, 128).rotateX(-Math.PI / 2);
+    const wallGeo = new THREE.CylinderGeometry(RING, RING, WALL, 128, 1, true).translate(0, WALL / 2, 0);
+    const bandMat = (opacity: number) => new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+    const wallMat = (opacity: number) => new THREE.MeshBasicMaterial({ map: this.wallTex, color: AMBER, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
+    this.bright = { band: bandMat(0.9), wall: wallMat(0.9) };
+    const faint = { band: bandMat(0.28), wall: wallMat(0.25) };
+    for (let i = 0; i < MAX_MARKS; i++) {
+      const r = new THREE.Group();
+      const band = new THREE.Mesh(bandGeo, i === 0 ? this.bright.band : faint.band);
+      band.position.y = 0.4;
+      band.renderOrder = 3;
+      const wall = new THREE.Mesh(wallGeo, i === 0 ? this.bright.wall : faint.wall);
+      wall.position.y = -0.6;
+      wall.renderOrder = 3;
+      r.add(band, wall);
+      r.visible = false;
+      this.rings.push(r);
+      this.group.add(r);
+    }
+    this.flash = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({ color: GREEN, transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+    this.flash.renderOrder = 4;
+    this.flash.visible = false;
+    // The flash is not part of the guide: a mark taken is shown even with the guide off.
+    ctx.stage.scene.add(this.flash);
     for (let i = 0; i < 2; i++) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
@@ -104,7 +196,7 @@ export class Guide implements Feature {
     if (code !== 'KeyG') return false;
     const on = !this.on();
     this.wanted = on;
-    this.ctx.say(on ? 'Course guide on: marks, and a line on the water to the next one. G turns it off' : 'Course guide off', 4);
+    this.ctx.say(on ? 'Course guide on: a ring round each mark, and a line on the water to the next one. Sail into the ring to take the mark. G turns it off' : 'Course guide off', on ? 6 : 4);
     return true;
   }
 
@@ -148,17 +240,53 @@ export class Guide implements Feature {
     mesh.visible = true;
   }
 
+  /** Hear the race change: the gun, a mark taken, the finish. */
+  private listen(): void {
+    const race = this.ctx.race;
+    const now = { id: race?.call?.id ?? '', started: !!race?.started, leg: race?.leg ?? 0, finished: !!race && race.finish !== null };
+    const was = this.seen;
+    this.seen = now;
+    if (!race?.call || now.id !== was.id) return;
+    const sound = this.ctx.sound;
+    if (now.started && !was.started) notes(sound, 'sawtooth', [[233, 0, 1.1], [311, 0, 1.1]], 0.16);
+    if (now.leg > was.leg) {
+      const mark = race.call.marks[now.leg - 1];
+      if (mark) {
+        this.flash.position.set(mark.x, 0.5, -mark.y);
+        this.flashFor = FLASH;
+      }
+      if (now.finished) notes(sound, 'sine', [[784, 0, 0.22], [988, 0.2, 0.22], [1175, 0.4, 0.22], [1568, 0.6, 0.7]], 0.2);
+      else notes(sound, 'sine', [[880, 0, 0.2], [1175, 0.17, 0.5]], 0.2);
+    }
+  }
+
   update(dt: number, seaTime: number): void {
+    this.listen();
+    const race = this.ctx.race;
+    // Hiding the guide hides the coaching with it: the calls before the gun go back to the bare time.
+    if (race) race.coach = this.on();
+    // A mark just taken: its ring goes green, swells and fades.
+    this.flashFor = Math.max(0, this.flashFor - dt);
+    this.flash.visible = this.flashFor > 0;
+    if (this.flash.visible) {
+      const k = 1 - this.flashFor / FLASH;
+      this.flash.scale.setScalar(1 + k * 0.35);
+      (this.flash.material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - k * k);
+    }
     const marks = this.on() ? this.ahead() : [];
     const { stage, sim, drone } = this.ctx;
+    // Rings only where a ring is the rule: on the marks of a race. A plain route on the chart has none.
+    const ringed = !!race?.call;
     for (let i = 0; i < MAX_MARKS; i++) {
       const b = this.buoys[i];
       const m = marks[i];
       b.visible = !!m;
+      this.rings[i].visible = !!m && ringed;
       if (!m) continue;
       const z = -m.y;
       b.position.set(m.x, stage.seaLevel(m.x, z, seaTime) - 0.25, z);
       b.rotation.set(Math.sin(seaTime * 0.9 + i) * 0.06, i, Math.cos(seaTime * 0.7 + i * 2) * 0.06);
+      this.rings[i].position.set(m.x, 0, z);
     }
     const next = marks[0];
     this.beacon.visible = !!next;
@@ -169,20 +297,34 @@ export class Guide implements Feature {
     this.beacon.position.set(next.x, 45, -next.y);
     // The arrowheads run toward the mark.
     this.tex.offset.y = (this.tex.offset.y + dt * 0.9) % 1;
+    // The posts of the ring's wall walk slowly round it, so it is seen to be a thing and not a mark on the lens.
+    this.wallTex.offset.x = (this.wallTex.offset.x + dt * 0.04) % 1;
     const s = sim.state;
     const d = Math.hypot(next.x - s.x, next.y - s.y);
-    if (d > 40) {
+    // Inside the next ring (which can only last before the gun) it shows green: this is the place.
+    const pre = race?.preStart() ?? null;
+    const inside = ringed && d < RING;
+    this.bright.band.color.setHex(inside ? GREEN : AMBER);
+    this.bright.wall.color.setHex(inside ? GREEN : AMBER);
+    // In a race the line stops at the ring, which is what she has to reach.
+    const stop = ringed ? RING : 0;
+    if (d > 40 + stop) {
       // Start the line a little ahead of the bow, so it does not lie across the cockpit.
       const k = Math.min(0.5, 18 / d);
-      this.lay(this.lines[0], s.x + (next.x - s.x) * k, -(s.y + (next.y - s.y) * k), next.x, -next.y, d > 600 ? 4 : 2.6);
+      const e = 1 - stop / d;
+      this.lay(this.lines[0], s.x + (next.x - s.x) * k, -(s.y + (next.y - s.y) * k), s.x + (next.x - s.x) * e, -(s.y + (next.y - s.y) * e), d > 600 ? 4 : 2.6);
     }
     const after = marks[1];
     if (after) this.lay(this.lines[1], next.x, -next.y, after.x, -after.y, 4);
 
-    // Her name and how far, beside the column of light.
+    // Her name and how far, beside the column of light. Before the gun: the start, and early or late.
     this.pos.set(next.x, 9, -next.y).project(drone.camera);
     if (this.pos.z < 1 && Math.abs(this.pos.x) < 1.05 && Math.abs(this.pos.y) < 1.05) {
-      const text = `${next.name} · ${d < 1852 ? `${Math.round(d / 10) * 10} m` : `${(d / 1852).toFixed(1)} nm`}`;
+      const range = shortRange(Math.max(0, d - stop));
+      const last = ringed && race!.started && race!.leg === race!.call!.marks.length - 1;
+      const text = pre ? `Start · ${next.name} · ${pre.state === 'inside' ? 'you are in the ring' : `${range} · ${marginText(pre)}`}`
+        : ringed && race!.leg === 0 ? `Start · ${next.name} · ${range}`
+          : `${last ? 'Finish · ' : ''}${next.name} · ${range}`;
       if (this.label.textContent !== text) this.label.textContent = text;
       this.label.style.display = 'block';
       this.label.style.transform = `translate(-50%, -100%) translate(${Math.round(((this.pos.x + 1) / 2) * window.innerWidth)}px, ${Math.round(((1 - this.pos.y) / 2) * window.innerHeight)}px)`;
@@ -191,6 +333,8 @@ export class Guide implements Feature {
 
   dispose(): void {
     this.ctx.stage.scene.remove(this.group);
+    this.ctx.stage.scene.remove(this.flash);
+    this.wallTex.dispose();
     this.label.remove();
     this.tex.dispose();
   }
