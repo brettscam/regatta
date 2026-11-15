@@ -74,6 +74,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   { title: 'Race and talk', rows: [
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
     [['Enter'], 'Message', 'Type a message to the other boats.'],
+    [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the ferry and ship calls off or on.'],
   ] },
   { title: 'Under power', note: 'The engine, for when there is no wind or no room to sail. It is not allowed in a race.', rows: [
     [['I'], 'Engine', 'Start it or stop it. It takes a second or two to fire, and starts out of gear.'],

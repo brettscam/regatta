@@ -10,4 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_SIGNIN_CODE?: string;
   /** Realtime messages a second that one sailing area may use. See net/web/pacing.ts. */
   readonly VITE_WATER_BUDGET?: string;
+  /** A TURN relay for the voice radio, if there is one. See net/web/config.ts. */
+  readonly VITE_TURN_URL?: string;
+  readonly VITE_TURN_USER?: string;
+  readonly VITE_TURN_PASS?: string;
 }
