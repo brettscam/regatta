@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CourseData } from '@slack-tide/world';
+import { onCityNight } from './massing';
 
 /** Repeatable noise in 0..1 from a grid position. */
 export function hash(i: number, j: number): number {
@@ -199,8 +201,9 @@ export function buildBridge(bridge: NonNullable<CourseData['bridge']>): THREE.Gr
   // Viaducts carry the road from the cable anchorages on to the hillsides.
   const SOUTH_APPROACH = 420;
   const NORTH_APPROACH = 280;
-  const paint = new THREE.MeshStandardMaterial({ color: 0xb3402e });
-  const shadowed = new THREE.MeshStandardMaterial({ color: 0x8c3021 });
+  // International Orange.
+  const paint = new THREE.MeshStandardMaterial({ color: 0xc0362c });
+  const shadowed = new THREE.MeshStandardMaterial({ color: 0x952a20 });
   const concrete = new THREE.MeshStandardMaterial({ color: 0xb9b2a2 });
   const road = new THREE.MeshStandardMaterial({ color: 0x4a4b4d });
   const group = new THREE.Group();
@@ -327,6 +330,38 @@ export function buildBridge(bridge: NonNullable<CourseData['bridge']>): THREE.Gr
     group.add(cable);
   }
   group.add(new THREE.LineSegments(lineGeom(thin), new THREE.LineBasicMaterial({ color: 0xa63a29, transparent: true, opacity: 0.55 })));
+
+  // Road lamps down both sides of the deck, and the towers floodlit, once the sun is down.
+  const lampPts: number[] = [];
+  for (let x = x0 + 20; x < x1; x += 46) for (const side of [-1, 1]) lampPts.push(x, DECK + 9, side * (WIDTH / 2 - 0.5));
+  const lampMat = new THREE.PointsMaterial({ color: 0xffd9a0, size: 3, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+  const lamps = new THREE.Points(lineGeom(lampPts), lampMat);
+  lamps.frustumCulled = false;
+  group.add(lamps);
+  onCityNight((n) => {
+    lampMat.opacity = n;
+    lamps.visible = n > 0.02;
+    paint.emissive.setRGB(0.75 * 0.22 * n, 0.21 * 0.22 * n, 0.17 * 0.22 * n);
+  });
+
+  // One mesh for each paint, not one for each plate: the whole bridge is a handful of draw calls.
+  const byPaint = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  for (const child of [...group.children]) {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || (mesh as unknown as THREE.InstancedMesh).isInstancedMesh) continue;
+    mesh.updateMatrix();
+    const geom = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+    geom.applyMatrix4(mesh.matrix);
+    const mat = mesh.material as THREE.Material;
+    if (!byPaint.has(mat)) byPaint.set(mat, []);
+    byPaint.get(mat)!.push(geom);
+    group.remove(mesh);
+  }
+  for (const [mat, geoms] of byPaint) {
+    const merged = new THREE.Mesh(mergeGeometries(geoms), mat);
+    merged.frustumCulled = false;
+    group.add(merged);
+  }
 
   // Sim (x east, y north) to scene (X east, Z south). Local +X runs from the south tower to the north tower.
   group.position.set(sx, 0, -sy);
