@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ReplayWorld } from '@slack-tide/world';
 import { waveHeight, type Wave } from './waves';
+import { buildOceanVessel, type OceanModel } from './oceanTraffic';
 
 const KT = 0.514444;
 const D2R = Math.PI / 180;
@@ -24,12 +25,17 @@ export interface TrafficRoute {
   name: string;
   kind: 'ferry' | 'ship' | 'sail';
   /** Which model to build. */
-  model: 'catamaran' | 'ferry' | 'container' | 'sloop';
+  model: 'catamaran' | 'ferry' | 'container' | 'sloop' | OceanModel;
   length: number;
   beam: number;
   speedKt: number;
   /** `shuttle` runs out and back along the line with a stop at each end. `loop` goes round and round. */
-  mode: 'shuttle' | 'loop';
+  mode: 'shuttle' | 'loop' | 'oneway';
+  /**
+   * For `oneway`: seconds from one passage to the next. She runs the line once from its first point to its last at her
+   * speed, and is off the chart until she is due again. This is a ship in a traffic lane: lanes are one-way.
+   */
+  every?: number;
   /** Seconds stopped at each end of a shuttle. */
   dwell?: number;
   /** A vessel that leaves the chart is not shown while it is stopped at the far ends. */
@@ -95,9 +101,11 @@ export class Track {
     this.length = total;
     this.speed = route.speedKt * KT;
     // Shuttles ease away from the dock and ease in to it.
-    this.ramp = closed ? 0 : Math.min(45, (total / this.speed) * 0.25);
+    // A ship on passage comes on to the chart at speed and leaves it at speed.
+    const oneway = route.mode === 'oneway';
+    this.ramp = closed || oneway ? 0 : Math.min(45, (total / this.speed) * 0.25);
     this.travel = total / this.speed + this.ramp;
-    this.cycle = closed ? total / this.speed : 2 * (this.travel + (route.dwell ?? 0));
+    this.cycle = closed ? total / this.speed : oneway ? Math.max(route.every ?? 0, this.travel + 60) : 2 * (this.travel + (route.dwell ?? 0));
   }
 
   /** Position at a distance along the line. */
@@ -162,6 +170,15 @@ export class Track {
       this.point(s, out);
       out.heading = this.bearing(s);
       out.sog = this.speed;
+      return;
+    }
+    if (r.mode === 'oneway') {
+      // One passage each cycle, first point to last. Between passages she is somewhere else in the world.
+      out.active = tau < this.travel;
+      const s = this.speed * Math.min(tau, this.travel);
+      this.point(s, out);
+      out.heading = this.bearing(Math.min(s, this.length - 1));
+      out.sog = out.active ? this.speed : 0;
       return;
     }
     const dwell = r.dwell ?? 0;
@@ -426,7 +443,9 @@ export class Traffic {
     for (const r of spec.routes) {
       let group: THREE.Group;
       let sails: SloopParts | null = null;
-      if (r.model === 'catamaran') group = buildCatamaran(r);
+      const ocean = buildOceanVessel(r);
+      if (ocean) group = ocean;
+      else if (r.model === 'catamaran') group = buildCatamaran(r);
       else if (r.model === 'ferry') group = buildFerry(r);
       else if (r.model === 'container') group = buildContainerShip(r);
       else ({ group, parts: sails } = buildSloopModel(r));

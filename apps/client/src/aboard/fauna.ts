@@ -187,6 +187,87 @@ export const FAUNA: Record<string, Fauna> = {
   },
 };
 
+// ---- the Gulf of the Farallones (course id `farallones`) -------------------------------------------
+// The ocean outside the Golden Gate in mid July, with the animals the game can already draw. Coordinates share the Bay's
+// origin. Kept apart from the Bay's list above so the two can be worked on separately.
+// Still wanted here, and not drawn yet because they need kinds of their own: blue whales on the krill along the shelf
+// edge west of the islands; white sharks at Southeast Farallon (they come for the elephant seals from September, are
+// seldom seen and are never a threat to a boat); common murres, which are most of the quarter of a million birds on the
+// islands; sooty shearwaters in rafts of thousands offshore; a black-footed albatross now and then west of the islands;
+// and sea lions hauled out on the rocks themselves rather than on floats.
+FAUNA.farallones = {
+  porpoise: [
+    // Off Point Bonita and in the Bonita Channel, where the ebb meets the swell.
+    { x: -7800, y: -2600, r: 800, n: 3 },
+    { x: -9800, y: 400, r: 600, n: 2 },
+    // Under the bridge, as on the Bay.
+    { x: -2500, y: -1150, r: 800, n: 2 },
+    // Off Bodega Head, off Chimney Rock, and round Pillar Point.
+    { x: -53500, y: 51500, r: 900, n: 2 },
+    { x: -44600, y: 17300, r: 900, n: 2 },
+    { x: -5000, y: -38000, r: 800, n: 2 },
+  ],
+  seals: [
+    { x: -20300, y: 8300, r: 350, n: 3 }, // the mouth of Bolinas Lagoon, where they haul out on the sand bar
+    { x: -45600, y: 19000, r: 400, n: 2 }, // Drakes Bay, under Chimney Rock
+    { x: -52900, y: 53300, r: 250, n: 2 }, // Bodega Harbour, inside the jetties
+    { x: -3200, y: -36900, r: 300, n: 2 }, // Pillar Point Harbor
+    { x: -2371, y: 278, r: 200, n: 1 }, // Horseshoe Cove
+  ],
+  quietSeals: true,
+  // No floats out here. The sea lions of the islands lie on the rocks, which the game does not draw them on yet.
+  haulouts: [],
+  sealions: [
+    // Round Southeast Farallon, just off the rocks, and in Fisherman Bay.
+    { path: [[-47900, -14100], [-48400, -13700], [-49300, -13900], [-49900, -14500], [-49500, -15200], [-48600, -15400], [-47900, -14800], [-47900, -14100]], n: 5 },
+    { path: [[-49200, -14050], [-48850, -14150]], n: 2 },
+    // The fish dock at Bodega, Pillar Point's breakwater, and Seal Rocks off the Cliff House.
+    { path: [[-52700, 55800], [-52300, 55600], [-52000, 55350]], n: 2 },
+    { path: [[-3200, -37200], [-3100, -37000], [-2900, -36850]], n: 2 },
+    { path: [[-6500, -5800], [-6700, -6300], [-6500, -6700]], n: 3 },
+  ],
+  // Humpbacks feed on anchovy and krill between the islands and the bar all summer. On the flood one works in toward the channel.
+  whale: [[-47000, -18500], [-42000, -14500], [-36000, -11000], [-28000, -8500], [-21000, -7200], [-14500, -6400]],
+  pelicans: [
+    { path: [[-2520, -1000], [-5600, -2300], [-7400, -2900], [-10000, 300], [-14000, 2900], [-19500, 7000]], n: 2 },
+    { path: [[-6300, -5500], [-6200, -12000], [-5500, -21000], [-7600, -26500], [-6500, -33500], [-3600, -37400]], n: 2 },
+    { path: [[-44800, 17400], [-46500, 20200], [-43500, 20900], [-40500, 18500]], n: 2 },
+    { path: [[-52200, 51900], [-52300, 52800], [-53100, 53300], [-52900, 55300]], n: 1 },
+  ],
+  cormorants: [
+    // The colonies: Southeast Farallon, Bodega Rock, and the cliffs under Point Reyes and Point Bonita.
+    { path: [[-48300, -14300], [-47800, -13500], [-48900, -13300], [-50100, -14300], [-49300, -15500], [-48200, -15200], [-48300, -14300]], n: 6 },
+    { path: [[-48300, -14300], [-45500, -12500], [-42000, -11000]], n: 3 },
+    { path: [[-52500, 51800], [-51500, 52600], [-52700, 52850]], n: 3 },
+    { path: [[-50400, 17900], [-51600, 16800], [-49000, 16500], [-45400, 17500]], n: 3 },
+    { path: [[-7100, -1900], [-8200, -2600], [-6000, -3900], [-5300, -4100]], n: 2 },
+  ],
+  // The sea buoy and the channel buoys.
+  perches: [{ x: -21342, y: -8896, up: 4.85 }, { x: -11944, y: -5449, up: 4.85 }, { x: -16159, y: -7228, up: 4.85 }],
+  gulls: [
+    { x: -48800, y: -14500, r: 700, n: 14, up: 70 }, // Southeast Farallon: the biggest western gull colony there is
+    { x: -57000, y: -7000, r: 400, n: 6, up: 40 }, // the North Farallones
+    { x: -52500, y: 51800, r: 250, n: 5, up: 20 }, // Bodega Rock
+    { x: -52100, y: 55400, r: 250, n: 5, up: 14 }, // the fish dock at Bodega
+    { x: -2800, y: -36700, r: 250, n: 5, up: 14 }, // Johnson Pier
+    { x: -4300, y: -21850, r: 200, n: 4, up: 14 }, // Pacifica Pier
+    { x: -6600, y: -6200, r: 250, n: 5, up: 22 }, // Seal Rocks
+    { x: -50300, y: 18300, r: 400, n: 5, up: 80 }, // the Point Reyes cliffs
+  ],
+  bait: [
+    { x: -7700, y: -2900 }, // off Point Bonita
+    { x: -11900, y: -5300 }, // the edge of the bar, by buoy 8
+    { x: -22200, y: 5200 }, // the end of Duxbury Reef
+    { x: -44400, y: 17100 }, // off Chimney Rock
+    { x: -51800, y: 16600 }, // off Point Reyes
+    { x: -47300, y: -13700 }, // north-east of Southeast Farallon
+    { x: -50600, y: -15300 }, // and south-west of it
+    { x: -53900, y: 51200 }, // off Bodega Head
+    { x: -5400, y: -38300 }, // the reef off Pillar Point
+  ],
+};
+// ---- end of the Gulf of the Farallones --------------------------------------------------------------
+
 // ---- small helpers ----------------------------------------------------------------------------------
 
 const TAU = Math.PI * 2;

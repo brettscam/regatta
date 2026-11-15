@@ -1,0 +1,40 @@
+[
+  {
+    "id": "morning",
+    "name": "Morning",
+    "hours": 1,
+    "say": "The last of the ebb running out of the Gate and light southerly airs outside. A quiet sea to learn the bar on"
+  },
+  {
+    "id": "afternoon",
+    "name": "Early afternoon",
+    "hours": 5.5,
+    "default": true,
+    "say": "The sea breeze is in at the Gate, 12 knots and building. Outside it is lighter. The flood starts mid afternoon"
+  },
+  {
+    "id": "evening",
+    "name": "Late afternoon",
+    "hours": 8.5,
+    "say": "Fifteen knots through the Gate with the flood under it, and the sun going down toward the Farallones"
+  },
+  {
+    "id": "night",
+    "name": "After dark",
+    "hours": 13,
+    "say": "The lights are lit. The big ebb of the night is starting: three knots over the bar by one in the morning, and ships in the lanes"
+  },
+  {
+    "id": "dawn",
+    "name": "Monday at first light",
+    "hours": 21.5,
+    "say": "The ebb easing, a light south-westerly, and the whole day ahead: the time to leave for the islands or for Drakes Bay"
+  },
+  {
+    "id": "fresh",
+    "name": "A fresh afternoon",
+    "hours": 5.5,
+    "boost": 2,
+    "say": "The recorded day was a quiet one out here. This is the same afternoon with twice the wind: 25 knots at the Gate, 10 to 15 outside. Nearer what the coast usually serves"
+  }
+]

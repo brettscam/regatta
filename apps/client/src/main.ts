@@ -150,6 +150,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     skipper: choice.skipper,
     logbook,
     places: data.places,
+    features: data.features,
     races: data.races,
     boardOpen: () => board.isOpen,
     boats: BOATS,

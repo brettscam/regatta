@@ -35,9 +35,9 @@ export interface CourseData {
   timeZone: string;
   season: { id: string; start: string; hours: number; stepSeconds: number; source: string };
   forecast: { issued: string; hours: number; source: string; windIssued?: string };
-  current: GridSpec & { scale: number; steps: number; file: string };
-  depth: GridSpec & { scale: number; file: string };
-  terrain: GridSpec & { max: number; file: string; source: string };
+  current: GridSpec & { scale: number; steps: number; file: string; insets?: GridSpec[] };
+  depth: GridSpec & { scale: number; file: string; insets?: GridSpec[] };
+  terrain: GridSpec & { max: number; file: string; source: string; insets?: GridSpec[] };
   wind: GridSpec & { scale: number; truth: WindStep[]; forecast: WindStep[]; note: string };
   tide: { station: string; x: number; y: number; truth: number[]; forecast: number[]; note: string };
   /** The towers of a bridge over the course, where there is one. */
@@ -50,6 +50,26 @@ export interface CourseData {
   coast: number[][];
   /** What the water says about its sea: an ocean swell coming in, open water beyond the chart. Left out, there is no swell. See `sea.ts`. */
   sea?: SeaSpec;
+}
+
+/**
+ * A grid may carry insets: smaller, finer grids over the places that need the detail (a harbour entrance, a tidal gate),
+ * so a big water does not have to be baked fine everywhere. Their cells follow the main grid's in the same file, in the
+ * order listed, laid out the same way. A place inside an inset is read from it. A course with none reads as before.
+ */
+function insetStarts(base: GridSpec, insets: GridSpec[] | undefined, per: number): { starts: number[]; end: number } {
+  let o = base.nx * base.ny * per;
+  const starts: number[] = [];
+  for (const g of insets ?? []) {
+    starts.push(o);
+    o += g.nx * g.ny * per;
+  }
+  return { starts, end: o };
+}
+
+/** How far inside a grid a place is, metres. Negative outside it. */
+function inside(g: GridSpec, x: number, y: number): number {
+  return Math.min(x - g.x0, g.x0 + (g.nx - 1) * g.dx - x, y - g.y0, g.y0 + (g.ny - 1) * g.dx - y);
 }
 
 export interface ReplayData {
@@ -115,6 +135,10 @@ export class ReplayWorld implements Environment {
   private readonly dep: Uint8Array;
   private readonly out: EnvSample = { windDir: 0, windSpeed: 0, currentX: 0, currentY: 0, depth: 0 };
   private readonly scratch = { x: 0, y: 0 };
+  private readonly scratch2 = { x: 0, y: 0 };
+  /** Where each inset's cells begin in the current and depth data. */
+  private readonly curInsets: number[];
+  private readonly depInsets: number[];
 
   constructor(data: ReplayData, startOffset = 0) {
     this.course = data.course;
@@ -122,8 +146,12 @@ export class ReplayWorld implements Environment {
     this.dep = data.depth;
     this.startOffset = startOffset;
     const c = this.course.current;
-    if (this.cur.length !== c.steps * c.nx * c.ny * 2) throw new Error('Current data does not match its grid');
-    if (this.dep.length !== this.course.depth.nx * this.course.depth.ny) throw new Error('Depth data does not match its grid');
+    const cur = insetStarts(c, c.insets, c.steps * 2);
+    const dep = insetStarts(this.course.depth, this.course.depth.insets, 1);
+    this.curInsets = cur.starts;
+    this.depInsets = dep.starts;
+    if (this.cur.length !== cur.end) throw new Error('Current data does not match its grid');
+    if (this.dep.length !== dep.end) throw new Error('Depth data does not match its grid');
   }
 
   /** Seconds into the season at a session time. */
@@ -229,13 +257,36 @@ export class ReplayWorld implements Environment {
   /** Surface current in m/s east and north. Zero over land and outside the grid. */
   current(x: number, y: number, t: number, out = this.scratch): { x: number; y: number } {
     const c = this.course.current;
+    const insets = c.insets;
+    if (insets) {
+      for (let n = 0; n < insets.length; n++) {
+        const g = insets[n];
+        const d = inside(g, x, y);
+        if (d < 0) continue;
+        this.currentIn(g, this.curInsets[n], x, y, t, out);
+        // Over the inset's outer cells the fine stream eases into the coarse one, so there is no step at its edge.
+        const edge = 2 * g.dx;
+        if (d < edge) {
+          const far = this.currentIn(c, 0, x, y, t, this.scratch2);
+          const w = d / edge;
+          out.x = out.x * w + far.x * (1 - w);
+          out.y = out.y * w + far.y * (1 - w);
+        }
+        return out;
+      }
+    }
+    return this.currentIn(c, 0, x, y, t, out);
+  }
+
+  private currentIn(g: GridSpec, start: number, x: number, y: number, t: number, out: { x: number; y: number }): { x: number; y: number } {
+    const c = this.course.current;
     const pos = Math.min(c.steps - 1, Math.max(0, (this.startOffset + t) / this.course.season.stepSeconds));
     const k = Math.min(c.steps - 2, Math.floor(pos));
     const ft = pos - k;
-    const { i, j, fx, fy } = bilinear(c, x, y);
-    const stride = c.nx * c.ny * 2;
-    const base = (j * c.nx + i) * 2;
-    const row = c.nx * 2;
+    const { i, j, fx, fy } = bilinear(g, x, y);
+    const stride = g.nx * g.ny * 2;
+    const base = start + (j * g.nx + i) * 2;
+    const row = g.nx * 2;
     const d = this.cur;
     let u = 0;
     let v = 0;
@@ -264,10 +315,18 @@ export class ReplayWorld implements Environment {
   /** Charted depth below the model datum, metres. 0 on land. */
   chartDepth(x: number, y: number): number {
     const g = this.course.depth;
+    if (g.insets) {
+      for (let n = 0; n < g.insets.length; n++) if (inside(g.insets[n], x, y) >= 0) return this.depthIn(g.insets[n], this.depInsets[n], x, y);
+    }
     if (x < g.x0 || y < g.y0 || x > g.x0 + (g.nx - 1) * g.dx || y > g.y0 + (g.ny - 1) * g.dx) return 60;
+    return this.depthIn(g, 0, x, y);
+  }
+
+  private depthIn(g: GridSpec, start: number, x: number, y: number): number {
+    const scale = this.course.depth.scale;
     const { i, j, fx, fy } = bilinear(g, x, y);
     const d = this.dep;
-    const o = j * g.nx + i;
+    const o = start + j * g.nx + i;
     const a = d[o];
     const b = d[o + 1];
     const c = d[o + g.nx];
@@ -276,9 +335,9 @@ export class ReplayWorld implements Environment {
     if (a === 0 || b === 0 || c === 0 || e === 0) {
       const near = fy < 0.5 ? (fx < 0.5 ? a : b) : fx < 0.5 ? c : e;
       if (near === 0) return 0;
-      return Math.min(...[a, b, c, e].filter((n) => n > 0)) * g.scale * 0.5;
+      return Math.min(...[a, b, c, e].filter((n) => n > 0)) * scale * 0.5;
     }
-    return ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + e * fx) * fy) * g.scale;
+    return ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + e * fx) * fy) * scale;
   }
 
   /** Depth of water here and now: charted depth plus the height of tide. 0 on land. */

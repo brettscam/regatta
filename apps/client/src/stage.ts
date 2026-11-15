@@ -3,7 +3,8 @@ import { KT } from '@slack-tide/sim';
 import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
+import { Buoy, buildBridge, buildLand, landHeight } from './scene/terrain';
+import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
 import { clearCityNight, setCityNight } from './scene/massing';
@@ -20,6 +21,25 @@ export interface StageBoat {
   heel: number;
   /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
   hulls?: number;
+}
+
+/**
+ * The ground the city is stood on. A plain course's land is one grid and is handed over as it is. Where the land has
+ * insets (the ocean outside the Gate), the city gets one even grid over the Bay's shores, read from the finest land
+ * there is at each point, so a building's footing is the ground that is drawn under it.
+ */
+function sceneryGround(course: CourseData, terrain: Uint8Array): [CourseData, Uint8Array] {
+  const main = course.terrain;
+  if (!main.insets?.length) return [course, terrain];
+  const height = landHeight(course, terrain);
+  const dx = 80;
+  const x0 = Math.max(main.x0, -9000);
+  const y0 = Math.max(main.y0, -12400);
+  const nx = Math.floor((Math.min(main.x0 + (main.nx - 1) * main.dx, 14000) - x0) / dx) + 1;
+  const ny = Math.floor((Math.min(main.y0 + (main.ny - 1) * main.dx, 13200) - y0) / dx) + 1;
+  const cells = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) cells[j * nx + i] = Math.round(Math.sqrt(Math.min(1, height(x0 + i * dx, y0 + j * dx) / main.max)) * 255);
+  return [{ ...course, terrain: { ...main, x0, y0, dx, nx, ny, insets: undefined } }, cells];
 }
 
 /**
@@ -44,6 +64,8 @@ export class Stage {
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
   private buoys: Buoy[] = [];
+  /** Lighthouses and lit marks, on a water that has them. */
+  private seamarks: Seamarks | null = null;
   private readonly focus = new THREE.Vector3();
   private seaKt = 0;
   private seaSet = false;
@@ -93,8 +115,10 @@ export class Stage {
     const pieces = new Set(scenery.pieces ?? []);
     const land = new THREE.Group();
     land.name = 'course';
-    land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
-    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
+    land.add(buildLand(this.course, data.terrain, scenery.landCover));
+    if (pieces.has('san-francisco')) land.add(buildScenery(...sceneryGround(this.course, data.terrain), data.depth));
+    this.seamarks = data.features?.lights.length ? new Seamarks(data.features.lights, landHeight(this.course, data.terrain)) : null;
+    if (this.seamarks) land.add(this.seamarks.group);
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
@@ -191,6 +215,7 @@ export class Stage {
       b.update(waveHeight(this.waves, b.x, -b.y, seaTime), Math.atan2(c.x, c.y), Math.hypot(c.x, c.y), seaTime);
     }
 
+    this.seamarks?.update(world.seasonTime(t), camera);
     this.sky.setTime(world.dateAt(t), this.course.origin.lat, this.course.origin.lon);
     this.focus.set(boat.x, 0, boat.z);
     this.sky.follow(this.focus);

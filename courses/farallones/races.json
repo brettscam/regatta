@@ -1,0 +1,95 @@
+[
+  {
+    "id": "out-the-gate",
+    "name": "Out the Gate and back",
+    "blurb": "From the bridge out to Point Bonita, across to Mile Rocks and home. 6 miles, and the shortest way to find out what the ocean is doing today.",
+    "marks": [
+      { "name": "Golden Gate", "x": -3200, "y": -1250 },
+      { "name": "Point Bonita", "x": -7500, "y": -2700 },
+      { "name": "Mile Rocks", "x": -5900, "y": -3800 },
+      { "name": "Golden Gate", "x": -3200, "y": -1250 }
+    ]
+  },
+  {
+    "id": "lightship",
+    "name": "The Lightship",
+    "blurb": "The classic first ocean race: out the ship channel to the sea buoy where the San Francisco lightship lay, round it, and back. 22 miles. Go out on the ebb, come home on the flood, and keep clear of the ships that use the same channel.",
+    "marks": [
+      { "name": "Golden Gate", "x": -3200, "y": -1250 },
+      { "name": "Point Bonita", "x": -7300, "y": -2800 },
+      { "name": "Buoy 8", "x": -11900, "y": -5300 },
+      { "name": "Buoy 2", "x": -16300, "y": -6500 },
+      { "name": "Lightship", "x": -21550, "y": -8900 },
+      { "name": "Buoy 1", "x": -16100, "y": -7350 },
+      { "name": "Buoy 7", "x": -11800, "y": -6200 },
+      { "name": "Mile Rocks", "x": -5900, "y": -3800 },
+      { "name": "Golden Gate", "x": -3200, "y": -1250 }
+    ]
+  },
+  {
+    "id": "drakes-bay",
+    "name": "Gate to Drakes Bay",
+    "blurb": "North by the Bonita Channel, outside Duxbury Reef, and 15 miles along the Point Reyes shore to anchor inside Chimney Rock. 27 miles, usually a beat, with a lee shore all the way: the marks keep the fleet three miles off it. The fleet stays the night and races home.",
+    "marks": [
+      { "name": "Golden Gate", "x": -3200, "y": -1250 },
+      { "name": "Point Bonita", "x": -7300, "y": -2500 },
+      { "name": "Bonita Channel", "x": -8350, "y": -400 },
+      { "name": "Off Tennessee Cove", "x": -9700, "y": 1300 },
+      { "name": "Off Muir Beach", "x": -15500, "y": 1600 },
+      { "name": "Duxbury buoy", "x": -21700, "y": 3200 },
+      { "name": "Off Bolinas Point", "x": -27000, "y": 5200 },
+      { "name": "Off Double Point", "x": -32300, "y": 8200 },
+      { "name": "Off Point Resistance", "x": -37500, "y": 11500 },
+      { "name": "Off Drakes Estero", "x": -41800, "y": 14600 },
+      { "name": "Chimney Rock", "x": -44200, "y": 16500 },
+      { "name": "Drakes Bay", "x": -44700, "y": 18400 }
+    ]
+  },
+  {
+    "id": "farallones",
+    "name": "Round the Farallones",
+    "blurb": "Out the Gate, 26 miles to Southeast Farallon, round it and home: 54 miles of open ocean, across the shipping lanes twice. Seven to nine hours at 6 to 8 knots, and all day and into the night in light airs. Leave early.",
+    "marks": [
+      { "name": "Golden Gate", "x": -3200, "y": -1250 },
+      { "name": "Point Bonita", "x": -7300, "y": -2800 },
+      { "name": "Buoy 8", "x": -11900, "y": -5300 },
+      { "name": "Buoy 2", "x": -16300, "y": -6500 },
+      { "name": "Lightship", "x": -21500, "y": -8700 },
+      { "name": "Half way out", "x": -34500, "y": -10800 },
+      { "name": "North of the island", "x": -48900, "y": -12500 },
+      { "name": "North Landing", "x": -50600, "y": -13300 },
+      { "name": "Maintop Bay", "x": -51000, "y": -14600 },
+      { "name": "South of the island", "x": -48900, "y": -16500 },
+      { "name": "Half way home", "x": -34500, "y": -12300 },
+      { "name": "Lightship", "x": -21400, "y": -9150 },
+      { "name": "Buoy 7", "x": -11800, "y": -6200 },
+      { "name": "Mile Rocks", "x": -5900, "y": -3800 },
+      { "name": "Golden Gate", "x": -3200, "y": -1250 }
+    ]
+  },
+  {
+    "id": "bodega",
+    "name": "Gate to Bodega",
+    "blurb": "The long one up the coast: outside Duxbury, round Point Reyes, ten miles of open beach with nowhere to go, and in behind Bodega Head. 54 miles, and Point Reyes is where it is won or lost. The marks keep the fleet off the lee shore.",
+    "marks": [
+      { "name": "Golden Gate", "x": -3200, "y": -1250 },
+      { "name": "Point Bonita", "x": -7300, "y": -2500 },
+      { "name": "Bonita Channel", "x": -8350, "y": -400 },
+      { "name": "Off Tennessee Cove", "x": -9700, "y": 1300 },
+      { "name": "Off Muir Beach", "x": -15500, "y": 1600 },
+      { "name": "Duxbury buoy", "x": -21700, "y": 3200 },
+      { "name": "Off Bolinas Point", "x": -27500, "y": 4600 },
+      { "name": "Off Double Point", "x": -34000, "y": 7400 },
+      { "name": "Drakes Bay offing", "x": -41000, "y": 10600 },
+      { "name": "Off Chimney Rock", "x": -47000, "y": 13600 },
+      { "name": "Point Reyes", "x": -53000, "y": 16000 },
+      { "name": "Point Reyes Beach", "x": -55000, "y": 23500 },
+      { "name": "Off Abbotts Lagoon", "x": -56000, "y": 31000 },
+      { "name": "Off Kehoe Beach", "x": -56300, "y": 38500 },
+      { "name": "Off Tomales Point", "x": -56500, "y": 45500 },
+      { "name": "Bodega Head", "x": -57200, "y": 50800 },
+      { "name": "Bodega Rock", "x": -52600, "y": 50500 },
+      { "name": "Bodega Harbour", "x": -51700, "y": 52500 }
+    ]
+  }
+]

@@ -1,0 +1,103 @@
+{
+  "id": "farallones",
+  "name": "Gulf of the Farallones",
+  "origin": { "lat": 37.83, "lon": -122.45 },
+  "timeZone": "America/Los_Angeles",
+
+  "model": {
+    "name": "sfbofs",
+    "title": "NOAA SFBOFS (San Francisco Bay Operational Forecast System)",
+    "archive": "forecast",
+    "fieldsKey": "sfbofs/netcdf/{cycle:%Y%m}/nos.sfbofs.fields.{kind}{n:03d}.{cycle:%Y%m%d}.t{cycle:%H}z.nc",
+    "box": { "lon0": -123.30, "lon1": -122.38, "lat0": 37.30, "lat1": 38.50 }
+  },
+  "outer": {
+    "name": "wcofs",
+    "title": "NOAA WCOFS (West Coast Operational Forecast System, 4 km)",
+    "fieldsKey": "wcofs/netcdf/{cycle:%Y%m}/nos.wcofs.2ds.f{n:03d}.{cycle:%Y%m%d}.t{cycle:%H}z.nc",
+    "box": { "lon0": -123.50, "lon1": -122.30, "lat0": 37.25, "lat1": 38.55 }
+  },
+  "sea": { "at": [37.75, -122.84], "name": "the position of the San Francisco bar buoy, 18 miles west of the Golden Gate" },
+  "season": {
+    "start": "2024-07-14T15:00",
+    "hours": 36,
+    "forecastHours": 48,
+    "hrrrForecastCycle": "2024-07-14T12:00"
+  },
+  "hrrrBox": { "lon0": -123.32, "lon1": -122.36, "lat0": 37.38, "lat1": 38.44 },
+  "tileBox": { "lon0": -123.24, "lon1": -122.28, "lat0": 37.43, "lat1": 38.39 },
+
+  "chart": [-66000.0, -41000.0, 6000.0, 59000.0],
+  "terrain": [-68000.0, -43000.0, 14000.0, 61000.0],
+  "dx": { "current": 1000.0, "depth": 200.0, "terrain": 200.0, "wind": 4000.0, "coast": 40.0 },
+  "coast": { "tolerance": 30.0, "minArea": 5000 },
+  "terrainMax": 820.0,
+  "outerBlend": 5000.0,
+
+  "insets": {
+    "current": [
+      { "name": "Golden Gate and the bar", "box": [-13000.0, -8000.0, 0.0, 5000.0], "dx": 250.0 }
+    ],
+    "depth": [
+      { "name": "Golden Gate and the bar", "box": [-16000.0, -9000.0, 0.0, 5000.0], "dx": 100.0 },
+      { "name": "Bodega Harbour", "box": [-54000.0, 52000.0, -51400.0, 56200.0], "dx": 25.0 },
+      { "name": "Southeast Farallon", "box": [-50200.0, -15800.0, -47200.0, -13200.0], "dx": 50.0 },
+      { "name": "Pillar Point", "box": [-5000.0, -38400.0, -1600.0, -35400.0], "dx": 50.0 },
+      { "name": "Bolinas and Duxbury Reef", "box": [-23000.0, 5800.0, -18600.0, 9800.0], "dx": 50.0 }
+    ],
+    "terrain": [
+      { "name": "Golden Gate", "box": [-9000.0, -7600.0, 6000.0, 4000.0], "dx": 80.0 },
+      { "name": "Southeast Farallon", "box": [-50200.0, -15800.0, -47200.0, -13200.0], "dx": 40.0 },
+      { "name": "Bodega Head", "box": [-56000.0, 51000.0, -50400.0, 57000.0], "dx": 80.0 },
+      { "name": "Point Reyes", "box": [-52000.0, 16400.0, -44000.0, 21200.0], "dx": 80.0 },
+      { "name": "Pillar Point", "box": [-5600.0, -38800.0, -1200.0, -34800.0], "dx": 80.0 }
+    ]
+  },
+  "channels": [
+    { "name": "Main ship channel", "depth": 16.8, "width": 610.0,
+      "note": "The dredged channel across the San Francisco bar, 55 feet deep and 2,000 feet wide, from buoys 1 and 2 to buoys 7 and 8. The tide model's bottom is too smooth to show it.",
+      "points": [[-16200, -6920], [-11900, -5750]] },
+    { "name": "Bodega Harbour channel", "depth": 4.6, "width": 100.0,
+      "note": "The dredged channel. In life it is 12 feet deep and 100 feet wide. Here it is 15 feet and 100 metres, so a keel boat can be sailed up it at low water. Local metres, traced from the elevation tiles.",
+      "points": [[-52250, 52850], [-52750, 52850], [-53150, 52900], [-53200, 53250], [-53000, 53700], [-52900, 54200], [-52900, 55500], [-52850, 55800], [-52600, 55850], [-52300, 55600], [-52000, 55350]] }
+  ],
+
+  "rocks": [
+    ["Middle Farallon", 37.7275, -123.0320, 60.0, 6.0]
+  ],
+
+  "tideStation": ["San Francisco (Presidio)", 37.8063, -122.4659],
+  "streamAt": ["Gate", "Golden Gate", 37.8197, -122.4786, 65],
+  "bridge": { "south": [37.8140, -122.4778], "north": [37.8254, -122.4794] },
+  "marks": [
+    ["gate", "Golden Gate", 37.8197, -122.4786, "bridge"],
+    ["bonita", "Point Bonita", 37.8155, -122.5297, "point"],
+    ["diablo", "Point Diablo", 37.8200, -122.4995, "point"],
+    ["landsend", "Lands End", 37.7850, -122.5060, "point"],
+    ["oceanbeach", "Ocean Beach", 37.7600, -122.5090, "town"],
+    ["pacifica", "Pacifica", 37.6330, -122.4930, "town"],
+    ["sanpedro", "Point San Pedro", 37.5950, -122.5200, "point"],
+    ["montara", "Point Montara", 37.5365, -122.5180, "point"],
+    ["pillar", "Pillar Point", 37.4950, -122.4960, "point"],
+    ["princeton", "Pillar Point Harbor", 37.5040, -122.4830, "town"],
+    ["muir", "Muir Beach", 37.8600, -122.5760, "town"],
+    ["stinson", "Stinson Beach", 37.9000, -122.6420, "town"],
+    ["bolinas", "Bolinas", 37.9090, -122.6860, "town"],
+    ["duxbury", "Duxbury Point", 37.8940, -122.7000, "point"],
+    ["drakes", "Drakes Bay", 38.0150, -122.9300, "bay"],
+    ["chimney", "Chimney Rock", 37.9900, -122.9650, "point"],
+    ["reyes", "Point Reyes", 37.9960, -123.0200, "point"],
+    ["tomales", "Tomales Point", 38.2350, -122.9950, "point"],
+    ["bodegahead", "Bodega Head", 38.3030, -123.0620, "point"],
+    ["bodega", "Bodega Bay", 38.3330, -123.0460, "town"],
+    ["sefarallon", "Southeast Farallon", 37.6990, -123.0030, "island"],
+    ["middlefarallon", "Middle Farallon", 37.7275, -123.0320, "island"],
+    ["northfarallon", "North Farallones", 37.7670, -123.0990, "island"],
+    ["sf", "SF", 37.7500, -122.6930, "buoy"],
+    ["ch1", "1", 37.7650, -122.6340, "buoy"],
+    ["ch2", "2", 37.7705, -122.6350, "buoy"],
+    ["ch7", "7", 37.7755, -122.5850, "buoy"],
+    ["ch8", "8", 37.7810, -122.5860, "buoy"],
+    ["dr", "DR", 37.8600, -122.6950, "buoy"]
+  ]
+}

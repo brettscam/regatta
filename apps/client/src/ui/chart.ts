@@ -3,6 +3,7 @@ import { metresToNm } from '@slack-tide/nav';
 import type { CourseData, ReplayWorld } from '@slack-tide/world';
 import type { Passage } from './passage';
 import type { TrafficVessel } from '../scene/traffic';
+import type { ChartArea, CourseFeatures } from '../world/features';
 
 const D2R = Math.PI / 180;
 const NM = 1852;
@@ -42,6 +43,8 @@ export interface ChartHost {
   boat(): ChartBoat;
   /** Other vessels on the water, shown like AIS targets. */
   traffic?: () => TrafficVessel[];
+  /** Hazards, traffic lanes, refuges and lights, on a water that has them. */
+  features?: CourseFeatures;
 }
 
 interface View {
@@ -84,6 +87,8 @@ export class Chart {
   private readonly depthLayer: HTMLCanvasElement;
   private readonly coast = new Path2D();
   private readonly view: View = { cx: 0, cy: 0, scale: 0.05 };
+  /** The furthest out the chart zooms, pixels per metre. A water bigger than the Bay can still be seen whole. */
+  private readonly minScale: number;
   private readonly timeFmt: Intl.DateTimeFormat;
   private readonly dayFmt: Intl.DateTimeFormat;
   private open = false;
@@ -100,6 +105,8 @@ export class Chart {
 
   constructor(private readonly host: ChartHost) {
     this.course = host.world.course;
+    const b = this.course.bounds;
+    this.minScale = Math.min(0.012, 640 / Math.max(b.x1 - b.x0, b.y1 - b.y0));
     this.timeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: this.course.timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
     this.dayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: this.course.timeZone, weekday: 'short', day: 'numeric', month: 'short' });
     this.overlay.innerHTML = `
@@ -237,7 +244,7 @@ export class Chart {
       e.preventDefault();
       const before = this.fromScreen(m, e.offsetX, e.offsetY);
       const k = Math.exp(-Math.max(-300, Math.min(300, e.deltaY)) * 0.0016);
-      this.view.scale = Math.max(0.012, Math.min(0.9, this.view.scale * k));
+      this.view.scale = Math.max(this.minScale, Math.min(0.9, this.view.scale * k));
       const after = this.fromScreen(m, e.offsetX, e.offsetY);
       this.view.cx += before.x - after.x;
       this.view.cy += before.y - after.y;
@@ -299,7 +306,7 @@ export class Chart {
     const h = Math.max(200, this.map.clientHeight || 500);
     this.view.cx = (x0 + x1) / 2;
     this.view.cy = (y0 + y1) / 2;
-    this.view.scale = Math.max(0.02, Math.min(0.25, Math.min(w / (x1 - x0 + 3200), h / (y1 - y0 + 3200))));
+    this.view.scale = Math.max(Math.min(0.02, this.minScale * 1.6), Math.min(0.25, Math.min(w / (x1 - x0 + 3200), h / (y1 - y0 + 3200))));
   }
 
   private clock(t: number): string {
@@ -364,6 +371,126 @@ export class Chart {
     ctx.moveTo(sx - ux * 343, -(sy - uy * 343));
     ctx.lineTo(nx + ux * 343, -(ny + uy * 343));
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---- hazards, lanes, refuges and lights -------------------------------------------------------
+  // Drawn only on a water whose `features.json` has them. Everything is magenta or red, as on a paper chart.
+
+  private areaPath(ctx: CanvasRenderingContext2D, w: number, h: number, v: View, a: ChartArea): { cx: number; cy: number } | null {
+    ctx.beginPath();
+    if (a.circle) {
+      const [cx, cy] = this.screen(w, h, v, a.circle.x, a.circle.y);
+      const r = a.circle.r * v.scale;
+      if (cx + r < 0 || cy + r < 0 || cx - r > w || cy - r > h) return null;
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      return { cx, cy };
+    }
+    if (!a.points?.length) return null;
+    let sx = 0, sy = 0, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    a.points.forEach(([x, y], i) => {
+      const [px, py] = this.screen(w, h, v, x, y);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+      sx += px; sy += py;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    });
+    ctx.closePath();
+    if (x1 < 0 || y1 < 0 || x0 > w || y0 > h) return null;
+    return { cx: sx / a.points.length, cy: sy / a.points.length };
+  }
+
+  private drawFeatures(ctx: CanvasRenderingContext2D, w: number, h: number, v: View, labels: boolean): void {
+    const f = this.host.features;
+    if (!f) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const a of f.areas) {
+      const mid = this.areaPath(ctx, w, h, v, a);
+      if (!mid) continue;
+      if (a.kind === 'separation') {
+        // The zone between the lanes: a magenta tint. Nobody sails along it.
+        ctx.fillStyle = 'rgba(176, 35, 122, 0.16)';
+        ctx.fill();
+      } else if (a.kind === 'lane') {
+        ctx.strokeStyle = 'rgba(176, 35, 122, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([9, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Outlined arrows down the lane, the way its traffic runs.
+        if (a.points && a.toward !== undefined) {
+          const [p0, p1, p2, p3] = a.points;
+          const ends: Array<[number, number]> = [[(p0[0] + p3[0]) / 2, (p0[1] + p3[1]) / 2], [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]];
+          const len = Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]);
+          const n = Math.max(1, Math.min(6, Math.floor((len * v.scale) / 150)));
+          const toward = (a.toward * Math.PI) / 180;
+          ctx.strokeStyle = 'rgba(176, 35, 122, 0.7)';
+          ctx.lineWidth = labels ? 1.6 : 1.1;
+          for (let k = 0; k < n; k++) {
+            const u = (k + 0.5) / n;
+            const [ax, ay] = this.screen(w, h, v, ends[0][0] + (ends[1][0] - ends[0][0]) * u, ends[0][1] + (ends[1][1] - ends[0][1]) * u);
+            const size = labels ? 26 : 14;
+            this.arrow(ctx, ax - Math.sin(toward) * size / 2, ay + Math.cos(toward) * size / 2, toward, size, size * 0.34);
+          }
+        }
+      } else if (a.kind === 'precaution') {
+        ctx.strokeStyle = 'rgba(176, 35, 122, 0.6)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (a.kind === 'hazard') {
+        ctx.fillStyle = 'rgba(192, 57, 43, 0.13)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(192, 57, 43, 0.85)';
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([5, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        // A refuge: a green line to keep outside of.
+        ctx.strokeStyle = 'rgba(31, 122, 77, 0.9)';
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([2, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (!labels || a.kind === 'separation' || a.kind === 'lane') continue;
+      const big = v.scale > 0.012;
+      ctx.font = `italic 600 ${a.kind === 'hazard' ? 11.5 : 10.5}px ui-serif, Georgia, serif`;
+      ctx.fillStyle = a.kind === 'hazard' ? '#a5281c' : a.kind === 'refuge' ? '#1f6a45' : MAGENTA;
+      const at = a.kind === 'precaution' && a.circle ? mid.cy - a.circle.r * v.scale * 0.62 : a.circle ? mid.cy + a.circle.r * v.scale + 12 : mid.cy;
+      ctx.fillText(a.name, mid.cx, at);
+      if (big && a.say) {
+        ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
+        ctx.fillText(a.kind === 'hazard' && a.least !== undefined ? `${a.say}. Least depth ${a.least} m` : a.say, mid.cx, at + 13);
+      }
+    }
+    // Lights: a magenta flare with the light's character, as a chart shows them.
+    for (const l of f.lights) {
+      const [sx, sy] = this.screen(w, h, v, l.x, l.y);
+      if (sx < -40 || sy < -20 || sx > w + 40 || sy > h + 20) continue;
+      ctx.fillStyle = MAGENTA;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(sx + 11, sy - 3, sx + 15, sy - 12);
+      ctx.quadraticCurveTo(sx + 5, sy - 9, sx, sy);
+      ctx.fill();
+      ctx.fillStyle = INK;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      if (labels && v.scale > 0.008) {
+        ctx.textAlign = 'left';
+        ctx.font = '600 9.5px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = MAGENTA;
+        ctx.fillText(`${l.character} ${l.focal}m ${l.range}M`, sx + 17, sy - 9);
+        ctx.textAlign = 'center';
+      }
+    }
     ctx.restore();
   }
 
@@ -573,6 +700,7 @@ export class Chart {
       v.cy += ((st.next.y - b.y) / d) * lead;
     }
     this.drawBase(ctx, w, h, v);
+    this.drawFeatures(ctx, w, h, v, false);
     this.drawRoute(ctx, w, h, v, false);
     this.drawTraffic(ctx, w, h, v, false);
     this.drawBoat(ctx, w, h, v, 8);
@@ -712,6 +840,8 @@ export class Chart {
     }
     ctx.globalAlpha = 1;
 
+    this.drawFeatures(ctx, w, h, v, true);
+
     // Named places and marks.
     for (const m of this.course.marks) {
       const [sx, sy] = this.screen(w, h, v, m.x, m.y);
@@ -760,7 +890,7 @@ export class Chart {
     this.drawBoat(ctx, w, h, v, 11);
 
     // Scale bar.
-    const barNm = [0.1, 0.25, 0.5, 1, 2].find((n) => n * NM * v.scale > 70) ?? 2;
+    const barNm = [0.1, 0.25, 0.5, 1, 2, 5, 10].find((n) => n * NM * v.scale > 70) ?? 10;
     const barPx = barNm * NM * v.scale;
     ctx.strokeStyle = INK;
     ctx.fillStyle = INK;

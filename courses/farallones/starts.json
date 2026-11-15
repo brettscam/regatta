@@ -1,0 +1,83 @@
+[
+  {
+    "id": "gate",
+    "name": "Under the Golden Gate Bridge",
+    "where": "Mid span, bound out to sea",
+    "teaches": "Leaving. Out past Point Bonita, over the bar by the ship channel, and on to the sea buoy where the lightship lay. Go out on the ebb and mind the ships.",
+    "x": -2300, "y": -1150,
+    "route": [
+      { "name": "Point Bonita", "x": -7300, "y": -2800 },
+      { "name": "Buoy 8", "x": -11900, "y": -5300 },
+      { "name": "Buoy 2", "x": -16300, "y": -6500 },
+      { "name": "Sea buoy", "x": -21200, "y": -8750 }
+    ]
+  },
+  {
+    "id": "bonita",
+    "name": "Off Point Bonita",
+    "where": "Outside the north head, under the lighthouse",
+    "teaches": "The inshore way north: the Bonita Channel between the Marin shore and the Potato Patch, then round Duxbury Reef to Bolinas.",
+    "x": -7500, "y": -2500,
+    "route": [
+      { "name": "Bonita Channel", "x": -8350, "y": -400 },
+      { "name": "Off Tennessee Cove", "x": -9700, "y": 1300 },
+      { "name": "Off Muir Beach", "x": -14500, "y": 2000 },
+      { "name": "Duxbury buoy", "x": -21700, "y": 3200 },
+      { "name": "Bolinas Bay", "x": -19800, "y": 7300 }
+    ]
+  },
+  {
+    "id": "drakes",
+    "name": "Drakes Bay",
+    "where": "At anchor inside Chimney Rock, in the lee of Point Reyes",
+    "teaches": "A harbour of refuge and a headland. Out round Chimney Rock and west to Point Reyes, the windiest point on the coast, and back to shelter.",
+    "x": -45400, "y": 19300,
+    "route": [
+      { "name": "Chimney Rock", "x": -44300, "y": 17000 },
+      { "name": "Point Reyes", "x": -50600, "y": 16300 },
+      { "name": "Chimney Rock", "x": -44300, "y": 17000 },
+      { "name": "Drakes Bay", "x": -45300, "y": 19200 }
+    ]
+  },
+  {
+    "id": "bodega",
+    "name": "Bodega Harbour",
+    "where": "Off the harbour jetties, in Bodega Bay",
+    "teaches": "Pilotage. In between the jetties and up the dredged channel to the fishing town, with mud flats close on both sides.",
+    "x": -51700, "y": 52700,
+    "route": [
+      { "name": "The jetties", "x": -52750, "y": 52850 },
+      { "name": "Inside the jetties", "x": -53150, "y": 52900 },
+      { "name": "Campbell Cove", "x": -53200, "y": 53250 },
+      { "name": "Channel", "x": -53000, "y": 53700 },
+      { "name": "Channel", "x": -52900, "y": 54200 },
+      { "name": "Spud Point", "x": -52900, "y": 55450 }
+    ]
+  },
+  {
+    "id": "pacifica",
+    "name": "Off Pacifica",
+    "where": "A mile off the pier, on the open coast south of the Gate",
+    "teaches": "A coastal passage with nowhere to hide: south past Point San Pedro and Montara to the breakwaters of Pillar Point.",
+    "x": -5900, "y": -21800,
+    "route": [
+      { "name": "Point San Pedro", "x": -8200, "y": -26400 },
+      { "name": "Point Montara", "x": -8300, "y": -32700 },
+      { "name": "Pillar Point reef", "x": -5200, "y": -38600 },
+      { "name": "Pillar Point Harbor", "x": -3150, "y": -37450 }
+    ]
+  },
+  {
+    "id": "farallones",
+    "name": "The Farallon Islands",
+    "where": "A mile east of Southeast Farallon, 27 miles out",
+    "teaches": "Being a long way from anywhere. Round the island outside the refuge line: birds, sea lions, a lighthouse on a rock, and the ships' western lane to the south.",
+    "x": -46600, "y": -14200,
+    "route": [
+      { "name": "North of the island", "x": -48600, "y": -12600 },
+      { "name": "Maintop Bay", "x": -50800, "y": -14300 },
+      { "name": "South of the island", "x": -49000, "y": -16400 },
+      { "name": "East Landing", "x": -46900, "y": -14900 }
+    ]
+  }
+]
