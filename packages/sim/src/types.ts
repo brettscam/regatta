@@ -58,6 +58,23 @@ export interface SpinnakerSpec {
   heelOffset: number;
 }
 
+/** An inboard diesel on a shaft, with the tank and the battery it charges. */
+export interface EngineSpec {
+  /** Rated power, kW. For show: the speeds below are what the sim uses. */
+  powerKw: number;
+  /** Speed under power at cruising revs in flat water with no wind, knots. */
+  cruiseKt: number;
+  /** Fuel burned at cruising revs, litres an hour. */
+  burnLph: number;
+  tankL: number;
+  /** House battery, amp hours. */
+  batteryAh: number;
+  /** What the alternator puts back at cruising revs, amps. */
+  alternatorA: number;
+  /** How much a head wind and its sea take off her under power: (m/s)^2 of speed-squared lost per (m/s)^2 of wind from ahead. */
+  windage: number;
+}
+
 export interface BoatSpec {
   id: string;
   name: string;
@@ -84,6 +101,8 @@ export interface BoatSpec {
   };
   rightingCurve: { deg: number[]; gz: number[] };
   helm: { maxRudderDeg: number; turnGain: number; rudderDrag: number };
+  /** Left out, she has no engine. */
+  engine?: EngineSpec;
   controls: ControlBinding[];
 }
 
@@ -200,6 +219,20 @@ export interface SimState {
   gustTime: number;
   /** How far the crew has let the mainsheet out beyond its best setting to spill a gust, radians. */
   gustEase: number;
+  /** The engine is running. */
+  engineOn: boolean;
+  /** Seconds of cranking left before it fires. Above 0 it is being started. */
+  engineCrank: number;
+  /** Throttle position: 0 neutral, 1 to 4 ahead (slow, half, cruise, full), -1 and -2 astern. See `THROTTLE`. */
+  throttle: number;
+  /** Litres burned since the tank was last filled. */
+  fuelUsed: number;
+  /** Amp hours taken out of the battery since it was last full. */
+  batteryUsed: number;
+  /** How many times the engine has stopped for want of fuel. */
+  engineStops: number;
+  /** How many times the pilot has dropped out because the battery was too low. */
+  batteryTrips: number;
   maneuver: Maneuver | null;
 }
 
@@ -262,4 +295,12 @@ export interface SimOutputs {
   /** Water under the keel, metres. Null where the world gives no depth. */
   underKeel: number | null;
   aground: boolean;
+  /** What the rev counter shows. 0 with the engine off. */
+  engineRpm: number;
+  /** Litres of fuel left. */
+  fuel: number;
+  /** Battery charge, 0 flat to 1 full. */
+  battery: number;
+  /** True while the engine is running and in gear. */
+  underPower: boolean;
 }
