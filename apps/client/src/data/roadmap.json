@@ -277,7 +277,7 @@
         },
         {
           "id": "collide",
-          "status": "next",
+          "status": "shipped",
           "area": "multiplayer",
           "title": "Collisions that count",
           "text": "Hit another boat and both are damaged: slowed, holed or dismasted by how hard. A bad one ends your race until you ask for a tow back to the start."

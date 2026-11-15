@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v24",
+      "date": "2026-11-15",
+      "title": "Wind shadow and collisions",
+      "items": [
+        "Boats now take each other's wind. Sail close to leeward of another boat and you lose up to a third of your breeze. The instruments show it and a line tells you whose shadow you are in. Pace boats feel yours too.",
+        "Boats no longer pass through each other. A collision stops you against the other hull and costs hull damage that grows with the closing speed: a scuff at one knot, a third of the hull at four.",
+        "A damaged hull is slower, up to 30 percent. Lie alongside a dock to repair her, or she mends slowly at anchor outside a race.",
+        "Hit hard enough and she is holed: you are out of the race and put back afloat nearby a few seconds later. Ferries and ships hit harder."
+      ]
+    },
+    {
       "id": "v23",
       "date": "2026-11-15",
       "title": "A start you can aim at",
