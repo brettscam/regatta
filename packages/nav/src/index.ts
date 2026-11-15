@@ -191,3 +191,5 @@ export function trackFix(p: Point, a: Point, b: Point): TrackFix {
 }
 
 export const metresToNm = (m: number): number => m / NM;
+
+export * from './chartwork';
