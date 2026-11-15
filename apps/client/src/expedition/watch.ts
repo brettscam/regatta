@@ -34,11 +34,33 @@ export const SAIL_PLANS: SailPlan[] = [
 const SHORTEN = [18, 28];
 const SHAKE_OUT = [15, 24];
 
+/**
+ * How a boat is sailed through a watch: how close she lies, what sail she carries in what wind, and when she can carry none.
+ * The James Caird's is the default everywhere, so her voyage is untouched. Another boat brings her own.
+ */
+export interface WatchRig {
+  /** The closest she will lie to the wind, degrees. */
+  fullAndBy: number;
+  plans: SailPlan[];
+  /** Mean wind, knots, at which the crew shortens down to each plan after the first, and at which they shake it out again. */
+  shorten: number[];
+  shakeOut: number[];
+  heaveTo: number;
+  makeSail: number;
+  /** Wind speeds the performance table is measured at, knots. Either side of each change of sail is measured under its own plan. */
+  tws: number[];
+}
+
+export const CAIRD_RIG: WatchRig = {
+  fullAndBy: FULL_AND_BY, plans: SAIL_PLANS, shorten: SHORTEN, shakeOut: SHAKE_OUT, heaveTo: HEAVE_TO_KT, makeSail: MAKE_SAIL_KT,
+  tws: [3, 6, 10, 14, 17.9, 18, 23, 27.9, 28, 34, 40, 47.9],
+};
+
 /** The sail the crew would have her under in this wind, given what she carries now. Reefing early, shaking out late. */
-export function sailPlanFor(twsKt: number, now = 0): number {
-  let plan = clamp(Math.round(now), 0, SAIL_PLANS.length - 1);
-  while (plan < SHORTEN.length && twsKt >= SHORTEN[plan]) plan++;
-  while (plan > 0 && twsKt < SHAKE_OUT[plan - 1]) plan--;
+export function sailPlanFor(twsKt: number, now = 0, rig: WatchRig = CAIRD_RIG): number {
+  let plan = clamp(Math.round(now), 0, rig.plans.length - 1);
+  while (plan < rig.shorten.length && twsKt >= rig.shorten[plan]) plan++;
+  while (plan > 0 && twsKt < rig.shakeOut[plan - 1]) plan--;
   return plan;
 }
 
@@ -54,26 +76,27 @@ export interface Performance {
   leeway: number[][];
 }
 
-const PERF_TWA = [FULL_AND_BY, 70, 80, 90, 105, 120, 135, 150, 165, 180];
-const PERF_TWS = [3, 6, 10, 14, 17.9, 18, 23, 27.9, 28, 34, 40, 47.9];
+const PERF_TWA = [55, 60, 70, 80, 90, 105, 120, 135, 150, 165, 180];
 
 /**
  * Sail her in a steady wind at each angle until she settles, and write down what she does. This is the real sim
  * with the crew trimming and a hand on the tiller holding the heading, so the watch reckoning that reads this table
  * agrees with sailing her in real time. About half a second of work, once, when the voyage is made.
  */
-export function measurePerformance(spec: BoatSpec): Performance {
+export function measurePerformance(spec: BoatSpec, rig: WatchRig = CAIRD_RIG): Performance {
   const known = measured.get(spec);
   if (known) return known;
+  const PERF_TWA_ALL = [rig.fullAndBy, ...PERF_TWA.filter((a) => a > rig.fullAndBy + 4)];
+  const PERF_TWS = rig.tws;
   const speed: number[][] = [];
   const leeway: number[][] = [];
   for (const tws of PERF_TWS) {
     const env: Environment = { sample: () => ({ windDir: 0, windSpeed: tws * KT, currentX: 0, currentY: 0 }) };
     // Each side of a change of sail is measured under the sail she carries on that side of it.
-    const plan = SAIL_PLANS[sailPlanFor(tws, tws === 17.9 || tws === 27.9 ? 0 : SAIL_PLANS.length - 1)];
+    const plan = rig.plans[sailPlanFor(tws, rig.shorten.some((k) => Math.abs(k - 0.1 - tws) < 1e-6) ? 0 : rig.plans.length - 1, rig)];
     const speeds: number[] = [];
     const leeways: number[] = [];
-    for (const twa of PERF_TWA) {
+    for (const twa of PERF_TWA_ALL) {
       const sim = new Sim(spec, env, { headingDeg: -twa, speedKt: polarSpeed(spec.polar, twa, tws) * 0.8, reef: plan.reef, furl: plan.furl });
       sim.setCrewTrim(true);
       sim.trimForWind();
@@ -93,7 +116,7 @@ export function measurePerformance(spec: BoatSpec): Performance {
     speed.push(speeds);
     leeway.push(leeways);
   }
-  const perf = { twa: PERF_TWA, tws: PERF_TWS, speed, leeway };
+  const perf = { twa: PERF_TWA_ALL, tws: PERF_TWS, speed, leeway };
   measured.set(spec, perf);
   return perf;
 }
@@ -132,6 +155,8 @@ export interface WatchBoat {
   /** Which of `SAIL_PLANS` she is under. */
   plan: number;
   hoveTo: boolean;
+  /** Share of her speed she still makes with her rigging cut about. 1 if left out. */
+  drive?: number;
 }
 
 export interface WatchStepResult extends WatchBoat {
@@ -154,12 +179,12 @@ export interface WatchStepResult extends WatchBoat {
  * @param course the compass course ordered, radians
  * @param seconds length of the step
  */
-export function watchStep(perf: Performance, world: WatchWorld, boat: WatchBoat, course: number, seconds: number, draft = 0.7): WatchStepResult {
+export function watchStep(perf: Performance, world: WatchWorld, boat: WatchBoat, course: number, seconds: number, draft = 0.7, rig: WatchRig = CAIRD_RIG): WatchStepResult {
   const wind = world.wind(boat.x, boat.y, boat.t);
   const cur = world.current(boat.x, boat.y, boat.t);
   const twsKt = wind.speed / KT;
-  const hoveTo = boat.hoveTo ? twsKt > MAKE_SAIL_KT : twsKt >= HEAVE_TO_KT;
-  const plan = sailPlanFor(twsKt, boat.plan);
+  const hoveTo = boat.hoveTo ? twsKt > rig.makeSail : twsKt >= rig.heaveTo;
+  const plan = sailPlanFor(twsKt, boat.plan, rig);
   let heading: number;
   let speed = 0;
   let leeway = 0;
@@ -174,10 +199,10 @@ export function watchStep(perf: Performance, world: WatchWorld, boat: WatchBoat,
   } else {
     const twa = wrapPi(wind.dir - course);
     const side = twa >= 0 ? 1 : -1;
-    headed = Math.abs(twa) < FULL_AND_BY * D2R;
-    heading = headed ? wrapTau(wind.dir - side * FULL_AND_BY * D2R) : wrapTau(course);
+    headed = Math.abs(twa) < rig.fullAndBy * D2R;
+    heading = headed ? wrapTau(wind.dir - side * rig.fullAndBy * D2R) : wrapTau(course);
     const made = performanceAt(perf, Math.abs(wrapPi(wind.dir - heading)) * R2D, twsKt);
-    speed = made.speed;
+    speed = made.speed * (boat.drive ?? 1);
     // She sags away from the wind: with the wind to starboard, to port.
     leeway = -side * made.leeway;
     const lateral = speed * Math.tan(leeway);
@@ -192,7 +217,7 @@ export function watchStep(perf: Performance, world: WatchWorld, boat: WatchBoat,
     x = boat.x;
     y = boat.y;
   }
-  return { x, y, t: boat.t + seconds, plan, hoveTo, heading, speed, leeway, twsKt, twd: wind.dir, headed, aground };
+  return { ...boat, x, y, t: boat.t + seconds, plan, hoveTo, heading, speed, leeway, twsKt, twd: wind.dir, headed, aground };
 }
 
 /**

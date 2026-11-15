@@ -35,17 +35,17 @@ export function chopScale(twsKt: number): number {
  * Significant wave height in metres for a mean wind: four times the root-mean-square height of the surface.
  * This is what a seaman means by the height of the sea.
  */
-export function significantHeight(twsKt: number): number {
+export function significantHeight(twsKt: number, gain = 1): number {
   let sum = 0;
   OCEAN.forEach(([, amp], i) => {
     const a = amp * (i < SWELL ? swellScale(twsKt) : chopScale(twsKt));
     sum += (a * a) / 2;
   });
-  return 4 * Math.sqrt(sum);
+  return 4 * Math.sqrt(sum) * gain;
 }
 
-function shape(w: Wave, i: number, twsKt: number): void {
-  w.amp = w.base * (i < SWELL ? swellScale(twsKt) : chopScale(twsKt));
+function shape(w: Wave, i: number, twsKt: number, gain = 1): void {
+  w.amp = w.base * gain * (i < SWELL ? swellScale(twsKt) : chopScale(twsKt));
   w.q = STEEPNESS / (w.k * w.amp * WAVE_COUNT);
 }
 
@@ -55,8 +55,11 @@ function aim(w: Wave, i: number, toward: number): void {
   w.dz = -Math.cos(bearing);
 }
 
-/** Make the sea model for one voyage. It remembers which way the swell is running, so each voyage needs its own. */
-export function oceanSea(): SeaModel {
+/**
+ * Make the sea model for one voyage. It remembers which way the swell is running, so each voyage needs its own.
+ * @param gain how high this sea runs against the Southern Ocean's for the same wind: 1 there, about half in the Caribbean
+ */
+export function oceanSea(gain = 1): SeaModel {
   let toward = 0;
   return {
     build(windFrom, twsKt) {
@@ -65,7 +68,7 @@ export function oceanSea(): SeaModel {
         const k = (2 * Math.PI) / length;
         const w: Wave = { dx: 0, dz: -1, k, amp, omega: Math.sqrt(G * k), q: 0, phase, length, base: amp };
         aim(w, i, toward);
-        shape(w, i, twsKt);
+        shape(w, i, twsKt, gain);
         return w;
       });
     },
@@ -82,7 +85,7 @@ export function oceanSea(): SeaModel {
           aim(w, i, toward);
           w.phase = (w.phase + w.k * (before - (w.dx * x + w.dz * z))) % (Math.PI * 2);
         }
-        shape(w, i, twsKt);
+        shape(w, i, twsKt, gain);
       });
     },
   };

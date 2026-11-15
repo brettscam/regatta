@@ -1,7 +1,7 @@
 import { mercator, type Projection } from '@slack-tide/nav';
 import type { CourseData, GridSpec, WindStep } from '@slack-tide/world';
 import type { LoadedCourse } from '../world/loadCourse';
-import { Land, noise2 } from './land';
+import { Land, noise2, type LandMass } from './land';
 import { makeWeather, type Sky, type Weather } from './weather';
 import type { Voyage } from './voyage';
 
@@ -20,9 +20,47 @@ const WIND_DX = 60000;
 /** Metres between depth samples. The sim grounds a boat by this grid, so the coast is true to about a kilometre. */
 const DEPTH_DX = 1000;
 /** Metres between terrain samples, on the patches round each group of islands. */
-const LAND_DX = 500;
+const LAND_DX_DEFAULT = 500;
 const LAND_MAX = 2950;
-const DEPTH_SCALE = 4;
+const DEPTH_SCALE_DEFAULT = 4;
+
+/** What `buildSea` needs of a voyage. A sea that is not a voyage from the record (the Caribbean of `pirates/`) gives just this. */
+export type SeaDef = Pick<Voyage, 'id' | 'line' | 'sea' | 'timeZone' | 'dayZero' | 'castOff' | 'days' | 'from' | 'to' | 'islands' | 'rocks' | 'drift'>;
+
+/** A reef or bank: shoal water with patches that will take the bottom out of a ship. The same for every seed. */
+export interface Reef {
+  name: string;
+  x: number;
+  y: number;
+  /** Metres from its middle to its edge. */
+  radius: number;
+}
+
+/** Ways a sea may differ from the Scotia Sea. Left out, every one of them gives the Scotia Sea as it was. */
+export interface SeaOptions {
+  /** The weather, when it is not made from a voyage's day-by-day script. */
+  weather?: Weather;
+  /** Ground cover the terrain is coloured with, and the words for where it is. */
+  landCover?: string;
+  where?: string;
+  /** Metres between terrain samples, and metres of water to one count of the depth grid. */
+  landDx?: number;
+  depthScale?: number;
+  /** Depth of water in metres at a distance in metres off a coast. */
+  shelf?(toCoast: number): number;
+  /** Height of the ground in metres. */
+  height?(m: LandMass, x: number, y: number): number;
+  reefs?: Reef[];
+}
+
+/** Depth of water over a reef at a point `d` metres from its middle, or null outside it. Awash in patches, shoal between. */
+export function reefDepth(reef: Reef, x: number, y: number): number | null {
+  const d = Math.hypot(x - reef.x, y - reef.y);
+  if (d >= reef.radius) return null;
+  const edge = 1 - d / reef.radius;
+  const head = noise2(x / 2300 + reef.x / 9000, y / 2300, 77);
+  return head * Math.sqrt(edge) > 0.36 ? 1 : 4 + 16 * (1 - edge);
+}
 
 export interface LandPatch {
   grid: GridSpec & { max: number };
@@ -46,7 +84,9 @@ const grid = (x0: number, y0: number, x1: number, y1: number, dx: number): GridS
 });
 
 /** Build a voyage's sea. The same voyage and seed always give the same sea, byte for byte. */
-export function buildSea(voyage: Voyage, seed: number): ExpeditionSea {
+export function buildSea(voyage: SeaDef, seed: number, opts: SeaOptions = {}): ExpeditionSea {
+  const LAND_DX = opts.landDx ?? LAND_DX_DEFAULT;
+  const DEPTH_SCALE = opts.depthScale ?? DEPTH_SCALE_DEFAULT;
   const s = voyage.sea;
   const proj = mercator(s.lat0, s.lon0);
   const sw = proj.toXY(s.south, s.west);
@@ -55,7 +95,7 @@ export function buildSea(voyage: Voyage, seed: number): ExpeditionSea {
   const land = new Land(voyage.islands, voyage.rocks, proj);
   const from = proj.toXY(voyage.from.lat, voyage.from.lon);
   const to = proj.toXY(voyage.to.lat, voyage.to.lon);
-  const weather = makeWeather(voyage, seed, { x0: from.x, x1: to.x });
+  const weather = opts.weather ?? makeWeather(voyage as Voyage, seed, { x0: from.x, x1: to.x });
   const hours = voyage.days * 24;
 
   // ---- wind: hourly, tenths of a metre a second -------------------------------------------------
@@ -111,8 +151,21 @@ export function buildSea(voyage: Voyage, seed: number): ExpeditionSea {
         const k = j * dg.nx + i;
         if (Land.within(m, x, y)) { depth[k] = 0; continue; }
         // The bottom shelves away from the shore: five fathoms close in, a hundred a few miles off.
-        const metres = 8 + Land.toCoast(m, x, y) * 0.03;
-        depth[k] = Math.min(depth[k], Math.max(2, Math.min(255, Math.round(metres / DEPTH_SCALE))));
+        const metres = opts.shelf ? opts.shelf(Land.toCoast(m, x, y)) : 8 + Land.toCoast(m, x, y) * 0.03;
+        depth[k] = Math.min(depth[k], Math.max(opts.shelf ? 1 : 2, Math.min(255, Math.round(metres / DEPTH_SCALE))));
+      }
+    }
+  }
+  for (const reef of opts.reefs ?? []) {
+    const i0 = Math.max(0, Math.floor((reef.x - reef.radius - dg.x0) / dg.dx));
+    const i1 = Math.min(dg.nx - 1, Math.ceil((reef.x + reef.radius - dg.x0) / dg.dx));
+    const j0 = Math.max(0, Math.floor((reef.y - reef.radius - dg.y0) / dg.dx));
+    const j1 = Math.min(dg.ny - 1, Math.ceil((reef.y + reef.radius - dg.y0) / dg.dx));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const k = j * dg.nx + i;
+        const metres = reefDepth(reef, dg.x0 + i * dg.dx, dg.y0 + j * dg.dx);
+        if (metres !== null && depth[k] > 0) depth[k] = Math.min(depth[k], Math.max(1, Math.round(metres / DEPTH_SCALE)));
       }
     }
   }
@@ -146,7 +199,7 @@ export function buildSea(voyage: Voyage, seed: number): ExpeditionSea {
           const y = pg.y0 + j * LAND_DX;
           if (!Land.within(m, x, y)) continue;
           // Square-root scale, as the baked courses use: fine steps near sea level, coarse on the tops.
-          heights[j * pg.nx + i] = Math.max(8, Math.round(Math.sqrt(Land.height(m, x, y) / LAND_MAX) * 255));
+          heights[j * pg.nx + i] = Math.max(8, Math.round(Math.sqrt((opts.height ? opts.height(m, x, y) : Land.height(m, x, y)) / LAND_MAX) * 255));
         }
       }
     }
@@ -193,7 +246,7 @@ export function buildSea(voyage: Voyage, seed: number): ExpeditionSea {
     current,
     depth,
     terrain: patches[0].heights,
-    about: { id: s.id, name: s.name, where: 'Southern Ocean', say: voyage.line, scenery: { landCover: 'ice', pieces: [] } },
+    about: { id: s.id, name: s.name, where: opts.where ?? 'Southern Ocean', say: voyage.line, scenery: { landCover: opts.landCover ?? 'ice', pieces: [] } },
     starts: [{ id: 'cast-off', name: voyage.from.name, where: s.name, teaches: '', x: from.x, y: from.y, route: [] }],
     times: [{ id: 'cast-off', name: 'Cast off', hours: voyage.castOff, say: '', default: true }],
     places: [],

@@ -29,6 +29,8 @@ export interface Kit {
   cap: number;
   /** Dress of another age: a hood drawn close round the face in place of the cap and sunglasses. */
   hood?: boolean;
+  /** A head-cloth in place of the cap, brim and sunglasses: a seaman of 1715. */
+  kerchief?: boolean;
   /** How much thicker than a modern sailor the figure is drawn, for layers of wool under windproofs. 1 if left out. */
   bulk?: number;
 }
@@ -150,6 +152,11 @@ export class Figure {
       const muffler = part(GEO.vest, cap, this.head);
       muffler.scale.set(0.8, 0.5, 0.86);
       muffler.position.set(0, -0.125, 0.02);
+    } else if (kit.kerchief) {
+      // A cloth tied over the head, and no more: no brim, no glasses.
+      const cloth = part(GEO.cap, cap, this.head);
+      cloth.position.y = 0.006;
+      cloth.scale.set(1.02, 0.9, 1.04);
     } else {
       part(GEO.cap, cap, this.head).position.y = 0.012;
       part(GEO.brim, cap, this.head).position.set(0, 0.03, -0.14);

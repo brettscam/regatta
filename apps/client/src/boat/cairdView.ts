@@ -19,7 +19,7 @@ interface SailCorners {
 }
 
 /** A piece of canvas stretched between four corners (three, for the jib: throat and peak together). */
-class Cloth {
+export class Cloth {
   readonly mesh: THREE.Mesh;
   readonly corners: SailCorners = { tack: new THREE.Vector3(), clew: new THREE.Vector3(), throat: new THREE.Vector3(), peak: new THREE.Vector3() };
   private readonly pos: THREE.BufferAttribute;

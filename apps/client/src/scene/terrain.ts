@@ -66,7 +66,7 @@ function evergreenUse(x: number, y: number, z: number, slope: number, north: num
 /**
  * The land around the course, from real elevation data.
  * Sim coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
- * @param cover which built-in ground cover to colour it with: `sf-bay` (the default) or `evergreen`
+ * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen`, `ice` or `tropic`
  */
 export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Mesh {
   const bay = cover !== 'evergreen';
@@ -77,6 +77,13 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const glacier = new THREE.Color(0.6, 0.72, 0.8);
   const crag = new THREE.Color(0.13, 0.13, 0.14);
   const tussock = new THREE.Color(0.27, 0.29, 0.19);
+  // The Greater Antilles: forest to the tops, cane and savanna on the low ground, white sand at the water.
+  const tropic = cover === 'tropic';
+  const jungle = new THREE.Color(0.07, 0.2, 0.07);
+  const canopy = new THREE.Color(0.13, 0.3, 0.1);
+  const savanna = new THREE.Color(0.38, 0.42, 0.18);
+  const coral = new THREE.Color(0.86, 0.82, 0.68);
+  const karst = new THREE.Color(0.47, 0.45, 0.4);
   const g = course.terrain;
   const { nx, ny, dx } = g;
   const pos = new Float32Array(nx * ny * 3);
@@ -135,6 +142,20 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
         col[k * 3] = c.r * lightSide;
         col[k * 3 + 1] = c.g * lightSide;
         col[k * 3 + 2] = c.b * lightSide;
+        continue;
+      }
+      if (tropic) {
+        c.copy(jungle).lerp(canopy, patch).lerp(savanna, THREE.MathUtils.clamp((1 - z / 180) * (broad * 1.5 - 0.35), 0, 0.85));
+        c.lerp(karst, THREE.MathUtils.smoothstep(slope, 0.5, 1.0) * 0.6);
+        let beach = 0;
+        for (let r = 1; r <= 2 && beach === 0; r++) {
+          if (wet(i - r, j) || wet(i + r, j) || wet(i, j - r) || wet(i, j + r)) beach = r === 1 ? 1 : 0.4;
+        }
+        if (beach > 0 && z < 30) c.lerp(coral, beach * (1 - THREE.MathUtils.smoothstep(z, 3, 30)));
+        const lit = (0.9 + 0.18 * hash(i, j)) * (1 - 0.18 * THREE.MathUtils.clamp((-e - n) * 1.6, 0, 1));
+        col[k * 3] = c.r * lit;
+        col[k * 3 + 1] = c.g * lit;
+        col[k * 3 + 2] = c.b * lit;
         continue;
       }
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
