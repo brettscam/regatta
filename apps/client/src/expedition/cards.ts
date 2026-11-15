@@ -1,6 +1,18 @@
 import type { VoyageResult } from './session';
 import type { Voyage } from './voyage';
 
+/** One thing to do on an expedition, as the briefing shows it: a voyage from the record, or the pirate game. */
+export interface Offer {
+  id: string;
+  title: string;
+  line: string;
+  briefing: string[];
+  /** The line under the briefing: how it is played. */
+  hint: string;
+  /** What the button that begins it says. */
+  go: string;
+}
+
 // The two cards of an expedition: the briefing before she sails and the plain account when it is over.
 // The briefing uses the join screen's panel. Words here are in the voice of the record: no more than is known.
 
@@ -8,10 +20,10 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 export class Briefing {
   private readonly el = document.getElementById('join') as HTMLElement;
-  private chosen: Voyage;
+  private chosen: Offer;
 
-  constructor(private readonly opts: { voyages: Voyage[]; onBack(): void; onCastOff(voyage: Voyage): void }) {
-    this.chosen = opts.voyages[0];
+  constructor(private readonly opts: { voyages: Offer[]; chosen?: string; onBack(): void; onPick(offer: Offer): void; onCastOff(offer: Offer): void }) {
+    this.chosen = opts.voyages.find((v) => v.id === opts.chosen) ?? opts.voyages[0];
     this.el.hidden = false;
     this.el.addEventListener('click', this.onClick);
     window.addEventListener('keydown', this.onKey);
@@ -32,8 +44,10 @@ export class Briefing {
       this.opts.onBack();
     } else if (b.dataset.act === 'next') this.go();
     else if (b.dataset.voyage) {
+      const was = this.chosen;
       this.chosen = this.opts.voyages.find((v) => v.id === b.dataset.voyage) ?? this.chosen;
       this.render();
+      if (this.chosen !== was) this.opts.onPick(this.chosen);
     }
   };
 
@@ -52,14 +66,14 @@ export class Briefing {
     const cards = this.opts.voyages.map((v) => `<button type="button" class="card" data-voyage="${v.id}" aria-pressed="${v.id === this.chosen.id}">
       <b>${esc(v.title)}</b><span class="say">${esc(v.line)}</span></button>`).join('');
     this.el.innerHTML = `
-      <header><h1>Expedition</h1><p>Voyages from history, sailed with what they had</p></header>
+      <header><h1>Expedition</h1><p>Other seas and other centuries</p></header>
       <div class="join-body">
         <h2>The voyage</h2>
         <div class="cards">${cards}</div>
         ${this.chosen.briefing.map((p) => `<p class="brief">${esc(p)}</p>`).join('')}
-        <p class="soon">You have the boat by hand, as any boat here. Enter stands a watch: four hours pass in a quarter of a minute while the helmsman holds your course, until something calls you. M is the chart. The / key lists the rest.</p>
+        <p class="soon">${esc(this.chosen.hint)}</p>
       </div>
-      <footer><button type="button" data-act="back">Back</button><button type="button" class="primary" data-act="next">Cast off</button></footer>`;
+      <footer><button type="button" data-act="back">Back</button><button type="button" class="primary" data-act="next">${esc(this.chosen.go)}</button></footer>`;
   }
 }
 

@@ -27,8 +27,8 @@ const CARDS: Array<{ mode: Mode; name: string; sub: string; say: string }> = [
     say: 'Modern sloops on San Francisco Bay and the San Juan Islands, with the wind and tide as they really were. Learn to sail, cruise in company, race.',
   },
   {
-    mode: 'expedition', name: 'Expedition', sub: 'Voyages from history',
-    say: 'A real boat on the sea she met, with what her people had to find their way: a compass, a clock and a bare chart. The aim is to arrive.',
+    mode: 'expedition', name: 'Expedition', sub: 'Other seas, other centuries',
+    say: 'The Caribbean of 1715 in a rover\'s sloop: chase, fight under sail in the real wind, plunder, and keep what you can. Or Shackleton\'s boat journey, with a compass and a bare chart.',
   },
 ];
 

@@ -504,3 +504,65 @@ body.expedition .trimcard, body.expedition .night { display: none; }
 .join .tally { margin: 4px 0 6px; display: grid; grid-template-columns: auto 1fr; gap: 9px 18px; align-items: baseline; }
 .join .tally dt { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 .join .tally dd { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; }
+
+/* ---- Expedition: the pirate game (src/expedition/pirates/) ----------------------------------------- */
+.rover { left: var(--edge-left); bottom: var(--edge-bottom); width: 268px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.rover[hidden], .glass[hidden] { display: none; }
+.rover .row, .glass .row { display: grid; grid-template-columns: 62px 1fr 30px; align-items: center; gap: 8px; }
+.rover .row span, .glass .row span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.rover .row b { text-align: right; font-weight: 600; }
+.bar { display: block; height: 6px; border-radius: 3px; background: rgba(238, 243, 244, 0.14); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: #9fd3c2; }
+.bar.low > i { background: #e2725b; }
+.rover .battery { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 6px; background: rgba(238, 243, 244, 0.05); }
+.rover .battery kbd { font: 600 11px var(--mono); text-align: center; border: 1px solid var(--edge); border-radius: 4px; padding: 1px 0; }
+.rover .battery b { font-size: 11px; font-weight: 600; color: var(--dim); }
+.rover .battery.hot { background: rgba(255, 196, 107, 0.16); }
+.rover .battery.hot b { color: var(--amber); }
+.rover .battery.wait b { color: rgba(238, 243, 244, 0.5); }
+.rover .battery.off { opacity: 0.5; }
+.rover .purse { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin-top: 2px; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+.rover .purse b { color: var(--ink); font-size: 12px; margin-left: 4px; }
+.glass { right: var(--edge-right); top: calc(var(--edge-top) + 74px); width: 280px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.glass h4, .boarding h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.glass h4::first-letter { text-transform: uppercase; }
+.glass h4 em { font-style: normal; color: var(--amber); font-weight: 500; }
+.glass p, .boarding p { margin: 0; line-height: 1.4; color: rgba(238, 243, 244, 0.86); }
+.glass p.k, .boarding p.k { font-size: 11px; color: var(--dim); }
+.boarding { left: 50%; top: 24%; transform: translateX(-50%); width: min(430px, calc(100% - 32px)); padding: 14px 16px; z-index: 5; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.boarding ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.boarding li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 8px; border-radius: 6px; background: rgba(238, 243, 244, 0.06); }
+.boarding li b { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.boarding li.won { background: rgba(159, 211, 194, 0.22); }
+.boarding li.lost { background: rgba(226, 114, 91, 0.25); }
+.join.sheet { width: min(620px, calc(100% - 32px)); }
+.join.cabinet { z-index: 8; width: min(760px, calc(100% - 32px)); }
+.join.sheet header h1 { font-size: 24px; }
+.join .tally dd small { display: block; font-size: 11.5px; font-weight: 400; color: var(--dim); }
+.join .ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+.join .ledger td { padding: 4px 6px 4px 0; border-bottom: 1px solid rgba(238, 243, 244, 0.08); }
+.join .ledger td:last-child { text-align: right; padding-right: 0; }
+.join .ledger small { color: var(--amber); margin-left: 4px; }
+.join .join-body > button, .join .trade button, .join .ledger button {
+  font: inherit; font-size: 12.5px; color: var(--ink); background: rgba(238, 243, 244, 0.07); border: 1px solid var(--edge); border-radius: 7px; padding: 6px 10px; cursor: pointer; text-align: left;
+}
+.join .ledger button { padding: 3px 9px; }
+.join .join-body > button:hover:not(:disabled), .join .trade button:hover:not(:disabled), .join .ledger button:hover { background: rgba(238, 243, 244, 0.14); }
+.join .trade { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.join .trade button:disabled { opacity: 0.45; cursor: default; }
+.join .note { padding: 8px 10px; border-left: 3px solid var(--amber); background: rgba(255, 196, 107, 0.08); }
+.join .curios { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.join .curios li { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--edge); background: rgba(238, 243, 244, 0.05); min-height: 62px; }
+.join .curios li b { font-size: 13.5px; font-weight: 600; padding-right: 36px; }
+.join .curios li span { font-size: 12px; line-height: 1.4; color: rgba(238, 243, 244, 0.8); }
+.join .curios li i { position: absolute; right: 10px; top: 9px; font-style: normal; font-size: 11px; color: var(--amber); }
+.join .curios li.want { border-style: dashed; opacity: 0.45; }
+.join .curios li.want b { font-weight: 400; font-style: italic; }
+@media (max-width: 760px) {
+  .rover { width: 210px; font-size: 11px; }
+  .glass { width: 210px; }
+  .join .trade, .join .curios { grid-template-columns: 1fr; }
+}
+/* The look-out's calls are long. Keep them between the sloop's panel and the corner chart. */
+body.pirates .alarm { left: calc(50% + 115px); top: var(--edge-top); bottom: auto; width: max-content; max-width: min(540px, calc(100% - 760px)); white-space: normal; text-align: center; line-height: 1.4; }
+@media (max-width: 1180px) { body.pirates .alarm { left: 50%; top: auto; bottom: calc(var(--edge-bottom) + 216px); max-width: calc(100% - 32px); } }
