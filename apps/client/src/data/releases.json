@@ -3,13 +3,13 @@
     {
       "id": "v21",
       "date": "2026-11-15",
-      "title": "The engine",
+      "title": "Home screen, your own skipper, and the engine",
       "items": [
+        "A home screen: returning skippers cast off in one press with the boat and water they used last.",
+        "Build your skipper on the new Profile tab (B): ten outfits from foul-weather gear to a lobster suit, hats, hair, face and build, or Surprise me. Other players see your skipper at the helm.",
+        "On the website a circle in the corner shows who is signed in, and opens your profile. Signing in has moved from the Logbook tab to the Profile tab.",
         "Every boat has an inboard diesel. I starts and stops it. Full stop steps the throttle up and comma steps it down, through neutral into astern.",
-        "She motors straight into the wind, slower the harder it blows. Astern the rudder is weak and the stern walks, as on a real boat.",
-        "A row under the instruments shows the revs, the fuel and the battery while the engine runs. The autopilot and instruments draw on the battery; the engine charges it.",
-        "Coming alongside a dock fills the tank and charges the battery.",
-        "No engine in a race: she comes out of gear before the gun."
+        "A row under the instruments shows revs, fuel and battery while the engine runs. A dock refuels her. No engine in a race."
       ]
     },
     {

@@ -4,6 +4,7 @@ import { BoatView, packSpin, unpackSpin, type BoatPose } from '../boat/boatView'
 import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
+import { myAvatarCode, readAvatar } from '../boat/avatar';
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
@@ -97,6 +98,8 @@ class Remote implements RemoteBoat {
   platformName = false;
   onHail: (text: string) => void = () => {};
   private hailStamp = -1;
+  /** The skipper's avatar as she last sent it. */
+  private av = '';
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
@@ -138,6 +141,7 @@ class Remote implements RemoteBoat {
     this.guest = p.guest;
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
     this.fresh = v.nw === 1;
+    if (typeof v.av === 'string' && v.av !== this.av) this.view.setAvatar(readAvatar((this.av = v.av.slice(0, 120))));
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.raceCall = v.rc ?? null;
@@ -365,6 +369,7 @@ export class Fleet {
       wire.col = this.me.colour;
       wire.nm = this.me.name;
       if (this.me.skipper) wire.sk = this.me.skipper;
+      (wire as unknown as Record<string, unknown>).av = myAvatarCode();
       if (this.hailed) {
         wire.msg = this.hailed.text;
         wire.mt = this.hailed.at;
