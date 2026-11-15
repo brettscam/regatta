@@ -1,5 +1,27 @@
 [
-  { "id": "morning", "name": "Late morning", "hours": 2.5, "say": "Light airs before the sea breeze fills in" },
-  { "id": "afternoon", "name": "Early afternoon", "hours": 5.5, "say": "The breeze is in and building" },
-  { "id": "evening", "name": "Late afternoon", "hours": 8.5, "say": "Full breeze with gusts, low sun" }
+  {
+    "id": "morning",
+    "name": "Late morning",
+    "hours": 2.5,
+    "say": "Light airs before the sea breeze fills in"
+  },
+  {
+    "id": "afternoon",
+    "name": "Early afternoon",
+    "hours": 5.5,
+    "say": "The breeze is in and building"
+  },
+  {
+    "id": "evening",
+    "name": "Late afternoon",
+    "hours": 8.5,
+    "say": "Full breeze with gusts, low sun"
+  },
+  {
+    "id": "blow",
+    "name": "A blowy afternoon",
+    "hours": 6.5,
+    "boost": 1.5,
+    "say": "The sea breeze at its summer worst: 20 knots and more in the slot, with gusts that will lay her over. Reef early"
+  }
 ]

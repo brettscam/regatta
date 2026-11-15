@@ -22,6 +22,8 @@ export interface StartTime {
   name: string;
   hours: number;
   say: string;
+  /** How much harder than the record it blows from this start: 1.5 is half as much again. The day as it was when left out. */
+  boost?: number;
   /** The time a newcomer to this water is offered. Early afternoon where no time says so. */
   default?: boolean;
 }

@@ -84,6 +84,7 @@ function raceNight(c: Choice): Choice {
 function setClock(choice: Choice): void {
   const t = data.times.find((k) => k.id === choice.time) ?? data.times[0];
   world.startOffset = num('start', t.hours) * 3600;
+  world.windBoost = Math.min(2, Math.max(1, num('boost', t.boost ?? 1)));
 }
 setClock(settle({}));
 const stage = new Stage(document.getElementById('view') as HTMLCanvasElement, data, world);
