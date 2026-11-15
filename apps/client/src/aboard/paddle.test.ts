@@ -200,6 +200,10 @@ describe('paddling the kayak', () => {
       stepCraft(held, { ahead: 1, steer: off > 0.03 ? -1 : 0 }, 1 / 60, water);
     }
     expect(Math.abs(Math.atan2(Math.sin(held.heading), Math.cos(held.heading))) / D2R).toBeLessThan(8);
+    // Left to herself for a couple of minutes she settles with the wind broad on the bow, not dead ahead.
+    run(loose, ahead, 120, water);
+    expect(loose.heading / D2R).toBeGreaterThan(45);
+    expect(loose.heading / D2R).toBeLessThan(65);
     // Lying still she has no way on for the wind to work against, and stays as she is.
     const still2 = newCraft(0, 0, 0);
     run(still2, rest, 20, water);

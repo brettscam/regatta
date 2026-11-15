@@ -15,6 +15,12 @@ const MOST = { porpoise: 16, seal: 10, sealion: 20, pelican: 26, cormorant: 14, 
 const SEAL_SCALE = 1.4;
 /** Real seconds between one remark and the next, so two animals met together are not talked over each other. */
 const BETWEEN_REMARKS = 14;
+/** Beyond this many metres from the camera small animals are drawn larger, up to this many times life size. */
+const FAR_FROM = 110;
+const FAR_SCALE = 2.2;
+/** A whale's blow is drawn larger from this far off, up to this many times. */
+const BLOW_FROM = 200;
+const BLOW_SCALE = 6;
 
 /** Wing shape and colour for each bird. Lengths are of one wing, metres. */
 const WING: Record<Bird, { len: number; chord: number; root: number; y: number; z: number; beat: number; colour: number }> = {
@@ -279,7 +285,7 @@ export class Wildlife implements Feature {
     const whaleHide = hide(0x23282c);
     this.back = new THREE.Mesh(backShape(), whaleHide);
     this.fluke = new THREE.Mesh(flukeShape(), whaleHide);
-    this.blow = new THREE.Mesh(blowShape(), this.keep(new THREE.MeshBasicMaterial({ color: 0xf4f8fa, transparent: true, opacity: 0, depthWrite: false })));
+    this.blow = new THREE.Mesh(blowShape(), this.keep(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })));
     for (const mesh of [this.back, this.fluke, this.blow]) {
       mesh.rotation.order = 'YXZ';
       mesh.visible = false;
@@ -377,6 +383,16 @@ export class Wildlife implements Feature {
     }
   }
 
+  /**
+   * Small animals a long way from the camera are drawn up to twice life size, for the same reason the pot buoys are drawn
+   * large: at its true size a pelican at a quarter of a mile is a couple of dots, and the eye on the water does better than that.
+   * Within a hundred metres or so everything is life size.
+   */
+  private aid(x: number, up: number, y: number): number {
+    const range = this.ctx.drone.camera.position.distanceTo(this.v.set(x, up, -y));
+    return Math.min(FAR_SCALE, Math.max(1, range / FAR_FROM));
+  }
+
   private place(flock: Flock, x: number, up: number, y: number, heading: number, pitch: number, roll: number, scale: number): number {
     const i = flock.next();
     if (i < 0) return -1;
@@ -394,18 +410,19 @@ export class Wildlife implements Feature {
     const fx = Math.sin(a.heading);
     const fy = Math.cos(a.heading);
     const arc = Math.sin(a.phase * Math.PI);
+    const k = this.aid(a.x, 0, a.y);
     switch (a.kind) {
       case 'porpoise': {
         // Over in a low arc, three metres on, and gone.
         const x = a.x + fx * 3.2 * a.phase;
         const y = a.y + fy * 3.2 * a.phase;
         const sea = stage.seaLevel(x, -y, seaTime, 4);
-        this.place(this.porpoise, x, sea - 0.42 + 0.5 * arc, y, a.heading, 0.55 * Math.cos(a.phase * Math.PI), 0, 1);
+        this.place(this.porpoise, x, sea + (-0.42 + 0.5 * arc) * k, y, a.heading, 0.55 * Math.cos(a.phase * Math.PI), 0, k);
         return;
       }
       case 'seal': {
         const sea = stage.seaLevel(a.x, -a.y, seaTime, 4);
-        this.place(this.seal, a.x, sea + (-0.42 + 0.52 * a.phase) * SEAL_SCALE, a.y, a.heading, 0.2, 0, SEAL_SCALE);
+        this.place(this.seal, a.x, sea + (-0.42 + 0.52 * a.phase) * SEAL_SCALE * k, a.y, a.heading, 0.2, 0, SEAL_SCALE * k);
         return;
       }
       case 'sealion': {
@@ -422,11 +439,11 @@ export class Wildlife implements Feature {
           const x = a.x + fx * 4 * a.phase;
           const y = a.y + fy * 4 * a.phase;
           const sea = stage.seaLevel(x, -y, seaTime, 4);
-          i = this.place(this.sealion, x, sea - 0.95 + 0.8 * arc, y, a.heading, -0.35 + 0.7 * Math.cos(a.phase * Math.PI), 0, 1);
+          i = this.place(this.sealion, x, sea + (-0.95 + 0.8 * arc) * k, y, a.heading, -0.35 + 0.7 * Math.cos(a.phase * Math.PI), 0, k);
         } else {
           // Swimming: tipped up so that only the head and neck are out.
           const sea = stage.seaLevel(a.x, -a.y, seaTime, 4);
-          i = this.place(this.sealion, a.x, sea - 1.24 - 0.5 * (1 - a.phase), a.y, a.heading, 0.75, 0, 1);
+          i = this.place(this.sealion, a.x, sea + (-1.24 - 0.5 * (1 - a.phase)) * k, a.y, a.heading, 0.75, 0, k);
         }
         if (i >= 0) this.sealion.mesh.setColorAt(i, this.colour.set(wet ? 0x33291f : 0x8a6f4d));
         return;
@@ -442,11 +459,11 @@ export class Wildlife implements Feature {
             this.blow.visible = true;
             const age = 1 - a.blow;
             this.blow.position.set(a.x + fx * 4, sea + 0.4, -(a.y + fy * 4));
-            // Drawn larger the farther off it is, as the pot buoys are drawn large: a blow is what the eye picks up at a mile,
-            // and at its true size it would be two dots on the screen.
+            // Drawn larger the farther off it is, much more so than the animals: a blow is what the eye picks up at a mile,
+            // and at its true size it would be two pale dots on the screen. Past 200 m it holds the size it has there, out to 1200 m.
             const range = this.ctx.drone.camera.position.distanceTo(this.blow.position);
-            this.blow.scale.setScalar((0.55 + 0.75 * age) * Math.min(5, Math.max(1, range / 300)));
-            (this.blow.material as THREE.MeshBasicMaterial).opacity = 0.8 * Math.min(1, a.blow * 1.7);
+            this.blow.scale.setScalar((0.8 + 0.5 * age) * Math.min(BLOW_SCALE, Math.max(1, range / BLOW_FROM)));
+            (this.blow.material as THREE.MeshBasicMaterial).opacity = 0.92 * Math.min(1, a.blow * 1.7);
           }
         } else {
           // Up quickly, a pause, then sliding under as she goes down head first.
@@ -483,7 +500,7 @@ export class Wildlife implements Feature {
       spread = a.phase > 0.5 ? 0.85 : 0;
       angle = -0.1 + 0.05 * Math.sin(seaTime * 0.8);
     }
-    const i = this.place(this.birds[kind], a.x, up, a.y, a.heading, pitch, a.bank, 1);
+    const i = this.place(this.birds[kind], a.x, up, a.y, a.heading, pitch, a.bank, this.aid(a.x, up, a.y));
     if (i < 0 || spread <= 0) return;
     this.m.copy(this.dummy.matrix);
     for (const side of [1, -1]) {

@@ -54,6 +54,8 @@ const HEAD_WIND = 0.0029;
 const CHOP = 0.25;
 /** Weathercocking: with way on, a wind on the beam turns her bow up into it, rad/s for each m/s of wind. About 3.5 degrees a second in 15 kt. */
 const WEATHERCOCK = 0.008;
+/** The angle off the wind, radians, at which she stops turning up into it. */
+const WEATHERCOCK_REST = 0.5;
 /** In water shallower than this, metres, the bottom holds the stream back: the eddies close inshore. */
 export const SLACK_DEPTH = 3;
 /** Longest step taken in one go, seconds. Longer frames are cut up. */
@@ -143,7 +145,11 @@ function stepOnce(c: Craft, input: Paddling, h: number, water: Water, yacht?: Hu
   const wanted = steer * (TURN_REST + TURN_WAY * way);
   c.turn += (wanted - c.turn) * Math.min(1, h / TURN_LAG);
   // Going ahead, a wind on the beam pushes her stern off and brings her bow up into it, unless the paddler corrects.
-  const cocking = WEATHERCOCK * fromStarboard * Math.max(0, Math.min(1, c.speed / CRUISE_SPEED));
+  // She does not come all the way head to wind: the turning dies away as the wind draws ahead, and she settles with it
+  // broad on the bow, thirty degrees or so off.
+  const angle = Math.abs(Math.atan2(Math.sin(off), Math.cos(off)));
+  const settle = Math.max(0, Math.min(1, (angle - WEATHERCOCK_REST) / 0.5));
+  const cocking = WEATHERCOCK * fromStarboard * settle * Math.max(0, Math.min(1, c.speed / CRUISE_SPEED));
   c.heading = wrap(c.heading + (c.turn + cocking) * h);
 
   // Speed through the water. A turn scrubs some of it off, and steering strokes leave less for going ahead.
