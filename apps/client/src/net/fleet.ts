@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Sim, type BoatSpec, type Environment } from '@slack-tide/sim';
-import { BoatView, type BoatPose } from '../boat/boatView';
+import { BoatView, packSpin, unpackSpin, type BoatPose } from '../boat/boatView';
 import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
@@ -29,6 +29,8 @@ interface Wire {
   /** main and jib luff, 0..100, and whether each is flogging */
   ml: number; jl: number; mf: number; jf: number;
   furl: number; reef: number;
+  /** her spinnaker, packed by `packSpin`: 0 or missing when it is not up */
+  sp?: number;
   /** seconds into the season */
   t: number;
   /** This viewer's id from the platform, where it gives one, for looking up a name. */
@@ -127,7 +129,7 @@ class Remote implements RemoteBoat {
     if (typeof v.x !== 'number' || typeof v.y !== 'number') return;
     this.wire = {
       x: num(v.x), y: num(v.y), h: num(v.h), l: num(v.l), r: num(v.r), b: num(v.b), j: num(v.j), a: num(v.a), w: num(v.w),
-      s: num(v.s), c: num(v.c), ml: num(v.ml), jl: num(v.jl), mf: num(v.mf), jf: num(v.jf), furl: num(v.furl, 1), reef: num(v.reef), t: num(v.t),
+      s: num(v.s), c: num(v.c), ml: num(v.ml), jl: num(v.jl), mf: num(v.mf), jf: num(v.jf), furl: num(v.furl, 1), reef: num(v.reef), sp: num(v.sp), t: num(v.t),
       id: typeof v.id === 'string' ? v.id : undefined,
     };
     this.heardAt = now;
@@ -193,6 +195,7 @@ class Remote implements RemoteBoat {
     o.twa = o.awa; o.tws = o.aws;
     o.main.luff = w.ml / 100; o.main.flogging = w.mf > 0; o.main.stall = 0;
     o.jib.luff = w.jl / 100; o.jib.flogging = w.jf > 0; o.jib.stall = 0; o.jib.backed = 0;
+    unpackSpin(w.sp ?? 0, s, o);
 
     const z = -this.y;
     const fx = Math.sin(this.heading);
@@ -351,7 +354,7 @@ export class Fleet {
         h: k(s.heading), l: k(s.heel), r: k(s.rudder), b: k(s.boomAngle), j: k(s.jibAngle),
         a: k(o.awa), w: Math.round(o.aws * 10), s: Math.round(o.sog * 100), c: k(o.cog),
         ml: Math.round(o.main.luff * 100), jl: Math.round(o.jib.luff * 100), mf: o.main.flogging ? 1 : 0, jf: o.jib.flogging ? 1 : 0,
-        furl: Math.round(s.furl * 100) / 100, reef: s.reef, t: Math.round(seasonTime * 10) / 10,
+        furl: Math.round(s.furl * 100) / 100, reef: s.reef, sp: packSpin(s, o), t: Math.round(seasonTime * 10) / 10,
       };
       (wire as unknown as Record<string, unknown>).nw = this.settle > 0 ? 1 : 0;
       if (this.myId) wire.id = this.myId;
