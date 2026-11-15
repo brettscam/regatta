@@ -4,8 +4,18 @@
 
 const KT = 0.514444;
 
-/** Flat out, about 4 knots. */
-export const TOP_SPEED = 4 * KT;
+/** A fit paddler in a sit-on kayak keeps up about 3 knots all day. */
+export const CRUISE_SPEED = 3 * KT;
+/** Flat out, about 4.5 knots, and not for long. */
+export const SPRINT_SPEED = 4.5 * KT;
+export const TOP_SPEED = SPRINT_SPEED;
+/** Seconds of sprinting in a fresh paddler: under a minute. */
+export const SPRINT_SECONDS = 50;
+/** Seconds to get her wind back, paddling easily and sitting still. */
+export const RECOVER_PADDLING = 150;
+export const RECOVER_RESTING = 80;
+/** Once blown, she cannot sprint again until this much of her wind is back. */
+export const SECOND_WIND = 0.35;
 /** Within this of a place's point she can land there from the water, at its dock. */
 export const DOCK_RANGE = 60;
 /** Run up on the shore within this of a place and the crew walks the rest. */
@@ -17,14 +27,16 @@ export const LANDING_SPEED = 0.8;
 /** Farther from the yacht than this, the way back is worth saying. */
 export const FAR_OFF = 300;
 
-/** Push from the paddle going ahead, m/s² on the kayak and paddler. */
-const DRIVE = 0.62;
+/** Push from the paddle at a cruising stroke, m/s² on the kayak and paddler. */
+const DRIVE = 0.5;
 /** Backing is weaker: half a stroke, the wrong way round. */
 const BACK = 0.36;
 /** A little drag that does not fade with speed, so a glide does come to an end. */
 const SKIN = 0.05;
-/** Drag that grows with the square of speed. Sized so that DRIVE gives TOP_SPEED. */
-const DRAG = (DRIVE / TOP_SPEED - SKIN) / TOP_SPEED;
+/** Drag that grows with the square of speed. Sized so that DRIVE gives CRUISE_SPEED. */
+const DRAG = (DRIVE / CRUISE_SPEED - SKIN) / CRUISE_SPEED;
+/** Push at a sprint: what it takes to hold SPRINT_SPEED against that drag, a little over twice the cruising push. */
+const SPRINT_DRIVE = (DRAG * SPRINT_SPEED + SKIN) * SPRINT_SPEED;
 /** Turn rates in rad/s: with sweep strokes at rest, and more with way on and the rudder biting. */
 const TURN_REST = 0.42;
 const TURN_WAY = 0.34;
@@ -32,6 +44,20 @@ const TURN_WAY = 0.34;
 const TURN_LAG = 0.55;
 /** Share of the wind's speed she is set downwind. A low hull and one person sitting up in the breeze. */
 const WINDAGE = 0.022;
+/**
+ * What a head wind takes off each stroke, m/s² for each (m/s)² of wind from ahead: the paddler's body and the blade
+ * swinging forward through the air. Sized so that 15 kt on the nose brings a 3 kt cruise down to about 2 over the
+ * ground and 20 kt to under 1, and 25 kt cannot be cruised into at all. A following wind gives back less than half.
+ */
+const HEAD_WIND = 0.0029;
+/** A chop knocks the run off her between strokes: up to this share of the push, from 8 kt of wind to 24. */
+const CHOP = 0.25;
+/** Weathercocking: with way on, a wind on the beam turns her bow up into it, rad/s for each m/s of wind. About 3.5 degrees a second in 15 kt. */
+const WEATHERCOCK = 0.008;
+/** The angle off the wind, radians, at which she stops turning up into it. */
+const WEATHERCOCK_REST = 0.5;
+/** In water shallower than this, metres, the bottom holds the stream back: the eddies close inshore. */
+export const SLACK_DEPTH = 3;
 /** Longest step taken in one go, seconds. Longer frames are cut up. */
 const MAX_STEP = 0.05;
 
@@ -45,6 +71,10 @@ export interface Craft {
   turn: number;
   /** True while the shore is stopping her. */
   beached: boolean;
+  /** The paddler's wind, 1 fresh to 0 spent. Sprinting uses it up. */
+  puff: number;
+  /** True from the moment she is spent until some of her wind is back. No sprinting meanwhile. */
+  blown: boolean;
 }
 
 export interface Paddling {
@@ -52,6 +82,8 @@ export interface Paddling {
   ahead: number;
   /** 1 to starboard, -1 to port. */
   steer: number;
+  /** Paddling flat out. Only counts when going ahead. */
+  sprint?: boolean;
 }
 
 export interface Water {
@@ -61,6 +93,8 @@ export interface Water {
   wind(x: number, y: number): { dir: number; speed: number };
   /** True where there is no water to float in. */
   land(x: number, y: number): boolean;
+  /** Depth of water, metres, where it is known. Close inshore the stream is weaker. */
+  depth?(x: number, y: number): number;
 }
 
 /** A yacht lying to her anchor, as the kayak sees her: something to fend off and to come back to. */
@@ -73,7 +107,7 @@ export interface Hulk {
 }
 
 export function newCraft(x: number, y: number, heading: number): Craft {
-  return { x, y, heading, speed: 0, turn: 0, beached: false };
+  return { x, y, heading, speed: 0, turn: 0, beached: false, puff: 1, blown: false };
 }
 
 /** Move the kayak on by `dt` seconds. Changes `c` in place. */
@@ -90,23 +124,51 @@ function stepOnce(c: Craft, input: Paddling, h: number, water: Water, yacht?: Hu
   const ahead = Math.sign(input.ahead);
   const steer = Math.sign(input.steer);
 
+  const wind = water.wind(c.x, c.y);
+  // The wind as she meets it: from ahead (positive) and on her starboard side (positive).
+  const off = wind.dir - c.heading;
+  const fromAhead = wind.speed * Math.cos(off);
+  const fromStarboard = wind.speed * Math.sin(off);
+
+  // The paddler's wind. A sprint spends it in under a minute. It comes back paddling easily, and faster sitting still.
+  const sprinting = ahead > 0 && !!input.sprint && !c.blown;
+  if (sprinting) {
+    c.puff = Math.max(0, c.puff - h / SPRINT_SECONDS);
+    if (c.puff <= 0) c.blown = true;
+  } else {
+    c.puff = Math.min(1, c.puff + h / (ahead !== 0 || steer !== 0 ? RECOVER_PADDLING : RECOVER_RESTING));
+    if (c.blown && c.puff >= SECOND_WIND) c.blown = false;
+  }
+
   // Turning. Sweep strokes turn her at rest. With way on she answers faster. Backing, the bow still goes where the key says.
-  const way = Math.min(1, Math.abs(c.speed) / TOP_SPEED);
+  const way = Math.min(1, Math.abs(c.speed) / CRUISE_SPEED);
   const wanted = steer * (TURN_REST + TURN_WAY * way);
   c.turn += (wanted - c.turn) * Math.min(1, h / TURN_LAG);
-  c.heading = wrap(c.heading + c.turn * h);
+  // Going ahead, a wind on the beam pushes her stern off and brings her bow up into it, unless the paddler corrects.
+  // She does not come all the way head to wind: the turning dies away as the wind draws ahead, and she settles with it
+  // broad on the bow, thirty degrees or so off.
+  const angle = Math.abs(Math.atan2(Math.sin(off), Math.cos(off)));
+  const settle = Math.max(0, Math.min(1, (angle - WEATHERCOCK_REST) / 0.5));
+  const cocking = WEATHERCOCK * fromStarboard * settle * Math.max(0, Math.min(1, c.speed / CRUISE_SPEED));
+  c.heading = wrap(c.heading + (c.turn + cocking) * h);
 
   // Speed through the water. A turn scrubs some of it off, and steering strokes leave less for going ahead.
-  const push = ahead > 0 ? DRIVE * (steer !== 0 ? 0.8 : 1) : ahead < 0 ? -BACK : 0;
+  // A chop takes some of every stroke, and a wind from ahead a good deal more.
+  let push = ahead < 0 ? -BACK : 0;
+  if (ahead > 0) {
+    const chop = CHOP * Math.max(0, Math.min(1, (wind.speed - 8 * KT) / (16 * KT)));
+    push = (sprinting ? SPRINT_DRIVE : DRIVE) * (steer !== 0 ? 0.8 : 1) * (1 - chop) - HEAD_WIND * fromAhead * Math.abs(fromAhead) * (fromAhead > 0 ? 1 : 0.4);
+  }
   const drag = (DRAG * Math.abs(c.speed) + SKIN + 0.25 * Math.abs(c.turn)) * c.speed;
   c.speed += (push - drag) * h;
   if (ahead === 0 && Math.abs(c.speed) < 0.04) c.speed = 0;
 
   // Over the ground: her own way, all of the stream, and a little of the wind.
+  // In a metre or two of water close inshore the stream is held back by the bottom, which is where to work up against a tide.
   const stream = water.current(c.x, c.y);
-  const sx = stream.x;
-  const sy = stream.y;
-  const wind = water.wind(c.x, c.y);
+  const slack = water.depth ? shoalStream(water.depth(c.x, c.y)) : 1;
+  const sx = stream.x * slack;
+  const sy = stream.y * slack;
   const vx = Math.sin(c.heading) * c.speed + sx - Math.sin(wind.dir) * wind.speed * WINDAGE;
   const vy = Math.cos(c.heading) * c.speed + sy - Math.cos(wind.dir) * wind.speed * WINDAGE;
   const nx = c.x + vx * h;
@@ -131,8 +193,39 @@ function stepOnce(c: Craft, input: Paddling, h: number, water: Water, yacht?: Hu
   if (yacht) fendOff(c, yacht);
 }
 
+/** How much of the stream is left in this depth of water: all of it in 3 m or more, about a third in the last few inches. */
+export function shoalStream(depth: number): number {
+  if (!(depth < SLACK_DEPTH)) return 1;
+  return 0.3 + 0.7 * Math.max(0, depth) / SLACK_DEPTH;
+}
+
+/**
+ * How she is getting on over the ground while the paddler works: metres a second made good along her heading.
+ * Negative means the tide or the wind is taking her astern faster than she can paddle.
+ */
+export function madeGood(c: Craft, water: Water): number {
+  const stream = water.current(c.x, c.y);
+  const slack = water.depth ? shoalStream(water.depth(c.x, c.y)) : 1;
+  const wind = water.wind(c.x, c.y);
+  const fx = Math.sin(c.heading);
+  const fy = Math.cos(c.heading);
+  return c.speed + (stream.x * slack - Math.sin(wind.dir) * wind.speed * WINDAGE) * fx + (stream.y * slack - Math.cos(wind.dir) * wind.speed * WINDAGE) * fy;
+}
+
+/** What is stopping her, when she is paddling and losing ground: the stream, or the wind. */
+export function heldBackBy(c: Craft, water: Water): 'tide' | 'wind' {
+  const stream = water.current(c.x, c.y);
+  const wind = water.wind(c.x, c.y);
+  const fx = Math.sin(c.heading);
+  const fy = Math.cos(c.heading);
+  const foul = -(stream.x * fx + stream.y * fy);
+  const head = wind.speed * Math.cos(wind.dir - c.heading);
+  // What the stream takes is its own speed. What a head wind takes is the stroke it spoils and the little it sets her back.
+  return foul >= HEAD_WIND * head * Math.abs(head) * 2.2 + head * WINDAGE ? 'tide' : 'wind';
+}
+
 /** Keep the kayak out of the yacht's hull: treated as a rounded slab along her centreline. */
-export function fendOff(c: Craft, yacht: Hulk): void {
+export function fendOff(c: { x: number; y: number }, yacht: Hulk): void {
   const fx = Math.sin(yacht.heading);
   const fy = Math.cos(yacht.heading);
   const dx = c.x - yacht.x;

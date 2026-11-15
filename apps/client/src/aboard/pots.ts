@@ -107,7 +107,7 @@ export class CrabPots implements Feature {
     this.working = 8;
     this.workingAt = 'Hauling a pot';
     if (result.keepers) this.ctx.logbook.count('crabs', result.keepers);
-    this.ctx.say(describeHaul(result), 9);
+    this.ctx.say(describeHaul(result), 12);
     this.keep();
   }
 

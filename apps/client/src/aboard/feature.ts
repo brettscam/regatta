@@ -1,5 +1,6 @@
 import type { Sim } from '@slack-tide/sim';
 import type { ReplayWorld } from '@slack-tide/world';
+import type { Sound } from '../audio/sound';
 import type { BoatView, Livery } from '../boat/boatView';
 import type { YardBoat } from '../boat/yard';
 import type { DroneCamera } from '../camera/drone';
@@ -40,6 +41,8 @@ export interface AboardContext {
   seasonNow(): number;
   /** True while a key is held down, by its KeyboardEvent.code. */
   held(code: string): boolean;
+  /** The game's sound, all of it made from noise and tones. Silent until the player has touched the page. */
+  sound: Sound;
   /** Another feature, by id, for the few cases where one depends on another. */
   feature<T extends Feature>(id: string): T | undefined;
 }

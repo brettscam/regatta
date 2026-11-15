@@ -160,6 +160,20 @@
           "area": "multiplayer",
           "title": "A common start",
           "text": "Everyone who enters a race is towed to a berth in the start area."
+        },
+        {
+          "id": "marks",
+          "status": "shipped",
+          "area": "multiplayer",
+          "title": "Race marks and a guide line",
+          "text": "Buoys at every mark, a beacon on the next one, and a line on the water to steer by."
+        },
+        {
+          "id": "wildlife1",
+          "status": "shipped",
+          "area": "world",
+          "title": "Wildlife on the Bay",
+          "text": "Porpoise, sea lions, seals, pelicans, cormorants, gulls and the odd humpback, where and when they really are."
         }
       ],
       "theme": ""
@@ -426,8 +440,8 @@
         {
           "id": "wildlife",
           "status": "later",
-          "title": "What you would really see",
-          "text": "Sea lions on the buoys, pelicans, harbour porpoise in the Gate, humpbacks and greys off the coast in season. Each water gets its own.",
+          "title": "Wildlife everywhere you sail",
+          "text": "Orcas and eagles in the San Juans, turtles and frigate birds in the islands, and animals close enough to see well without being told.",
           "area": "world"
         },
         {

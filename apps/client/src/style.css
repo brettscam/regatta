@@ -475,3 +475,6 @@ body.lobby .cheat { display: none; }
 
 /* The next mark's name and range, beside its column of light. */
 .mark-label { color: #1a1205; background: var(--amber); border-color: var(--amber); font-weight: 600; }
+/* ---- seen on the water: the animals card on the logbook -------------------------------------------- */
+.board .barhop.seen { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.board .barhop.seen li { padding: 8px 12px; }
