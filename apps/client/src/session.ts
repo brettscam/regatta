@@ -190,6 +190,7 @@ export class Session {
       sim: this.sim,
       nextMark: () => this.passage.marks[this.passage.nextIndex] ?? null,
       busy: () => (this.coach?.active ?? false) || this.chart.isOpen || opts.boardOpen() || this.paused,
+      racing: () => this.race.call !== null && this.race.finish === null,
     });
 
     const togglePause = (): void => {

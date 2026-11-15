@@ -100,12 +100,14 @@ export class Mooring implements Feature {
     this.berth = null;
     // She does not need telling about the berth she has just left.
     if (berth) this.approach.set(berth.id, { near: 0, said: true });
+    const left = was === 'anchor' ? 'Anchor aweigh' : berth?.kind === 'dock' ? `Cast off from ${berth.name}` : `Mooring slipped${berth ? ` at ${berth.name}` : ''}`;
+    // With the engine running she leaves under power, and the sim leaves the wheel and the sheets alone.
+    if (s.engineOn) return this.ctx.say(`${left}. The engine is running, out of gear, and you have the wheel. Full stop puts her ahead, comma astern`, 8);
     // The sim bears away on whichever side the wind happens to be. Take the tack that leads to open water.
     const preferred = sim.out.twa >= 0 ? 1 : -1;
     const side = clearerTack((heading, metres) => world.depth(s.x + Math.sin(heading) * metres, s.y + Math.cos(heading) * metres, s.t), sim.out.twd, preferred);
     if (side !== preferred) sim.setHelm('wind', side * LEAVING_ANGLE);
     const tack = side > 0 ? 'starboard' : 'port';
-    const left = was === 'anchor' ? 'Anchor aweigh' : berth?.kind === 'dock' ? `Cast off from ${berth.name}` : `Mooring slipped${berth ? ` at ${berth.name}` : ''}`;
     this.ctx.say(`${left}. Under way on ${tack} tack: sails set, the pilot holding her on a close reach. Take the wheel when you are ready`, 8);
   }
 
