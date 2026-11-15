@@ -98,6 +98,11 @@ export class ReplayWorld implements Environment {
   readonly course: CourseData;
   /** Seconds from the start of the season to the start of the session. */
   startOffset: number;
+  /**
+   * How much harder it blows than the record says: 1 is the day as it was. A start time can ask for more,
+   * for a day when the afternoon breeze really pipes up. Wind and gusts scale together; direction does not change.
+   */
+  windBoost = 1;
   private readonly cur: Int8Array;
   private readonly dep: Uint8Array;
   private readonly out: EnvSample = { windDir: 0, windSpeed: 0, currentX: 0, currentY: 0, depth: 0 };
@@ -171,7 +176,7 @@ export class ReplayWorld implements Environment {
     };
     const u = (at(steps[k], 'u') * (1 - ft) + at(steps[k + 1], 'u') * ft) * w.scale;
     const v = (at(steps[k], 'v') * (1 - ft) + at(steps[k + 1], 'v') * ft) * w.scale;
-    return { dir: (Math.atan2(-u, -v) + TAU) % TAU, speed: Math.hypot(u, v) };
+    return { dir: (Math.atan2(-u, -v) + TAU) % TAU, speed: Math.hypot(u, v) * this.windBoost };
   }
 
   /**
@@ -210,7 +215,7 @@ export class ReplayWorld implements Environment {
       const r1 = r0 + w.nx;
       return (g[r0] * (1 - fx) + g[r0 + 1] * fx) * (1 - fy) + (g[r1] * (1 - fx) + g[r1 + 1] * fx) * fy;
     };
-    return (at(a) * (1 - ft) + at(b) * ft) * w.scale;
+    return (at(a) * (1 - ft) + at(b) * ft) * w.scale * this.windBoost;
   }
 
   /** Surface current in m/s east and north. Zero over land and outside the grid. */

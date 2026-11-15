@@ -157,7 +157,7 @@ export class Session {
     this.fleet.extra = () => {
       const out: Record<string, unknown> = {};
       for (const f of this.features) Object.assign(out, f.wire?.());
-      return { ...out, ...this.race.wire(), st: this.status(), cs: this.stage.course.id };
+      return { ...out, ...this.race.wire(), st: this.status(), cs: this.stage.course.id, wb: world.windBoost };
     };
     this.fleetPanel = new FleetPanel({
       race: this.race,
@@ -448,6 +448,8 @@ export class Session {
     this.race.draw(seaTime, stage.waves, dtReal, drone.camera, window.innerWidth, window.innerHeight);
     this.fleetPanel.update(dtReal);
     // Just arrived among boats already out: take up their clock, whichever way it differs, and say so.
+    // One wind for everyone on the water: the hardest blow anyone brought with them.
+    for (const b of fleet.boats) if (b.windBoost > world.windBoost) world.windBoost = b.windBoost;
     if (fleet.adoptClock !== null) {
       world.startOffset += fleet.adoptClock - world.seasonTime(sim.state.t);
       fleet.adoptClock = null;
