@@ -542,8 +542,8 @@ export function keepClear(
   };
   const hold = at(1);
   const miss = CLEAR.miss + she.length / 2;
-  // Already opening, or passing wide: nothing to do.
-  const danger = hold.cpa < miss && (hold.tcpa > 0.5 || range < miss);
+  // Already opening, passing wide, or sailing along in company without closing: nothing to do.
+  const danger = hold.cpa < miss && hold.tcpa > 0.5 && hold.cpa < range * 0.8;
   if (!danger) return { pace: 1, danger: false, cpa: hold.cpa, tcpa: hold.tcpa };
   if (!gives) return { pace: 1, danger: true, cpa: hold.cpa, tcpa: hold.tcpa };
   const slow = at(CLEAR.slow);

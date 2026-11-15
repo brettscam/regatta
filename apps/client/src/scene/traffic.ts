@@ -588,7 +588,7 @@ export class Traffic {
       this.group.add(group);
       const track = new Track(r, spec.referenceHours * 3600);
       // Every route must keep its vessel afloat at the lowest water of the season. Say so loudly if one does not.
-      const need = r.kind === 'ship' ? 15 : r.kind === 'ferry' ? 6 : 4;
+      const need = r.kind === 'ship' ? 13 : r.kind === 'ferry' ? 6 : 4;
       const p = { x: 0, y: 0 };
       for (let s = 0; s <= track.length; s += 50) {
         track.point(s, p);

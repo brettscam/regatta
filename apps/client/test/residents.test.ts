@@ -392,6 +392,12 @@ describe('keeping clear', () => {
     expect(givesWay('kayak')).toBe(true);
   });
 
+  it('carries on beside a boat sailing along in company, however close, so the two can race', () => {
+    const c = keepClear(she, { x: 30, y: -5, cog: 0.05, sog: 3.1 }, true);
+    expect(c.danger).toBe(false);
+    expect(c.pace).toBe(1);
+  });
+
   it('leaves a boat that is lying still alone', () => {
     expect(keepClear({ ...she, sog: 0 }, { x: 0, y: 100, cog: Math.PI, sog: 3 }, true).pace).toBe(1);
   });
