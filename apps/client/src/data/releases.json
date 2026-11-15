@@ -1,6 +1,18 @@
 {
   "notes": [
     {
+      "id": "v15",
+      "date": "2026-11-14",
+      "title": "Race marks you can see, and a living Bay",
+      "items": [
+        "Race marks. Every mark still to round is a big orange buoy. The next one has a column of light over it and its name and range beside it, and a line of arrowheads on the water runs from your bow to it. G turns the guide on and off, and it works for a plain route too.",
+        "The race panel no longer jumps back to the top or misses clicks while you choose a course and pace boats.",
+        "Wildlife. Harbor porpoise in the Gate and Raccoon Strait, sea lions on the floats at Pier 39, harbor seals in the quiet coves, pelicans, cormorants and gulls, and now and then a humpback on the flood. The crew calls each one out the first time, with a bearing. A card in your logbook keeps count.",
+        "Fishing by the tide. Halibut bite on moving water and stop at slack, stripers like the turn of the tide, and trolling under diving birds is better. Lure speeds are the real ones: 6 knots catches nothing. Dungeness inside the Bay all go back; rock crab are the keepers.",
+        "The kayak paddles like one: 3 knots at a cruise, Shift with W to sprint until you are blown, a head wind that slows you and a beam wind that turns you."
+      ]
+    },
+    {
       "id": "v14",
       "date": "2026-11-14",
       "title": "Everyone starts together, and a second place to sail",

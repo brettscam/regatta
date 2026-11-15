@@ -1,6 +1,8 @@
 import releasesJson from '../data/releases.json';
 import roadmapJson from '../data/roadmap.json';
 import { visited } from '../aboard/visited';
+import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
+import { sightings } from '../aboard/sightings';
 import type { Logbook } from '../net/logbook';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
@@ -55,6 +57,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   { title: 'See more', rows: [
     [['1', '2', '3', '4'], 'Camera', 'Jump to a view: the wheel, the mast, the bow, or above the boat.'],
     [['M'], 'Chart', 'The map. Plan a route and see the wind and tide forecast.'],
+    [['G'], 'Course guide', 'Buoys on the marks and a line on the water to the next one. On by itself in a race.'],
     [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
     [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
     [['C'], 'Coaching', 'Tips on or off.'],
@@ -410,6 +413,14 @@ export class Board {
     return `<h3>Bar hop · ${n} of ${stops.length}</h3><p class="lede">Stop the boat nearby with X, then O: step ashore at a dock, or take the kayak in. Each place is stamped the first time.</p><ul class="barhop">${cards}</ul>`;
   }
 
+  /** The animals of the Bay, each marked with the number of sails it has been seen on. */
+  private seenCard(): string {
+    const seen = sightings();
+    const n = ANIMALS.filter((k) => seen[k]).length;
+    const cards = ANIMALS.map((k) => `<li class="${seen[k] ? 'been' : ''}"><b>${esc(FIELD_GUIDE[k].name)}</b><i>${seen[k] ? `Seen on ${seen[k]} ${seen[k] === 1 ? 'sail' : 'sails'}` : 'Not yet'}</i></li>`).join('');
+    return `<h3>Seen on the water · ${n} of ${ANIMALS.length}</h3><p class="lede">The crew call out each animal the first time it comes in sight on a sail. Porpoise like the tide at the Gate, seals the quiet anchorages, and a whale needs the flood and some luck.</p><ul class="barhop seen">${cards}</ul>`;
+  }
+
   private log(): string {
     const t = this.logbook.totals;
     const stat = (label: string, value: string) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
@@ -430,7 +441,7 @@ export class Board {
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${this.seenCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */

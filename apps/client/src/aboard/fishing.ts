@@ -1,16 +1,24 @@
 import * as THREE from 'three';
 import { KT, SIM_DT } from '@slack-tide/sim';
 import type { AboardContext, Feature } from './feature';
-import { BITE_SPELL, STRIKE_SECONDS, biteIn, describeFish, fishingAdvice, fishingMode, type Bite, type FishingMode, type Water } from './catch';
+import { BITE_SPELL, STRIKE_SECONDS, biteIn, describeFish, fishingAdvice, fishingMode, fishingReason, withinLimit, type Bite, type FishingMode, type Water } from './catch';
+import { baitAt, type Sea } from './fauna';
 
 const UP = new THREE.Vector3(0, 1, 0);
+
+/** The time of day on the course's own clock, in hours. */
+function localHour(date: Date, timeZone: string): number {
+  const [h, m] = date.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).split(':').map(Number);
+  return (h % 24) + m / 60;
+}
 const ROD_LENGTH = 2.2;
 /** How much of the butt sits down in the rod holder. */
 const ROD_BUTT = 0.3;
 
 /**
  * A line over the stern. L puts it out and brings it in. Under sail it trolls, stopped or at anchor it fishes the
- * bottom. When a fish takes it there are a few seconds to press L and strike. What bites is worked out in `catch.ts`.
+ * bottom. When a fish takes it there are a few seconds to press L and strike. What bites is worked out in `catch.ts`,
+ * from the state of the tide, the hour, the boat's speed and whether birds are working bait near by (`fauna.ts`).
  */
 export class Fishing implements Feature {
   readonly id = 'fishing';
@@ -31,6 +39,15 @@ export class Fishing implements Feature {
   /** Real seconds since a fish got away, during which L is taken as a late strike and not as reeling in. */
   private late = 0;
   private landed = 0;
+  /** Fish of each kind kept this sail, against the day's limit. */
+  private readonly aboard = new Map<string, number>();
+  /** The last thing said about why the fishing is slow, and how long conditions have been saying something else. */
+  private toldWhy = '';
+  private whyFor = 0;
+  private hour = 12;
+  private hourAt = -1;
+  private readonly tideSet = { x: 0, y: 0 };
+  private readonly sea: Sea;
 
   private readonly rig = new THREE.Group();
   private readonly rod: THREE.Mesh;
@@ -46,6 +63,15 @@ export class Fishing implements Feature {
 
   constructor(private readonly ctx: AboardContext) {
     const d = ctx.spec.dimensions;
+    const flow = { x: 0, y: 0 };
+    this.sea = {
+      depth: (x, y) => ctx.world.chartDepth(x, y),
+      stream: (x, y) => {
+        ctx.world.current(x, y, ctx.sim.state.t, flow);
+        return Math.hypot(flow.x, flow.y);
+      },
+      tideRate: 0,
+    };
     // In a holder on the stern rail, to starboard of the centreline and inboard of the lifebuoy.
     this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
     const carbon = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45 });
@@ -72,8 +98,26 @@ export class Fishing implements Feature {
   }
 
   private water(): Water {
-    const s = this.ctx.sim.state;
-    return { x: s.x, y: s.y, depth: this.ctx.world.depth(s.x, s.y, s.t), speedKt: Math.abs(s.speed) / KT, held: s.hold !== 'none' };
+    const { sim, world, stage } = this.ctx;
+    const s = sim.state;
+    const now = this.ctx.seasonNow();
+    const held = s.hold !== 'none';
+    world.current(s.x, s.y, s.t, this.tideSet);
+    // The hour and the tide move slowly: once a game minute is often enough to ask.
+    const minute = Math.floor(now / 60);
+    if (minute !== this.hourAt) {
+      this.hourAt = minute;
+      this.hour = localHour(world.dateAt(s.t), stage.course.timeZone);
+      this.sea.tideRate = world.tideRate(s.t);
+    }
+    return {
+      x: s.x, y: s.y, depth: world.depth(s.x, s.y, s.t), speedKt: Math.abs(s.speed) / KT, held,
+      sogKt: held ? 0 : sim.out.sog / KT,
+      streamKt: Math.hypot(this.tideSet.x, this.tideSet.y) / KT,
+      tideRate: this.sea.tideRate,
+      hour: this.hour,
+      bait: baitAt(stage.course.id, now, this.sea, s.x, s.y),
+    };
   }
 
   key(code: string): boolean {
@@ -99,18 +143,23 @@ export class Fishing implements Feature {
     this.mode = this.told = fishingMode(w);
     this.toldSkip = this.mode === 'skip';
     this.changed = 0;
+    this.toldWhy = fishingReason(w);
+    this.whyFor = 0;
     this.stream = this.mode === 'still' ? 0 : 1;
     this.rest = BITE_SPELL;
     this.spell = Math.floor(this.ctx.seasonNow() / BITE_SPELL);
-    this.ctx.say(`Line out. ${fishingAdvice(w)}. L brings it in`, 7);
+    this.ctx.say(`Line out. ${fishingAdvice(w)}. L brings it in`, 9);
     return true;
   }
 
-  private land(b: Bite): void {
+  private land(hooked: Bite): void {
+    // One more than the day's limit of its kind goes back, however good a fish.
+    const b = withinLimit(hooked, this.aboard.get(hooked.species.id) ?? 0);
     this.fish = null;
     this.rest = 40;
     if (b.keeper) {
       this.landed++;
+      this.aboard.set(b.species.id, (this.aboard.get(b.species.id) ?? 0) + 1);
       this.ctx.logbook.count('fish');
     }
     this.ctx.say(`${describeFish(b)}. The line is back out`, 8);
@@ -140,6 +189,18 @@ export class Fishing implements Feature {
       this.changed = 0;
       if (mode !== 'skip' || !this.toldSkip) this.ctx.say(fishingAdvice(w), 6);
       if (mode === 'skip') this.toldSkip = true;
+      this.toldWhy = fishingReason(w);
+      this.whyFor = 0;
+    }
+    // And say so when the tide, the light or the birds change what the line can hope for.
+    const why = mode === this.told ? fishingReason(w) : this.toldWhy;
+    if (why === this.toldWhy) this.whyFor = 0;
+    else if ((this.whyFor += 0.5) >= 10) {
+      const was = this.toldWhy;
+      this.toldWhy = why;
+      this.whyFor = 0;
+      if (why) this.ctx.say(why, 7);
+      else if (was.startsWith('Slack water')) this.ctx.say('The tide is making again, and the bait is fishing', 5);
     }
     if (this.rest > 0) this.rest -= 0.5;
     const spell = Math.floor(this.ctx.seasonNow() / BITE_SPELL);
