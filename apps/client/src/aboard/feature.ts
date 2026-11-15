@@ -9,6 +9,7 @@ import type { RemoteBoat } from '../net/fleet';
 import type { Place } from '../session';
 import type { Stage } from '../stage';
 import type { Race } from '../race/race';
+import type { ShadedWind } from '../race/shadow';
 import type { Hud } from '../ui/hud';
 import type { Passage } from '../ui/passage';
 
@@ -16,6 +17,8 @@ import type { Passage } from '../ui/passage';
 export interface AboardContext {
   sim: Sim;
   world: ReplayWorld;
+  /** The wind her sim is fed: the world's, scaled by `air.factor` when another boat is taking it. See `race/shadow.ts`. */
+  air: ShadedWind;
   /** The shared scene: `stage.scene` to add meshes to, `stage.seaLevel(x, z, seaTime)` for the height of the water. */
   stage: Stage;
   hud: Hud;

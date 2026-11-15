@@ -5,6 +5,7 @@ import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 import { myAvatarCode, readAvatar } from '../boat/avatar';
+import { readDamage } from '../aboard/contactRules';
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
@@ -58,8 +59,14 @@ export interface RemoteBoat {
   /** Seconds into the season on that boat's clock, run forward to now. */
   seasonTime: number;
   guest: boolean;
-  /** Length overall, metres. */
+  /** Length overall, beam and mast height, metres. */
   length: number;
+  beam: number;
+  mast: number;
+  /** True while she says she is at anchor, on a mooring or alongside: her sails are stowed. */
+  held: boolean;
+  /** Hull damage as she tells it, whole percent, 0 sound to 100 holed. */
+  damage: number;
   /** The name on her transom. */
   boatName: string;
   /** What she says she is doing: at anchor, ashore at Sam's, fishing. Another page's word. */
@@ -103,6 +110,7 @@ class Remote implements RemoteBoat {
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
+  damage = 0;
   status = ''; raceCall: unknown = null; raceEvent: unknown = null; windBoost = 1; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -116,10 +124,18 @@ class Remote implements RemoteBoat {
   /** Which boat, colour and name this view was built for. A change means building her again. */
   readonly identity: string;
   readonly length: number;
+  readonly beam: number;
+  readonly mast: number;
+
+  get held(): boolean {
+    return this.hold.kind !== 'none';
+  }
 
   constructor(readonly peer: string, spec: BoatSpec, who: Identity, env: Environment, scene: THREE.Scene) {
     this.identity = `${who.boat}|${who.colour}|${who.name}`;
     this.length = spec.dimensions.loa;
+    this.beam = spec.dimensions.beam;
+    this.mast = spec.dimensions.mastHeight;
     this.holder = new Sim(spec, env, {});
     // She arrives in her own colours with her own name on the transom.
     this.view = new BoatView(spec, { topsides: HEX.test(who.colour) ? who.colour : undefined, name: who.name || undefined });
@@ -144,6 +160,7 @@ class Remote implements RemoteBoat {
     if (typeof v.av === 'string' && v.av !== this.av) this.view.setAvatar(readAvatar((this.av = v.av.slice(0, 120))));
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
+    this.damage = readDamage(v.dm);
     this.raceCall = v.rc ?? null;
     this.raceEvent = v.ev ?? null;
     this.windBoost = Math.min(2, Math.max(1, num(v.wb, 1)));

@@ -39,6 +39,7 @@ export class DroneCamera {
   private readonly offset = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
   private hop = 0;
+  private jolt = 0;
   /** How many times the player has moved the camera. */
   moves = 0;
 
@@ -102,6 +103,11 @@ export class DroneCamera {
     this.target.x = THREE.MathUtils.clamp(this.target.x, -25, 25);
     this.target.z = THREE.MathUtils.clamp(this.target.z, -25, 25);
     this.target.y = THREE.MathUtils.clamp(this.target.y, 0.3, 30);
+  }
+
+  /** A jolt through the boat: the picture shakes and settles in half a second. `strength` 0 to 1. */
+  shake(strength: number): void {
+    this.jolt = Math.max(this.jolt, Math.min(1, Math.max(0, strength)));
   }
 
   /**
@@ -168,6 +174,14 @@ export class DroneCamera {
     dist = Math.max(0.4, dist - this.hop);
 
     this.camera.position.copy(this.lookAt).addScaledVector(this.offset, dist);
+    if (this.jolt > 0) {
+      // Bigger from far off, so it reads the same on the screen from any distance.
+      const k = this.jolt * (0.06 + dist * 0.012);
+      this.camera.position.x += (Math.random() - 0.5) * k;
+      this.camera.position.y += (Math.random() - 0.5) * k;
+      this.camera.position.z += (Math.random() - 0.5) * k;
+      this.jolt = this.jolt < 0.02 ? 0 : this.jolt * Math.exp(-dt / 0.14);
+    }
     // Stay dry.
     const floor = seaLevel(this.camera.position.x, this.camera.position.z) + 0.45;
     if (this.camera.position.y < floor) this.camera.position.y = floor;
