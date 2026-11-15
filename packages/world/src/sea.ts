@@ -221,7 +221,7 @@ export function describeSea(sea: Sea): string {
   else {
     const short = sea.length < 14;
     let kind: string;
-    if (sea.breaking > 0.5) kind = short ? 'short breaking chop' : 'breaking seas';
+    if (sea.breaking > 0.5 && h >= 0.4) kind = short ? 'short breaking chop' : 'breaking seas';
     else if (sea.steepness >= 0.055) kind = short ? 'short steep chop' : sea.length < 40 ? 'steep chop' : 'steep seas';
     else if (h < 0.35) kind = 'light chop';
     else kind = sea.length < 40 ? 'chop' : 'seas';
