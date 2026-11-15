@@ -17,7 +17,7 @@ import { PeriodHud } from './instruments';
 import type { ExpeditionSea } from './sea';
 import { significantHeight } from './swell';
 import type { Voyage } from './voyage';
-import { WAKE_CHECKS, type Facts, type Memory } from './wake';
+import { WAKE_CHECKS, sightingRange, type Facts, type Memory } from './wake';
 import { FULL_AND_BY, HEAVE_TO_KT, HOVE_TO_DRIFT, MAKE_SAIL_KT, SAIL_PLANS, WATCH_RATE, WATCH_STEP, judgedSpeed, measurePerformance, sailPlanFor, watchStep, type Performance } from './watch';
 
 const NM = 1852;
@@ -659,12 +659,13 @@ export class ExpeditionSession {
     // Grey-green water, darker under cloud. A gale fills the air with spray and brings the horizon in.
     const dull = 1 - 0.55 * stage.overcast;
     stage.ocean.setWater(this.deep.setRGB(0.012, 0.034, 0.046), this.scatter.setRGB(0.02 * dull, 0.085 * dull, 0.085 * dull));
+    // The haze closes in as the look-out's eye does: land shows through it, faintly, at the distance he would call it.
     const thick = THREE.MathUtils.clamp((twsKt - 30) / 30, 0, 1);
-    stage.haze.far = 26000 - 9000 * stage.overcast - 9000 * thick;
+    stage.haze.far = THREE.MathUtils.clamp(sightingRange(2000, stage.sky.elevation, stage.overcast, twsKt) * 1.5, 7000, 38000);
     stage.haze.near = 900 - 500 * thick;
     this.ice.update(s.x, s.y, s.t, stage.origin, seaTime, (px, pz) => stage.seaLevel(px, pz, seaTime, 4));
 
-    if (sailing) this.aboard(dtReal, twsKt, wind.dir);
+    if (this.phase !== 'briefing') this.aboard(dtReal, twsKt, wind.dir);
     this.chart?.update(dtReal);
     const o = sim.out;
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), s.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
@@ -706,7 +707,7 @@ export class ExpeditionSession {
       this.helmsman = false;
       this.say('You have the tiller. P hands it back to the helmsman');
     }
-    if (!this.onWatch && !this.paused) {
+    if (!this.onWatch && !this.paused && this.phase === 'sailing') {
       if (this.helmsman) {
         // The crew shorten and make sail as the wind asks, and heave to when she can carry nothing.
         if (!this.hoveTo && twsKt >= HEAVE_TO_KT) {
@@ -752,7 +753,7 @@ export class ExpeditionSession {
       date: this.world.dateAt(s.t),
       timeZone: this.opts.voyage.timeZone,
       day: this.day(),
-      pace: this.paused ? 'Paused' : this.onWatch ? 'On watch' : this.rateIndex === 0 ? 'Real time' : `${TIME_RATES[this.rateIndex]}× time`,
+      pace: this.phase === 'ended' ? 'The end' : this.paused ? 'Paused' : this.onWatch ? 'On watch' : this.rateIndex === 0 ? 'Real time' : `${TIME_RATES[this.rateIndex]}× time`,
       fast: this.onWatch || this.rateIndex > 0,
       paused: this.paused,
     }, dtReal);
