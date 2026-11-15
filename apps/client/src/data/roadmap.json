@@ -246,6 +246,13 @@
           "area": "multiplayer",
           "title": "Come aboard",
           "text": "Paddle over to a friend's boat, go aboard for a drink, and hand over a fish you caught."
+        },
+        {
+          "id": "collide",
+          "status": "next",
+          "area": "multiplayer",
+          "title": "Collisions that count",
+          "text": "Hit another boat and both are damaged: slowed, holed or dismasted by how hard. A bad one ends your race until you ask for a tow back to the start."
         }
       ],
       "theme": "Bay together"
