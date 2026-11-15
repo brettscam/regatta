@@ -26,24 +26,35 @@ const NEAR = 900;
  * of her: the hull in her colours with her name on the transom and her number on the sail, her crew, and the label over her.
  */
 export class PaceBoat extends PaceSailor {
-  readonly view: BoatView;
+  /** The boat as drawn. Built the first time she is drawn, one boat a frame, so calling a race with nine of them does not stop the game while they are all built at once. */
+  view: BoatView | null = null;
   private readonly label = document.createElement('div');
   private readonly pos = new THREE.Vector3();
   private readonly motion = { heave: 0, pitch: 0 };
   private frame = 0;
   private owed = 0;
 
-  constructor(entrant: Entrant, berth: Berth, spec: BoatSpec, env: Environment, private readonly scene: THREE.Scene, marks: readonly Mark[], private readonly index = 0) {
+  constructor(entrant: Entrant, berth: Berth, private readonly spec: BoatSpec, env: Environment, private readonly scene: THREE.Scene, marks: readonly Mark[], private readonly index = 0) {
     super(entrant, berth, spec, env, marks, index);
     const who = entrant.who;
-    this.view = new BoatView(spec, { topsides: who.colour, name: who.boat, sail: who.sail, avatar: castAvatar(who.id) });
-    scene.add(this.view.root);
     this.label.className = 'boat-label';
     this.label.title = who.character;
     document.body.appendChild(this.label);
   }
 
-  draw(seaTime: number, waves: Wave[], dt: number, camera: THREE.Camera, width: number, height: number): void {
+  /**
+   * @param build whether she may be built this frame, if she has not been yet
+   * @returns true if this call built her
+   */
+  draw(seaTime: number, waves: Wave[], dt: number, camera: THREE.Camera, width: number, height: number, build = true): boolean {
+    let built = false;
+    if (!this.view) {
+      if (!build) return false;
+      const who = this.entrant.who;
+      this.view = new BoatView(this.spec, { topsides: who.colour, name: who.boat, sail: who.sail, avatar: castAvatar(who.id) });
+      this.scene.add(this.view.root);
+      built = true;
+    }
     const s = this.sim.state;
     const o = this.sim.out;
     const z = -s.y;
@@ -51,7 +62,7 @@ export class PaceBoat extends PaceSailor {
     this.frame++;
     this.owed += dt;
     const far = (camera.position.x - s.x) ** 2 + (camera.position.z - z) ** 2 > NEAR * NEAR;
-    if (far && (this.frame + this.index) % 4 !== 0) {
+    if (far && !built && (this.frame + this.index) % 4 !== 0) {
       const root = this.view.root;
       root.position.x = s.x;
       root.position.z = z;
@@ -76,10 +87,11 @@ export class PaceBoat extends PaceSailor {
       if (this.label.textContent !== text) this.label.textContent = text;
       this.label.style.transform = `translate(-50%, -100%) translate(${Math.round(((this.pos.x + 1) / 2) * width)}px, ${Math.round(((1 - this.pos.y) / 2) * height)}px)`;
     }
+    return built;
   }
 
   dispose(): void {
-    this.scene.remove(this.view.root);
+    if (this.view) this.scene.remove(this.view.root);
     this.label.remove();
   }
 }

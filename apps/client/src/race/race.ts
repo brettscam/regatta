@@ -544,7 +544,9 @@ export class Race {
   }
 
   draw(seaTime: number, waves: Wave[], dt: number, camera: THREE.Camera, width: number, height: number): void {
-    for (const p of this.pacers) p.draw(seaTime, waves, dt, camera, width, height);
+    // A pace boat not yet built is built here, one a frame.
+    let build = true;
+    for (const p of this.pacers) if (p.draw(seaTime, waves, dt, camera, width, height, build)) build = false;
   }
 }
 
