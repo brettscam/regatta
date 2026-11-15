@@ -8,6 +8,10 @@ import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
 import { clearCityNight, setCityNight } from './scene/massing';
 import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
+import { SeaField } from './scene/seaField';
+import { Wake, type WakeVessel } from './scene/wake';
+import { Spray } from './scene/spray';
+import { graphics } from './scene/quality';
 import type { LoadedCourse } from './world/loadCourse';
 
 export interface StageBoat {
@@ -17,6 +21,9 @@ export interface StageBoat {
   heading: number;
   speed: number;
   heel: number;
+  /** Her size, for the wake she leaves. A 38-footer if not given. */
+  length?: number;
+  beam?: number;
 }
 
 /**
@@ -29,6 +36,17 @@ export class Stage {
   readonly scene = new THREE.Scene();
   readonly sky: SkySystem;
   readonly ocean: Ocean;
+  /** The course's wind and depth as the sea's shader reads them. */
+  readonly field = new SeaField();
+  /** What every vessel leaves on the water, and the spray off their bows. */
+  readonly wake: Wake;
+  readonly spray = new Spray();
+  private readonly afloat: WakeVessel[] = [];
+  private readonly white = new THREE.Color();
+  private readonly tint = new THREE.Color();
+  private readonly seaAt = (x: number, z: number, count: number) => waveHeight(this.waves, x, z, this.seaTime, count);
+  private seaTime = 0;
+  private lastSea = 0;
   traffic!: Traffic;
   course!: CourseData;
   world!: ReplayWorld;
@@ -57,8 +75,11 @@ export class Stage {
     // Haze takes the far shore, as it does on the Bay.
     this.scene.fog = this.haze;
     this.sky = new SkySystem(this.renderer, this.scene);
-    this.ocean = new Ocean(this.sky.reflection.texture);
-    this.scene.add(this.ocean.mesh);
+    this.wake = new Wake(graphics.level);
+    this.ocean = new Ocean(this.sky.reflection.texture, this.wake, this.field);
+    this.scene.add(this.ocean.mesh, this.spray.points);
+    this.applyQuality();
+    graphics.watch(() => this.applyQuality());
     this.setCourse(data, world);
     window.addEventListener('resize', () => this.resize());
   }
@@ -81,6 +102,7 @@ export class Stage {
     clearCityNight();
     this.course = data.course;
     this.world = world;
+    this.field.setCourse(data.course, data.depth);
     const scenery = data.about.scenery ?? {};
     const pieces = new Set(scenery.pieces ?? []);
     const land = new THREE.Group();
@@ -103,6 +125,43 @@ export class Stage {
     this.seaKt = wind.speed / KT;
   }
 
+  /** Every vessel's wake into the sea's maps, and spray off the bows near enough to see. */
+  private wakes(seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windFrom: number, windSpeed: number, windKt: number, day: number): void {
+    const list = this.afloat;
+    const n = ships.length + 1;
+    while (list.length < n) list.push({ id: '', x: 0, z: 0, heading: 0, speed: 0, length: 11.6, beam: 3.8, lee: 0 });
+    list.length = n;
+    const me = list[0];
+    me.id = 'own';
+    me.x = boat.x; me.z = boat.z; me.heading = boat.heading; me.speed = boat.speed;
+    me.length = boat.length ?? 11.6; me.beam = boat.beam ?? 3.8;
+    me.lee = THREE.MathUtils.clamp(boat.heel / 0.3, -1, 1);
+    for (let i = 0; i < ships.length; i++) {
+      const s = ships[i];
+      const v = list[i + 1];
+      v.id = s.id;
+      v.x = s.x; v.z = -s.y; v.heading = s.heading; v.speed = s.sog; v.length = s.length; v.beam = s.beam;
+      // A sailing boat heels away from the wind, and her leeward bow wave is the bigger one.
+      v.lee = s.kind === 'sail' ? -Math.sign(Math.sin(windFrom - s.heading)) * 0.7 * Math.min(1, s.sog / 2) : 0;
+    }
+    this.wake.update(this.renderer, seaTime, camera, list);
+
+    const dt = seaTime - this.lastSea;
+    this.lastSea = seaTime;
+    this.seaTime = seaTime;
+    const toward = windFrom + Math.PI;
+    for (let i = 0; i < n; i++) {
+      const v = list[i];
+      const dx = v.x - camera.position.x;
+      const dz = v.z - camera.position.z;
+      if (dx * dx + dz * dz > 220 * 220 + v.length * v.length * 9) continue;
+      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
+    }
+    // White water takes the colour of the light: bright by day, warm at sunset, a grey ghost at night.
+    this.white.copy(this.haze.color).multiplyScalar(0.3).add(this.tint.copy(this.sky.sunColor).multiplyScalar(0.62 * day + 0.05));
+    this.spray.update(seaTime, camera, this.renderer.domElement.height, Math.sin(toward) * windSpeed, -Math.cos(toward) * windSpeed, this.white);
+  }
+
   /** Height of the sea at a scene position. */
   seaLevel(x: number, z: number, seaTime: number, count = 6): number {
     return waveHeight(this.waves, x, z, seaTime, count);
@@ -118,7 +177,17 @@ export class Stage {
     }
   }
 
-  /** Hold 60 frames a second: if frames run long for a while, render fewer pixels. It only ever steps down. */
+  /** Fit what is drawn to the graphics level: everything on high, the cheaper version of each effect on low. */
+  private applyQuality(): void {
+    const low = graphics.level === 'low';
+    this.wake.setDetail(graphics.level);
+    this.spray.amount = low ? 0.4 : 1;
+  }
+
+  /**
+   * Hold 60 frames a second: if frames run long for a while, render fewer pixels, and when that is not enough
+   * drop the graphics to low (unless the player has asked for high). It only ever steps down.
+   */
   private keepPace(dtReal: number): void {
     const p = this.pace;
     if (p.warmup > 0) { p.warmup -= dtReal; return; }
@@ -135,7 +204,7 @@ export class Stage {
       this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);
       this.renderer.setPixelRatio(this.pixelRatio);
       this.resize();
-    }
+    } else if (p.slowWindows >= 3 && graphics.fallBack()) p.slowWindows = 0;
   }
 
   /**
@@ -156,7 +225,8 @@ export class Stage {
     const hourly = world.wind(boat.x, -boat.z, t);
     this.seaKt += (hourly.speed / KT - this.seaKt) * Math.min(1, dtReal * rate * 0.004);
     setSeaState(this.waves, this.seaKt);
-    this.ocean.setWaves(this.waves, hourly.dir, windKt);
+    this.ocean.setWaves(this.waves, hourly.dir);
+    this.field.update(world, t);
 
     this.traffic.update(t, seaTime, this.waves);
     for (const b of this.buoys) {
@@ -174,8 +244,8 @@ export class Stage {
     // The lights of the shore come on as the sun goes down: first at two degrees up, all of them by four below.
     setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
     this.ocean.setSun(this.sky.sunDir, this.sky.sunColor);
-    this.ocean.setShips(ships);
     this.ocean.update(seaTime, camera, boat);
+    this.wakes(seaTime, camera, boat, ships, hourly.dir, hourly.speed, windKt, up);
 
     this.frameCount++;
     if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);
