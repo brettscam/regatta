@@ -646,3 +646,7 @@ body:not(.lobby):has(#readout.hidden) .boardlink { left: var(--edge-left); }
 .hails .radio span { color: var(--dim); }
 /* A ferry's call runs to three lines, so the hails sit clear of the line of text at the bottom of the screen. */
 .hails { bottom: calc(var(--edge-bottom) + 80px); }
+
+/* ---- the weather level on the way in ---- */
+.join .when.weather { align-items: center; margin-top: 10px; }
+.join .when.weather .k { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-right: 6px; }

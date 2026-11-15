@@ -70,6 +70,7 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - Race start coaching and the rule for taking a mark are the pure `race/startline.ts` (`taken()`, shared by the player and pace boats; time-on-distance; the calls). A mark is taken inside 130 m, drawn as a ring by `aboard/guide.ts`; passing abeam within 520 m also counts and the line says so. Before the gun the chart route leads to the start mark only
 - Wind shadow is the pure `race/shadow.ts`; the session's sim and each pace boat's run on a `ShadedWind` (`session.air`) wrapped round the world, and `aboard/badair.ts` tells the player. Nothing goes on the wire for it
 - Collisions are `aboard/contact.ts` with pure rules in `contactRules.ts` (capsule hulls, damage from closing speed, `hitDamage(closing, heavy, fault)` is where right-of-way would scale it). Damage is `SimState.damage` (0 to 1, slows her through `damageSpeed`), sent as `dm`; `Sim.shove` pushes hulls apart. Docks repair; 100% is holed, retired and refloated
+- The way in offers a weather level (`WEATHER` in `ui/join.ts`: light 0.6, normal, heavy 1.5, kept as `Choice.weather`). `setClock` in `main.ts` multiplies it into `world.windBoost` (0.5 to 2). Boats in company take the strongest boost among them
 - The recorded weather is 36 hours. `world.wrapSeason` moves a session back a day when it reaches the end. Boats whose clock is past the end are not followed
 
 ## Status

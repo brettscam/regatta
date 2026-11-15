@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v25",
+      "date": "2026-11-15",
+      "title": "Choose your weather",
+      "items": [
+        "On the way in, under the time of day, choose how hard it blows: Lighter, As it was, or Extreme.",
+        "Lighter is about two thirds of the recorded wind: gentle and forgiving for a first sail.",
+        "Extreme is half as much again, 20 knots and more with hard gusts. She can be knocked flat or gybe by accident. Reef early with J.",
+        "Boats sailing together share one wind: the strongest anyone chose."
+      ]
+    },
+    {
       "id": "v24",
       "date": "2026-11-15",
       "title": "Wind shadow and collisions",
