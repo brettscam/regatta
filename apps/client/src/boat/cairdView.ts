@@ -43,6 +43,9 @@ class Cloth {
     g.setAttribute('position', this.pos);
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
+    // The cloth moves every frame. A fixed, generous sphere round the whole rig saves working one out each time
+    // the pointer or the camera asks what it has hit.
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 2.6, 0), 7);
     this.mesh = new THREE.Mesh(g, material);
     this.mesh.castShadow = true;
     this.mesh.frustumCulled = false;
