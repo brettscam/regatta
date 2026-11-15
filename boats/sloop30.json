@@ -288,6 +288,15 @@
     "turnGain": 0.176,
     "rudderDrag": 0.03
   },
+  "engine": {
+    "powerKw": 15,
+    "cruiseKt": 6.0,
+    "burnLph": 2.2,
+    "tankL": 75,
+    "batteryAh": 200,
+    "alternatorA": 45,
+    "windage": 0.026
+  },
   "controls": [
     {
       "node": "wheel",

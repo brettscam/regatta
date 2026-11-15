@@ -106,6 +106,70 @@ export class Sound {
     this.flog.gain.setTargetAtTime(quiet * 0.55 * loose * Math.min(1.3, 0.3 + awsKt / 18), now, 0.12);
   }
 
+  private motor: { gain: GainNode; low: OscillatorNode; high: OscillatorNode; chug: OscillatorNode; chugDepth: GainNode; tone: BiquadFilterNode; rumble: GainNode } | null = null;
+
+  /**
+   * The diesel: two saw waves an octave apart under a low-pass, beaten at the firing rate so it chugs at idle and
+   * smooths out as the revs rise, with a little exhaust noise. Call every frame; `rpm` 0 is silence.
+   * @param rpm what the rev counter shows. Under about 400 it is the starter turning her over.
+   * @param load 0 in neutral, 1 flat out in gear
+   */
+  engine(rpm: number, load: number, paused: boolean): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (!this.motor) {
+      if (rpm <= 0) return;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 220;
+      tone.Q.value = 0.8;
+      const low = ctx.createOscillator();
+      low.type = 'sawtooth';
+      const high = ctx.createOscillator();
+      high.type = 'sawtooth';
+      high.detune.value = 9;
+      const highGain = ctx.createGain();
+      highGain.gain.value = 0.45;
+      const beat = ctx.createGain();
+      beat.gain.value = 0.6;
+      const chug = ctx.createOscillator();
+      chug.type = 'sine';
+      const chugDepth = ctx.createGain();
+      chugDepth.gain.value = 0.4;
+      chug.connect(chugDepth).connect(beat.gain);
+      low.connect(tone);
+      high.connect(highGain).connect(tone);
+      tone.connect(beat).connect(gain).connect(this.master);
+      // Exhaust: low noise, wet and uneven.
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuffer(ctx, 2);
+      src.loop = true;
+      const wet = ctx.createBiquadFilter();
+      wet.type = 'lowpass';
+      wet.frequency.value = 380;
+      const rumble = ctx.createGain();
+      rumble.gain.value = 0;
+      src.connect(wet).connect(rumble).connect(beat);
+      for (const node of [low, high, chug, src]) node.start();
+      this.motor = { gain, low, high, chug, chugDepth, tone, rumble };
+    }
+    const m = this.motor;
+    const now = ctx.currentTime;
+    const on = rpm > 0 && !paused;
+    // A four-cylinder four-stroke fires twice a turn.
+    const fire = Math.max(6, (rpm / 60) * 2);
+    const cranking = rpm > 0 && rpm < 400;
+    m.low.frequency.setTargetAtTime(cranking ? 46 : fire, now, 0.12);
+    m.high.frequency.setTargetAtTime(cranking ? 139 : fire * 2, now, 0.12);
+    m.chug.frequency.setTargetAtTime(cranking ? 7 : fire / 4, now, 0.12);
+    m.chugDepth.gain.setTargetAtTime(cranking ? 0.6 : Math.max(0.1, 0.45 - rpm / 9000), now, 0.2);
+    m.tone.frequency.setTargetAtTime(170 + rpm * 0.11 + load * 160, now, 0.2);
+    m.rumble.gain.setTargetAtTime(on ? 0.5 + load * 0.5 : 0, now, 0.2);
+    m.gain.gain.setTargetAtTime(on ? (cranking ? 0.2 : 0.16 + 0.2 * load) : 0, now, on ? 0.15 : 0.35);
+  }
+
   /** A sea lion's bark: one short, hoarse honk. `near` is 1 alongside, falling to 0 out of earshot. */
   bark(near: number): void {
     const ctx = this.ctx;

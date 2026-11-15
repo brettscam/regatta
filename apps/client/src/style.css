@@ -511,3 +511,19 @@ body.lobby .award { display: none; }
 .board .xpbar i { display: block; height: 100%; background: var(--amber); border-radius: 4px; }
 .board .xptable td:last-child, .board .xptable th:last-child { text-align: right; }
 .board .xptable tr.lost td { color: var(--dim); }
+
+/* ---- the engine panel: a row under the instruments, there only while the engine runs or something is low ---- */
+.readout .engine { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 16px; align-items: end; border-top: 1px solid var(--edge); padding-top: 6px; }
+.readout .engine[hidden], .readout.hidden .engine { display: none; }
+.readout .engine .k { display: block; }
+.readout .engine .revs b { display: block; font-size: 15px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.readout .engine .revs small { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.readout .engine .gauge { min-width: 86px; display: grid; grid-template-columns: 1fr auto; align-items: baseline; }
+.readout .engine .gauge .n { font-size: 11px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.readout .engine .gauge .bar { grid-column: 1 / -1; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(238, 243, 244, 0.14); overflow: hidden; }
+.readout .engine .gauge .bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: rgba(238, 243, 244, 0.8); }
+.readout .engine .gauge.low .bar i { background: var(--amber); }
+.readout .engine .gauge.low .n { color: var(--amber); }
+.readout .engine .gauge.out .bar i { background: #e0584a; }
+.readout .engine .gauge.out .n { color: #e0584a; }
+.readout .engine .revs.off b { color: var(--dim); }

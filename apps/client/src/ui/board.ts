@@ -73,6 +73,11 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
     [['Enter'], 'Message', 'Type a message to the other boats.'],
   ] },
+  { title: 'Under power', note: 'The engine, for when there is no wind or no room to sail. It is not allowed in a race.', rows: [
+    [['I'], 'Engine', 'Start it or stop it. It takes a second or two to fire, and starts out of gear.'],
+    [['.'], 'Throttle up', 'One step at a time: ahead slow, half, cruise, full. From astern it comes back through neutral.'],
+    [[','], 'Throttle down', 'One step back: down to neutral, then astern slow and astern full. Astern is weak, and she steers badly backwards.'],
+  ] },
   { title: 'Stop for a while', rows: [
     [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
     [['Z'], 'Sleep', 'Skip to the morning. Only while stopped, and only when you are alone on the water.'],

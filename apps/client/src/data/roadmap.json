@@ -530,7 +530,7 @@
         },
         {
           "id": "engine",
-          "status": "building",
+          "status": "shipped",
           "area": "experience",
           "title": "The engine",
           "text": "Motor in and out of harbour and through a calm, with a fuel gauge and a battery to keep an eye on."

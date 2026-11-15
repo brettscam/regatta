@@ -1,6 +1,18 @@
 {
   "notes": [
     {
+      "id": "v21",
+      "date": "2026-11-15",
+      "title": "The engine",
+      "items": [
+        "Every boat has an inboard diesel. I starts and stops it. Full stop steps the throttle up and comma steps it down, through neutral into astern.",
+        "She motors straight into the wind, slower the harder it blows. Astern the rudder is weak and the stern walks, as on a real boat.",
+        "A row under the instruments shows the revs, the fuel and the battery while the engine runs. The autopilot and instruments draw on the battery; the engine charges it.",
+        "Coming alongside a dock fills the tank and charges the battery.",
+        "No engine in a race: she comes out of gear before the gun."
+      ]
+    },
+    {
       "id": "v20",
       "date": "2026-11-14",
       "title": "Experience points and ranks",
