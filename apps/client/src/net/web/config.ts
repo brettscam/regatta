@@ -19,3 +19,11 @@ export const SIGNIN_CODE: boolean = env.VITE_SIGNIN_CODE === '1';
  * area and for everything else.
  */
 export const WATER_BUDGET: number = Number(env.VITE_WATER_BUDGET) > 0 ? Number(env.VITE_WATER_BUDGET) : 40;
+
+/**
+ * A TURN relay for the voice radio, for players whose networks will not let two browsers reach each other directly.
+ * None is set up: voice uses public STUN servers only, which is enough for most home networks. To add one, set
+ * VITE_TURN_URL (one or more `turn:` addresses, comma-separated), VITE_TURN_USER and VITE_TURN_PASS when building.
+ * These reach every visitor's browser, so they must be credentials meant for that.
+ */
+export const TURN = { url: env.VITE_TURN_URL || '', user: env.VITE_TURN_USER || '', pass: env.VITE_TURN_PASS || '' };

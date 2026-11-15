@@ -40,6 +40,10 @@ export interface TrafficRoute {
   color: string | number;
   /** Way points in metres east and north of the course origin. Depth along each line is checked when the fleet is built. */
   points: Array<[number, number]>;
+  /** What the two ends of a shuttle are called on the radio: "Sausalito", "the Ferry Building". See `aboard/radioCalls.ts`. */
+  ends?: [string, string];
+  /** A way point (by its place in `points`) the vessel reports at on the radio, and what it is called: "the Golden Gate". */
+  gate?: { at: number; name: string };
 }
 
 /** A course's traffic, from its `traffic.json`. */
@@ -130,6 +134,22 @@ export class Track {
     if (tau < ramp) return { s: (v * tau * tau) / (2 * ramp), v: (v * tau) / ramp };
     if (tau > T - ramp) return { s: L - (v * (T - tau) ** 2) / (2 * ramp), v: (v * (T - tau)) / ramp };
     return { s: (v * ramp) / 2 + v * (tau - ramp), v };
+  }
+
+  /** Seconds after leaving on a one-way run at which the vessel is `s` metres along it. The inverse of `run`. */
+  runTime(s: number): number {
+    const { ramp, speed: v, travel: T, length: L } = this;
+    const d = Math.max(0, Math.min(L, s));
+    if (ramp <= 0) return d / v;
+    const edge = (v * ramp) / 2;
+    if (d < edge) return Math.sqrt((2 * ramp * d) / v);
+    if (d > L - edge) return T - Math.sqrt((2 * ramp * (L - d)) / v);
+    return ramp / 2 + d / v;
+  }
+
+  /** Metres along the line at which it passes a way point of the route, by the way point's place in `points`. */
+  along(wayPoint: number): number {
+    return this.cum[Math.max(0, Math.min(this.cum.length - 1, wayPoint * 14))];
   }
 
   /** Where the vessel is at a moment in the season. A pure function of time. */
@@ -399,7 +419,7 @@ export class Traffic {
   private readonly actors: Actor[] = [];
   private readonly scratch = { x: 0, y: 0, heading: 0, sog: 0, active: true };
 
-  constructor(spec: TrafficSpec, private readonly world: ReplayWorld) {
+  constructor(readonly spec: TrafficSpec, private readonly world: ReplayWorld) {
     this.group.name = 'traffic';
     // How far the tide drops below the chart's datum over the season, metres.
     const lowestTide = Math.max(0, -Math.min(...world.course.tide.truth));

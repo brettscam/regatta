@@ -7,6 +7,7 @@ import { Mooring } from './mooring';
 import { Guide } from './guide';
 import { Kayak } from './kayak';
 import { CrabPots } from './pots';
+import { Radio } from './radio';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
 
@@ -27,6 +28,7 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new FlowView(ctx),
     new Guide(ctx),
     new CheatStrip(ctx),
+    new Radio(ctx),
     new Wildlife(ctx),
   ];
 }

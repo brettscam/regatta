@@ -488,3 +488,11 @@ body.lobby .cheat { display: none; }
 .fleetpanel .invite { display: flex; gap: 8px; }
 .fleetpanel .invite input { flex: 1; font-size: 12px; }
 .fleetpanel .lede.note { color: var(--amber); }
+
+/* ---- the radio (aboard/radio.ts): a light among the hails while somebody is on the air ----------- */
+.hails .radio { order: 1; display: flex; align-items: center; gap: 8px; width: fit-content; background: var(--glass); border-radius: 10px; font-size: 12.5px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.hails .radio i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px var(--amber); }
+.hails .radio.tx { border-color: rgba(255, 107, 94, 0.6); }
+.hails .radio.tx i { background: #ff6b5e; box-shadow: 0 0 8px #ff6b5e; }
+.hails .radio b { letter-spacing: 0.1em; }
+.hails .radio span { color: var(--dim); }

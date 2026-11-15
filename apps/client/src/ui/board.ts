@@ -66,6 +66,7 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   { title: 'Race and talk', rows: [
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
     [['Enter'], 'Message', 'Type a message to the other boats.'],
+    [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the ferry and ship calls off or on.'],
   ] },
   { title: 'Stop for a while', rows: [
     [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],

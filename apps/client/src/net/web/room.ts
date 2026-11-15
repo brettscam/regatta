@@ -37,8 +37,8 @@ const newId = (): string => {
 
 export class WebRoom implements Room {
   readonly stamped = true;
-  /** This tab. A second tab of the same person is a second boat. */
-  private readonly me = newId();
+  /** This tab. A second tab of the same person is a second boat. The voice radio (`voice.ts`) goes by the same id. */
+  readonly me = newId();
   private state: Report = {};
   /** When the game last gave a report, and whether it has gone out. */
   private touched = 0;

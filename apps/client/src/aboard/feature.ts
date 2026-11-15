@@ -29,6 +29,8 @@ export interface AboardContext {
   logbook: Logbook;
   /** A passing remark at the bottom of the screen. */
   say(text: string, seconds?: number): void;
+  /** A line among the hails, as if spoken by `from`: where words on the radio are written out. */
+  heard(from: string, text: string): void;
   /** Something that needs the player. Also drops time back to real speed. */
   alarm(text: string): void;
   /** True while other people's boats are on the water. The clock is shared then, so time cannot be skipped. */
@@ -56,7 +58,7 @@ export interface Feature {
   readonly id: string;
   /**
    * A key was pressed that the game itself does not use. Return true if this feature took it.
-   * Taken already: Space P T H C M B R F G X Z K L O U Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
+   * Taken already: Space P T H C M B R F G X Z K L O U V Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */

@@ -220,6 +220,7 @@ export class Session {
       sim: this.sim, world, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
       spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
+      heard: (from, text) => this.heard(from, text),
       alarm: (text) => this.alarm(text),
       sharing: () => this.sharing,
       company: () => this.fleet.boats,
