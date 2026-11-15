@@ -8,7 +8,7 @@ import type { Logbook } from '../net/logbook';
 import type { Wave } from '../scene/waves';
 import type { TrafficVessel } from '../scene/traffic';
 import type { Passage } from '../ui/passage';
-import { CLOSES_AFTER, gunTime, inText, isOpen, nextEvent, whenText } from './events';
+import { CLOSES_AFTER, addEvent, eventWater, gunTime, inText, isOpen, nextEvent, readEvent, sharedEvent, whenText } from './events';
 import { PaceBoat } from './pace';
 
 export interface RaceMark { name: string; x: number; y: number }
@@ -226,6 +226,8 @@ export class Race {
   wire(): Record<string, unknown> {
     return {
       rc: this.mine && this.call ? this.call : null,
+      // A race fixed for a set time is passed from boat to boat, so those who never had the link hear of it.
+      ev: ((e) => (e ? { name: e.name, course: e.course, water: eventWater(e), at: Date.parse(e.at) } : null))(sharedEvent()),
       rj: this.call?.id ?? '',
       rp: this.leg,
       rd: Math.round(this.toGo),
@@ -308,6 +310,14 @@ export class Race {
         this.ctx.invite(b.name || call.host, `calls a race: ${call.name}. Gun in ${clockText(call.gun - now)}. Press R to join`);
       }
     }
+    // Races other boats know of that were fixed for a set time.
+    for (const b of this.ctx.fleet.boats) {
+      const heard = readEvent(b.raceEvent);
+      if (heard && addEvent(heard) && gunTime(heard) > Date.now()) {
+        const c = this.ctx.courses.find((k) => k.id === heard.course);
+        if (c) this.ctx.invite(b.name || 'Another boat', `has fixed a race: ${c.name}, gun at ${whenText(heard)}, ${inText(heard)}. It opens for joining 25 minutes before`);
+      }
+    }
     // A race fixed for a real time opens for joining a while before its gun. Every boat builds the same call from the same data.
     const event = nextEvent();
     const course = event && this.ctx.courses.find((c) => c.id === event.course);
@@ -354,7 +364,7 @@ export class Race {
       const offer = [...this.offers.values()].find((o) => (o.at ? o.at > Date.now() - CLOSES_AFTER * 60e3 : o.gun > this.now));
       if (offer) {
         const left = offer.at ? (offer.at - Date.now()) / 1000 : offer.gun - this.now;
-        return left > 0 ? `${offer.host} calls a race · gun in ${clockText(left)} · R to join` : `${offer.name} started ${clockText(-left)} ago · R to join late`;
+        return left > 0 ? `${offer.at ? offer.name : `${offer.host} calls a race`} · gun in ${clockText(left)} · R to join` : `${offer.name} started ${clockText(-left)} ago · R to join late`;
       }
       // Something fixed for later today: keep it in view.
       const event = nextEvent();

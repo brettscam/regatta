@@ -174,6 +174,13 @@
           "area": "world",
           "title": "Wildlife on the Bay",
           "text": "Porpoise, sea lions, seals, pelicans, cormorants, gulls and the odd humpback, where and when they really are."
+        },
+        {
+          "id": "city1",
+          "status": "shipped",
+          "area": "world",
+          "title": "The real skyline",
+          "text": "The towers, piers, Alcatraz and both bridges a Bay sailor steers by, lit at dusk."
         }
       ],
       "theme": ""
@@ -467,10 +474,10 @@
         },
         {
           "id": "city",
-          "status": "next",
+          "status": "later",
           "area": "world",
-          "title": "A city that looks like the city",
-          "text": "The skyline, the piers, Alcatraz and the bridges drawn closer to the real thing."
+          "title": "More of the shore",
+          "text": "Cliffs on Alcatraz, the low-rise city, Sausalito and Tiburon, pier numbers and the Marina breakwater."
         },
         {
           "id": "dinghy",
@@ -526,33 +533,47 @@
     },
     {
       "id": "voyages",
-      "name": "Other voyages · Different games on the same sea",
+      "name": "Expedition · Voyages from history",
       "when": "Exploring",
-      "blurb": "Not Regatta, but built on the same water, wind and seamanship. Vote if you would play them.",
+      "blurb": "A second way to play, chosen at the start: historical voyages you try to survive, navigating the way they did.",
       "items": [
+        {
+          "id": "shackleton",
+          "status": "next",
+          "area": "world",
+          "title": "Shackleton's boat journey, 1916",
+          "text": "Six men, a 22 ft lifeboat, 800 miles of the Southern Ocean from Elephant Island to South Georgia. Faithful and harsh: gales, ice on the deck, a tainted water cask, and four sun sights to find an island. First to be built."
+        },
+        {
+          "id": "columbus",
+          "status": "later",
+          "area": "world",
+          "title": "Columbus, 1492",
+          "text": "Palos to the Bahamas on the trade winds, with a crew that wants to turn back. The first of the old ships."
+        },
+        {
+          "id": "dagama",
+          "status": "later",
+          "area": "world",
+          "title": "Da Gama, 1497",
+          "text": "Lisbon to Calicut round the Cape for pepper: the wide swing into the Atlantic, scurvy, and a hostile coast."
+        },
         {
           "id": "magellan",
           "status": "idea",
-          "title": "The age of sail",
-          "text": "Magellan's circumnavigation or a voyage of your own in a square-rigger: provision for months, keep a crew alive, and find your way by compass, lead line, sextant and stars.",
-          "area": "world"
-        },
-        {
-          "id": "shackleton",
-          "status": "idea",
-          "title": "Shackleton's boat journey",
-          "text": "Eight hundred miles of Southern Ocean in a 22 ft lifeboat, with four sun sights and no margin.",
-          "area": "world"
+          "area": "world",
+          "title": "Magellan, 1519",
+          "text": "Sanlucar to the Spice Islands the wrong way round: mutiny, the Strait, ninety-nine days across the Pacific, and eighteen men home."
         },
         {
           "id": "pirates",
           "status": "idea",
-          "title": "Pirates of the Caribbean trade",
-          "text": "Spanish, Dutch and British ships, islands to hide and refit in, and prizes to take. Sailing a ship in a fight, with the wind gauge deciding it.",
-          "area": "world"
+          "area": "world",
+          "title": "Pirates of the Caribbean trade, about 1715",
+          "text": "Trade and chase. A fight is decided by men, ships, guns and seamanship in the wind and sea of the day, not by aiming a cannon."
         }
       ],
-      "theme": "Other voyages"
+      "theme": "Expedition"
     }
   ]
 }

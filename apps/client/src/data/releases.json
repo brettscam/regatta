@@ -1,6 +1,26 @@
 {
   "notes": [
     {
+      "id": "v17",
+      "date": "2026-11-14",
+      "title": "Fix a race for later and send the link",
+      "items": [
+        "In the race panel (R), choose a course, type the time for the gun, and press Fix the race. On bajaregatta.com you get a link to send: whoever opens it gets your race on the way in.",
+        "Boats already on the water with you are told too. The race opens for joining 25 minutes before the gun, and joining tows everyone to the start."
+      ]
+    },
+    {
+      "id": "v16",
+      "date": "2026-11-14",
+      "title": "The city, as it looks from the water",
+      "items": [
+        "San Francisco's skyline is now the real one: Salesforce Tower, the Transamerica Pyramid, Coit Tower on its hill, the Ferry Building, Sutro Tower behind, and Oracle Park beside McCovey Cove.",
+        "Alcatraz has its cellhouse, lighthouse and water tower. The Bay Bridge has its four towers, double deck and centre anchorage, with the white east span beyond.",
+        "The waterfront has its pier sheds, Pier 39, Ghirardelli and the square-rigger Balclutha.",
+        "At dusk the windows and the bridge lights come on."
+      ]
+    },
+    {
       "id": "v15",
       "date": "2026-11-14",
       "title": "Race marks you can see, and a living Bay",

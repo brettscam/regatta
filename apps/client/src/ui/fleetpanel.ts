@@ -1,7 +1,7 @@
 import { KT, R2D } from '@slack-tide/sim';
 import type { RemoteBoat } from '../net/fleet';
-import { alone as noHost } from '../net/platform';
-import { inText, isOpen, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
+import { alone as noHost, onWeb } from '../net/platform';
+import { addEvent, eventLink, inText, isOpen, makeEvent, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
 import { clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -14,6 +14,8 @@ export interface FleetPanelContext {
   me(): { x: number; y: number; sog: number; name: string; boatName: string; status: string };
   /** The route on the chart, which can be raced as it stands. */
   chartRoute(): RaceMark[];
+  /** The water being sailed: a course id. */
+  water: string;
 }
 
 /**
@@ -28,13 +30,24 @@ export class FleetPanel {
   /** Pace boats asked for. Until the player chooses: two when alone, none with friends, since each player's pace boats sail a little differently. */
   private pace: number | null = null;
   private clock = 0;
+  /** The time typed for a race to be fixed at, as HH:MM, and a word on how that went. */
+  private atTime = '';
+  private fixNote = '';
   private parts: HTMLElement[] | null = null;
   private readonly shown: string[] = ['', '', ''];
 
   constructor(private readonly ctx: FleetPanelContext) {
     this.course = ctx.courses[0]?.id ?? 'chart';
     this.el.addEventListener('click', this.onClick);
-    this.el.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.toggle(false); });
+    this.el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.toggle(false);
+      // Typing a time is not sailing.
+      e.stopPropagation();
+    });
+    this.el.addEventListener('input', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.id === 'race-at') this.atTime = t.value;
+    });
     this.bar.addEventListener('click', () => this.toggle(true));
   }
 
@@ -53,7 +66,9 @@ export class FleetPanel {
     const d = b.dataset;
     const race = this.ctx.race;
     if (d.act === 'close') return this.toggle(false);
-    if (d.course) this.course = d.course;
+    if (d.act === 'fix') this.fix();
+    else if (d.act === 'copylink') void this.copyLink();
+    else if (d.course) this.course = d.course;
     else if (d.minutes) this.minutes = Number(d.minutes);
     else if (d.pace) this.pace = Number(d.pace);
     else if (d.join) {
@@ -77,6 +92,35 @@ export class FleetPanel {
     if (this.clock <= 0) {
       this.clock = 1;
       this.render();
+    }
+  }
+
+  /** Fix a race for a time on the clock. It goes on this page's address, so the address is the invitation. */
+  private fix(): void {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(this.atTime);
+    if (!m) { this.fixNote = 'Type the time for the gun first, like 19:30.'; return; }
+    if (this.course === 'chart') { this.fixNote = 'A race fixed for later needs one of the named courses.'; return; }
+    const at = new Date();
+    at.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    // A time already gone today means tomorrow.
+    if (at.getTime() < Date.now() + 60e3) at.setDate(at.getDate() + 1);
+    const me = this.ctx.me().name.trim();
+    const event = makeEvent(this.ctx.water, this.course, at.getTime(), me ? `${me}'s race` : 'Race');
+    addEvent(event);
+    try {
+      if (onWeb()) history.replaceState(null, '', eventLink(event));
+    } catch { /* the address stays as it was; the link below still works */ }
+    this.fixNote = '';
+  }
+
+  private async copyLink(): Promise<void> {
+    const event = nextEvent();
+    if (!event) return;
+    try {
+      await navigator.clipboard.writeText(eventLink(event));
+      this.fixNote = 'Link copied. Send it to whoever is racing.';
+    } catch {
+      this.fixNote = 'Copying is blocked here. Select the link and copy it by hand.';
     }
   }
 
@@ -110,8 +154,14 @@ export class FleetPanel {
     // A race fixed for later: say when, where to be, and when it opens.
     const event = nextEvent();
     const evCourse = event && this.ctx.courses.find((c) => c.id === event.course);
-    const fixed = event && evCourse && !isOpen(event)
-      ? `<div class="offer"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. It opens for joining here ${OPENS_BEFORE} minutes before. Be near <b>${esc(evCourse.marks[0].name)}</b> by then.</p></div>`
+    // A race a player fixed carries a link to send. The game's own calendar races do not need one.
+    const invite = event && event.id.startsWith('r-')
+      ? (onWeb()
+        ? `<div class="invite"><input type="text" readonly aria-label="Link to this race" value="${esc(eventLink(event))}"><button type="button" class="primary" data-act="copylink">Copy link</button></div><p class="lede">Send this link. Whoever opens it gets this race on the way in. Boats already on the water with you are told as well.</p>`
+        : '<p class="lede">Everyone on the water with you is told. A link to send only works on bajaregatta.com.</p>')
+      : '';
+    const fixed = event && evCourse
+      ? `<div class="offer fixed"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. ${isOpen(event) ? 'It is open: join below.' : `It opens for joining here ${OPENS_BEFORE} minutes before, and joining tows you to the start.`}</p>${invite}</div>`
       : '';
     return { live: `${fixed}${offers}`, form: `
       <h3>Call a race</h3>
@@ -119,7 +169,11 @@ export class FleetPanel {
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
       ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
       <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
-      <button type="button" class="primary" data-act="call">Call the race</button>` };
+      <button type="button" class="primary" data-act="call">Call the race</button>
+      <h3>Or fix a time and send a link</h3>
+      <div class="fixrow"><label for="race-at">Gun at</label><input id="race-at" type="time" value="${esc(this.atTime)}"><button type="button" data-act="fix">Fix the race</button></div>
+      <p class="lede">For a race later today: choose the course above, type the time, and you get a link to send. It opens for joining ${OPENS_BEFORE} minutes before the gun.</p>
+      ${this.fixNote ? `<p class="lede note">${esc(this.fixNote)}</p>` : ''}` };
   }
 
   /** In a race: the clock and the standings, which tick, and the way out, which does not. */
