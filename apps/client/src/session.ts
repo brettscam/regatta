@@ -165,6 +165,7 @@ export class Session {
       boats: () => this.fleet.boats,
       me: () => ({ x: this.sim.state.x, y: this.sim.state.y, sog: this.sim.out.sog, name: opts.skipper, boatName: opts.livery.name ?? '', status: this.status() }),
       chartRoute: () => this.passage.marks.map((m) => ({ name: m.name, x: m.x, y: m.y })),
+      water: stage.course.id,
     });
     this.bindHail();
     opts.logbook.identify(opts.skipper, opts.spec.id, opts.livery.name ?? '', opts.livery.topsides ?? '');

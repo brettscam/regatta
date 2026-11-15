@@ -40,6 +40,9 @@ function raceSoon() {
 function firstWater(): string {
   const asked = params.get('course');
   if (hasCourse(asked)) return asked;
+  // A link to a race says which water it is on.
+  const linked = params.get('water');
+  if (params.has('race') && hasCourse(linked)) return linked;
   // The test parameters have always meant the Bay unless they say otherwise.
   if (params.has('go')) return DEFAULT_COURSE;
   const event = raceSoon();
@@ -71,8 +74,10 @@ function settle(c: Partial<Choice>): Choice {
 /** With a fixed race less than an hour and a half off, the way in starts at its start, in the afternoon breeze. */
 function raceNight(c: Choice): Choice {
   const event = raceSoon();
-  if (!event || eventWater(event) !== data.about.id || !data.starts.some((s) => s.id === event.spot)) return c;
-  return { ...c, spot: event.spot, time: DEFAULT_TIME };
+  if (!event || eventWater(event) !== data.about.id) return c;
+  // Everyone in the afternoon breeze, and at the race's start if it names one.
+  const spot = event.spot;
+  return { ...c, spot: spot && data.starts.some((s) => s.id === spot) ? spot : c.spot, time: DEFAULT_TIME };
 }
 
 /** Put the world's clock at the chosen time of day. ?start=hours overrides it for play testing. */
