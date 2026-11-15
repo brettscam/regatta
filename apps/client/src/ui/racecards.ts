@@ -95,7 +95,7 @@ export function entryCard(s: Standing, index: number, started: boolean, marks: n
   return `<li class="entry ${s.me ? 'me' : s.pace ? 'club' : 'person'} ${state.kind}"${about ? ` title="${esc(about)}"` : ''}>
     <span class="pics">${boatPicture(s.colour, s.sail)}${badge(s)}</span>
     <span class="names"><b>${esc(s.boat || 'A boat')}</b><span>${esc(s.name)}${s.sail ? ` · sail ${esc(s.sail)}` : ''}</span>
-      <span class="tag ${s.pace ? 'club' : 'person'}">${tag}${s.pace && s.level ? ` · ${esc(s.level)}` : ''}</span>${crew}</span>
+      <span class="kind ${s.pace ? 'club' : 'person'}">${tag}${s.pace && s.level ? ` · ${esc(s.level)}` : ''}</span>${crew}</span>
     <span class="state">${esc(state.text)}</span>
     ${s.pace && s.character ? `<span class="char">${esc(s.character)}</span>` : ''}
   </li>`;
