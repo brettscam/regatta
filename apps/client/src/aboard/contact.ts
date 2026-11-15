@@ -1,7 +1,7 @@
 import { KT, SIM_DT, damageSpeed } from '@slack-tide/sim';
 import { collisionAward } from '../xp/score';
 import {
-  CONTACT, ContactWatch, closingSpeed, damageText, hitDamage, hitWord, mend, overlap,
+  CONTACT, ContactWatch, closingSpeed, damageText, hitDamage, hitWord, mend, needsWayOn, overlap, pushClear,
   type Berthed, type Hull,
 } from './contactRules';
 import type { AboardContext, Feature } from './feature';
@@ -37,6 +37,8 @@ export class Contact implements Feature {
   /** Sim seconds until a holed boat is afloat again. Below 0 she is not holed. */
   private sinking = -1;
   private lastCost = -1e9;
+  /** True from when a hull (or the rescue boat) leaves her stopped until she is sailing again. */
+  private stopped = false;
   private tidyAt = 0;
   private where: Berthed = 'none';
   private mending = false;
@@ -117,6 +119,12 @@ export class Contact implements Feature {
       if (this.sinking < 0) this.refloat();
       return;
     }
+    // A collision stops her dead, and the sim will not start a boat from a dead stop in an ordinary breeze (see
+    // `needsWayOn`), so she is given the first of her way once her sails are driving.
+    if (this.stopped && s.hold === 'none') {
+      if (s.speed > 0.5) this.stopped = false;
+      else if (needsWayOn(s.speed, sim.out.targetSpeed, sim.out.aground, sim.out.underPower)) s.speed = CONTACT.wayOn;
+    }
     const d = sim.boat.dimensions;
     const me: Hull = { x: s.x, y: s.y, heading: s.heading, length: d.loa, beam: d.beam };
     for (const other of this.gather()) {
@@ -124,15 +132,15 @@ export class Contact implements Feature {
       if (!ov) continue;
       const o = sim.out;
       const closing = closingSpeed(Math.sin(o.cog) * o.sog, Math.cos(o.cog) * o.sog, other.vx, other.vy, ov.nx, ov.ny);
-      const hit = this.watch.touch(other.id, s.t, closing);
+      const hit = this.watch.touch(other.id, s.t, closing, ov.depth);
       if (s.hold === 'none') {
         // Out of the other hull, and the way she had toward it is gone. What she had along it she keeps, so she slides off.
-        const sinH = Math.sin(s.heading);
-        const cosH = Math.cos(s.heading);
-        const toward = Math.max(0, (s.speed * sinH + s.lateral * cosH) * ov.nx + (s.speed * cosH - s.lateral * sinH) * ov.ny);
-        sim.shove(-ov.nx * ov.depth, -ov.ny * ov.depth, -ov.nx * toward, -ov.ny * toward);
+        const p = pushClear(s.heading, s.speed, s.lateral, ov, SIM_DT);
+        sim.shove(p.dx, p.dy, p.dvx, p.dvy, p.turn);
+        if (p.toward > 0) this.stopped = true;
         me.x = s.x;
         me.y = s.y;
+        me.heading = s.heading;
       }
       if (!hit) continue;
       const damage = hitDamage(hit.closing, other.heavy);
@@ -175,6 +183,7 @@ export class Contact implements Feature {
     if (s.hold !== 'none') sim.release();
     if (spot) leaveAt(sim, world, spot);
     s.damage = 0;
+    this.stopped = true;
     this.ctx.alarm(spot
       ? `Afloat again ${metres} m off, with the hull patched up. She is head to wind: put the wheel over and sail her away`
       : 'Afloat again, with the hull patched up');
@@ -191,8 +200,10 @@ export class Contact implements Feature {
       this.news.length = 0;
       const kt = (worst.closing / KT).toFixed(1);
       const hard = Math.min(1, worst.closing / KT / 6);
-      ctx.sound.thud(0.15 + 0.85 * hard);
-      ctx.drone.shake(0.25 + 0.75 * hard);
+      if (worst.closing > 0) {
+        ctx.sound.thud(0.15 + 0.85 * hard);
+        ctx.drone.shake(0.25 + 0.75 * hard);
+      }
       if (worst.holed) {
         const was = this.racing;
         if (was) ctx.race?.leave(true);
@@ -200,7 +211,7 @@ export class Contact implements Feature {
       } else if (worst.damage > 0) {
         const total = Math.max(1, Math.round(s.damage * 100));
         ctx.alarm(`${hitWord(worst.damage)} ${worst.name} at ${kt} kt. Hull damage ${total}%: she is ${Math.round((1 - damageSpeed(s.damage)) * 100)}% slower until a dock mends her`);
-      } else ctx.say(`Touched ${worst.name}. No damage`, 4);
+      } else if (worst.closing > 0) ctx.say(`Touched ${worst.name}. No damage`, 4);
     }
 
     // Mending: said when it starts and when it is done.

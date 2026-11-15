@@ -576,22 +576,32 @@ export class Sim {
   // ---- pushed from outside ---------------------------------------------------------------------
 
   /**
-   * A push from outside the sim: another hull. She is moved bodily and her velocity through the water changes,
-   * both given east and north. Nothing else is touched, so the next step carries on from where this leaves her.
+   * A push from outside the sim: another hull. She is moved bodily, her velocity through the water changes (both given
+   * east and north), and her head may be knocked round. Nothing else is touched, so the next step carries on from
+   * where this leaves her.
    * @param dx metres east
    * @param dy metres north
    * @param dvx change of velocity, m/s east
    * @param dvy change of velocity, m/s north
+   * @param turn change of heading, radians, positive to starboard. Her velocity keeps its direction over the water.
    */
-  shove(dx: number, dy: number, dvx = 0, dvy = 0): void {
-    if (!Number.isFinite(dx + dy + dvx + dvy)) return;
+  shove(dx: number, dy: number, dvx = 0, dvy = 0, turn = 0): void {
+    if (!Number.isFinite(dx + dy + dvx + dvy + turn)) return;
     const s = this.state;
     s.x += dx;
     s.y += dy;
-    const sinH = Math.sin(s.heading);
-    const cosH = Math.cos(s.heading);
-    s.speed += dvx * sinH + dvy * cosH;
-    s.lateral += dvx * cosH - dvy * sinH;
+    // Her velocity over the water, east and north, with the push added. It is put back on her new heading.
+    let sinH = Math.sin(s.heading);
+    let cosH = Math.cos(s.heading);
+    const vx = s.speed * sinH + s.lateral * cosH + dvx;
+    const vy = s.speed * cosH - s.lateral * sinH + dvy;
+    if (turn !== 0) {
+      s.heading = wrapTau(s.heading + turn);
+      sinH = Math.sin(s.heading);
+      cosH = Math.cos(s.heading);
+    }
+    s.speed = vx * sinH + vy * cosH;
+    s.lateral = vx * cosH - vy * sinH;
   }
 
   // ---- stepping -------------------------------------------------------------------------------

@@ -7,6 +7,11 @@
  *   That is a little inside the real hull at the bow and the quarters, on purpose.
  * - Two hulls have to be inside each other by more than the slop before it counts: 0.4 m against another player's boat,
  *   whose place on this screen is a fraction of a second old, 0.1 m against everything else.
+ * - She is pushed clear and loses the way she had toward the other hull; what she had along it she keeps. Stopped with
+ *   her bow against another hull and her sails still driving, her head pays off away from it at 5 degrees a second
+ *   until she can slide clear, so she is never pinned for good.
+ * - Two hulls first found more than a metre inside each other did not sail there: one of them has just arrived, been
+ *   towed or been put on a berth. They are pushed apart and no damage is done.
  * - One coming together is one hit, however long they grind. It is over once they have been apart for two seconds.
  * - Under 0.3 kt of closing speed is fenders: no damage. Above it the damage in percent of the hull is
  *   1.5 v² + 1.5 v with v in knots: 3% at 1 kt, 9% at 2, 18% at 3, 30% at 4, 45% at 5, 63% at 6, holed outright from about 7.7.
@@ -24,6 +29,14 @@ export const CONTACT = {
   /** Overlap forgiven before two hulls count as touching: another player's boat, and anything sailed on this page. */
   slopRemote: 0.4,
   slopLocal: 0.1,
+  /** How fast her head pays off when her bow is pressed against another hull, radians a second. */
+  glance: (5 * Math.PI) / 180,
+  /** Under this speed, m/s, a pressed bow pays off. Faster, she glances off by herself. */
+  glanceUnder: 1,
+  /** The way put on a boat a collision stopped dead, m/s, once her sails are driving again. See `Contact.step`. */
+  wayOn: 0.02,
+  /** A contact that begins deeper than this, metres, is a boat appearing on top of another, not a collision. */
+  jump: 1,
   /** Seconds apart before the next touch is a new hit. */
   clear: 2,
   /** Closing speed, knots, under which a touch does no damage. */
@@ -148,6 +161,60 @@ export function closingSpeed(vax: number, vay: number, vbx: number, vby: number,
 }
 
 /**
+ * Which way her head goes when she is pressed against another hull: away from it, if it is her bow that is on.
+ * @param off bearing of the point of contact from her bow, radians, positive to starboard
+ * @returns -1 to port, 1 to starboard, 0 when the contact is abaft the beam
+ */
+export function glanceTurn(off: number): number {
+  const a = Math.atan2(Math.sin(off), Math.cos(off));
+  if (Math.abs(a) >= Math.PI / 2) return 0;
+  return a >= 0 ? -1 : 1;
+}
+
+/** What to do to a boat that is in contact with another hull: the arguments of the sim's `shove`. */
+export interface Push {
+  dx: number;
+  dy: number;
+  dvx: number;
+  dvy: number;
+  turn: number;
+  /** The way she had toward the other hull, m/s, which the push takes off her. 0 if she was not closing on it herself. */
+  toward: number;
+}
+
+/**
+ * The push that puts a boat clear of a hull she is in contact with. She is moved out by the depth of the overlap and
+ * loses the way she had toward the other hull, keeping what she had along it, so she slides off. All but stopped with
+ * her bow pressed on, her head pays off as well.
+ * @param speed her speed through the water along her heading, m/s
+ * @param lateral her leeway speed, m/s, positive to starboard
+ * @param dt seconds this push covers
+ */
+export function pushClear(heading: number, speed: number, lateral: number, ov: Overlap, dt: number): Push {
+  const sinH = Math.sin(heading);
+  const cosH = Math.cos(heading);
+  const toward = Math.max(0, (speed * sinH + lateral * cosH) * ov.nx + (speed * cosH - lateral * sinH) * ov.ny);
+  const pressed = toward > 0 && Math.abs(speed) < CONTACT.glanceUnder;
+  return {
+    dx: -ov.nx * ov.depth, dy: -ov.ny * ov.depth, dvx: -ov.nx * toward, dvy: -ov.ny * toward,
+    turn: pressed ? glanceTurn(Math.atan2(ov.nx, ov.ny) - heading) * CONTACT.glance * dt : 0,
+    toward,
+  };
+}
+
+/**
+ * Whether a boat a collision left stopped dead should be given the first of her way again (`CONTACT.wayOn`).
+ * The sim holds a boat that is all but stopped at exactly no speed, and one step of her sails' drive is less than its
+ * threshold, so in an ordinary breeze a boat stopped dead never gathers way by herself. Head to wind, aground or with
+ * no drive to speak of she stays stopped.
+ * @param speed m/s through the water
+ * @param targetSpeed the speed her sails are driving her toward, m/s
+ */
+export function needsWayOn(speed: number, targetSpeed: number, aground: boolean, underPower: boolean): boolean {
+  return speed === 0 && !aground && !underPower && targetSpeed > 1;
+}
+
+/**
  * Damage from one hit, as a share of the hull, 0 to 1.
  * @param closing speed the two came together at, m/s
  * @param heavy the other vessel is a ferry or a ship
@@ -190,12 +257,14 @@ export class ContactWatch {
    * Two hulls are touching now.
    * @param t seconds, on any clock that only goes forward
    * @param closing m/s
+   * @param depth metres the hulls are inside each other
    */
-  touch(id: string, t: number, closing: number): Hit | null {
+  touch(id: string, t: number, closing: number, depth = 0): Hit | null {
     const before = this.last.get(id);
     this.last.set(id, t);
     if (before !== undefined && t - before < CONTACT.clear && t >= before) return null;
-    return { id, closing: Math.max(0, closing) };
+    // Found deep inside each other: nobody sailed into anybody.
+    return { id, closing: depth > CONTACT.jump ? 0 : Math.max(0, closing) };
   }
 
   /** True while this vessel is touching or has only just come clear. */

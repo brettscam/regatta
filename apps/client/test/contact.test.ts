@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { Sim, SIM_DT, type BoatSpec, type Environment } from '@slack-tide/sim';
+import sloop from '../../../boats/sloop38.json';
 import {
-  CONTACT, ContactWatch, closingSpeed, damageNote, damageText, hitDamage, hitWord, mend, overlap, readDamage, type Hull,
+  CONTACT, ContactWatch, closingSpeed, damageNote, damageText, glanceTurn, hitDamage, hitWord, mend, needsWayOn, overlap, pushClear,
+  readDamage, type Hull,
 } from '../src/aboard/contactRules';
 import { COLLISION, POINTS, collisionAward } from '../src/xp/score';
 
@@ -100,6 +103,22 @@ describe('closing speed', () => {
   });
 });
 
+describe('a bow pressed against another hull', () => {
+  it('pays off away from it', () => {
+    expect(glanceTurn(20 * DEG)).toBe(-1);
+    expect(glanceTurn(-20 * DEG)).toBe(1);
+    // Dead ahead she goes one way and keeps going that way.
+    expect(glanceTurn(0)).toBe(-1);
+    expect(glanceTurn(360 * DEG + 20 * DEG)).toBe(-1);
+  });
+
+  it('a hull on her quarter or astern turns her nowhere', () => {
+    expect(glanceTurn(120 * DEG)).toBe(0);
+    expect(glanceTurn(-170 * DEG)).toBe(0);
+    expect(glanceTurn(180 * DEG)).toBe(0);
+  });
+});
+
 describe('damage from a hit', () => {
   const at = (kt: number, heavy = false, fault = 1) => hitDamage(kt * KT, heavy, fault);
 
@@ -163,6 +182,14 @@ describe('one contact is one hit', () => {
 
   it('a hull pushed into her from astern while she is parting still counts, at no speed', () => {
     expect(new ContactWatch().touch('a', 0, -1)).toEqual({ id: 'a', closing: 0 });
+  });
+
+  it('a boat that appears on top of her is pushed off, not counted as a collision', () => {
+    const w = new ContactWatch();
+    expect(w.touch('a', 0, 4, 2.5)).toEqual({ id: 'a', closing: 0 });
+    expect(hitDamage(0)).toBe(0);
+    // Sailed into, the overlap starts shallow.
+    expect(w.touch('b', 0, 4, 0.08)).toEqual({ id: 'b', closing: 4 });
   });
 
   it('forgets old contacts, and everything if the clock goes back', () => {
@@ -239,5 +266,103 @@ describe('what a collision costs in points', () => {
   it('being holed costs more, whenever it happens', () => {
     expect(collisionAward(7, 5, true)).toEqual({ kind: 'lost', points: POINTS.holed, label: 'Holed' });
     expect(POINTS.holed).toBeLessThan(POINTS.collision);
+  });
+});
+
+describe('sailing into a boat that is lying still', () => {
+  const boat = sloop as unknown as BoatSpec;
+  const d = boat.dimensions;
+  /** A steady breeze from the north, no tide. */
+  const breeze = (kt: number): Environment => ({ sample: () => ({ windDir: 0, windSpeed: kt * KT, currentX: 0, currentY: 0 }) });
+
+  /** She reaches east into the side of a boat lying head to wind across her bow, as `aboard/contact.ts` steps it. */
+  function ram(windKt: number, seconds: number, offset = 0) {
+    const sim = new Sim(boat, breeze(windKt), { x: 0, y: offset, headingDeg: 90, speedKt: 5 });
+    sim.setCrewTrim(true);
+    sim.trimForWind();
+    const other: Hull = { x: 40, y: 0, heading: 0, length: d.loa, beam: d.beam };
+    const watch = new ContactWatch();
+    const s = sim.state;
+    let hits = 0;
+    let closing = 0;
+    let deepest = 0;
+    let stopped = false;
+    let pinned = 0;
+    let through = false;
+    for (let i = 0; i < seconds / SIM_DT; i++) {
+      sim.step();
+      if (stopped && needsWayOn(s.speed, sim.out.targetSpeed, sim.out.aground, sim.out.underPower)) s.speed = CONTACT.wayOn;
+      const me: Hull = { x: s.x, y: s.y, heading: s.heading, length: d.loa, beam: d.beam };
+      // Her middle never gets to the other boat's centreline while she is within his length.
+      if (Math.abs(s.x - other.x) < 0.5 && Math.abs(s.y - other.y) < d.loa / 2) through = true;
+      const ov = overlap(me, other, CONTACT.slopLocal);
+      if (!ov) continue;
+      pinned += SIM_DT;
+      deepest = Math.max(deepest, ov.depth);
+      const hit = watch.touch('other', s.t, closingSpeed(Math.sin(sim.out.cog) * sim.out.sog, Math.cos(sim.out.cog) * sim.out.sog, 0, 0, ov.nx, ov.ny));
+      if (hit) {
+        hits++;
+        closing = hit.closing;
+      }
+      const p = pushClear(s.heading, s.speed, s.lateral, ov, SIM_DT);
+      sim.shove(p.dx, p.dy, p.dvx, p.dvy, p.turn);
+      if (p.toward > 0) stopped = true;
+      expect(overlap({ ...me, x: s.x, y: s.y, heading: s.heading }, other, CONTACT.slopLocal + 0.02)).toBeNull();
+    }
+    return { sim, hits, closing, deepest, pinned, through, other };
+  }
+
+  it('is one hit at the speed she was making, and she does not pass through', () => {
+    const r = ram(12, 40);
+    expect(r.hits).toBe(1);
+    expect(r.closing / KT).toBeGreaterThan(4);
+    expect(r.closing / KT).toBeLessThan(8);
+    expect(r.through).toBe(false);
+    // One step of her way is the most she is ever inside the other hull.
+    expect(r.deepest).toBeLessThan(0.1);
+  });
+
+  it('she is not pinned for good: her head pays off, she slides clear and sails on', () => {
+    for (const [windKt, offset] of [[8, 0], [12, 0], [12, 2], [18, -3]] as const) {
+      const r = ram(windKt, 120, offset);
+      const s = r.sim.state;
+      expect(r.hits, `${windKt} kt`).toBe(1);
+      expect(r.through, `${windKt} kt`).toBe(false);
+      expect(r.pinned, `${windKt} kt`).toBeLessThan(45);
+      expect(overlap({ x: s.x, y: s.y, heading: s.heading, length: d.loa, beam: d.beam }, r.other), `${windKt} kt`).toBeNull();
+      expect(s.speed / KT, `${windKt} kt`).toBeGreaterThan(2.5);
+    }
+  });
+
+  it('a boat stopped dead is only started again when her sails are driving', () => {
+    expect(needsWayOn(0, 2.5, false, false)).toBe(true);
+    expect(needsWayOn(0, 0.4, false, false)).toBe(false);
+    expect(needsWayOn(0, 2.5, true, false)).toBe(false);
+    expect(needsWayOn(0, 2.5, false, true)).toBe(false);
+    expect(needsWayOn(0.3, 2.5, false, false)).toBe(false);
+  });
+
+  it('a hull coming up from astern pushes her on and takes no way off her', () => {
+    // The contact is dead astern of a boat heading north at 3 m/s.
+    const p = pushClear(0, 3, 0, { depth: 0.2, nx: 0, ny: -1 }, SIM_DT);
+    expect(p.toward).toBe(0);
+    expect(p.dy).toBeCloseTo(0.2, 12);
+    expect(p.dvx).toBeCloseTo(0, 12);
+    expect(p.dvy).toBeCloseTo(0, 12);
+    expect(p.turn).toBe(0);
+  });
+
+  it('a glancing blow takes off only the way toward the other hull', () => {
+    // Heading north at 4 m/s, the other hull 30 degrees on the starboard bow.
+    const n = { depth: 0.1, nx: Math.sin(30 * DEG), ny: Math.cos(30 * DEG) };
+    const p = pushClear(0, 4, 0, n, SIM_DT);
+    expect(p.toward).toBeCloseTo(4 * Math.cos(30 * DEG), 9);
+    // What is left is along the other hull's side.
+    const vx = p.dvx;
+    const vy = 4 + p.dvy;
+    expect(vx * n.nx + vy * n.ny).toBeCloseTo(0, 9);
+    expect(Math.hypot(vx, vy)).toBeCloseTo(4 * Math.sin(30 * DEG), 9);
+    // Still moving well: she glances off by herself, with no help from the turn.
+    expect(p.turn).toBe(0);
   });
 });

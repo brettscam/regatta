@@ -76,6 +76,17 @@ describe('a shove from another hull', () => {
     expect(sim.state.lateral).toBeCloseTo(lateral - 0.5, 9);
   });
 
+  it('her head can be knocked round, and she carries on over the water the way she was going', () => {
+    const sim = makeSim(90, 5);
+    const speed = sim.state.speed;
+    sim.state.lateral = 0;
+    sim.shove(0, 0, 0, 0, Math.PI / 2);
+    // Now heading south and still moving east: all of it is sideways, to port.
+    expect(sim.state.heading).toBeCloseTo(Math.PI, 9);
+    expect(sim.state.speed).toBeCloseTo(0, 9);
+    expect(sim.state.lateral).toBeCloseTo(-speed, 9);
+  });
+
   it('ignores a push that is not a number', () => {
     const sim = makeSim();
     const before = sim.snapshot();
