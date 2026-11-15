@@ -67,7 +67,7 @@ export class Controls {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly drone: DroneCamera,
-    private readonly boat: BoatView,
+    private boat: BoatView,
     private readonly sim: Sim,
     private readonly hud: Hud,
     private readonly sound: Sound,
@@ -90,6 +90,15 @@ export class Controls {
       this.pointers.clear();
       this.drag = null;
     });
+  }
+
+  /** She has changed boats: the parts to point at are the new boat's. */
+  setBoat(boat: BoatView): void {
+    this.boat = boat;
+    this.hover = null;
+    this.keyTag = null;
+    this.drag = this.drag?.kind === 'part' ? null : this.drag;
+    this.hud.hideTag();
   }
 
   // ---- picking --------------------------------------------------------------------------------

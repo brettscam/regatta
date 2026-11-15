@@ -111,13 +111,26 @@ export class Sim {
   out: SimOutputs;
 
   constructor(
-    readonly boat: BoatSpec,
+    public boat: BoatSpec,
     public env: Environment,
     init: InitialConditions | SimState = {},
   ) {
     this.state = 'tick' in init ? structuredCloneState(init) : initialState(init);
     this.out = this.blankOutputs();
     this.settleSails();
+  }
+
+  /**
+   * Put her in a different boat without stopping: a race sailed in one class. Where she is and how she is moving carry over.
+   * Anything set beyond what the new boat allows comes inside her limits.
+   */
+  setBoat(boat: BoatSpec): void {
+    this.boat = boat;
+    const s = this.state;
+    s.reef = clamp(s.reef, 0, boat.sails.main.reefs.length - 1);
+    for (const name of ['mainsheet', 'jibsheet_port', 'jibsheet_stbd'] as const) this.setControl(name, this.getControl(name));
+    const maxRudder = boat.helm.maxRudderDeg * D2R;
+    s.rudderCmd = clamp(s.rudderCmd, -maxRudder, maxRudder);
   }
 
   // ---- controls -------------------------------------------------------------------------------

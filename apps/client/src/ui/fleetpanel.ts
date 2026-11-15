@@ -2,7 +2,8 @@ import { KT, R2D } from '@slack-tide/sim';
 import type { RemoteBoat } from '../net/fleet';
 import { alone as noHost, onWeb } from '../net/platform';
 import { addEvent, eventLink, inText, isOpen, makeEvent, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
-import { clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
+import { classText, clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
+import type { YardBoat } from '../boat/yard';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const deg3 = (rad: number) => String(Math.round(((rad * R2D) % 360 + 360) % 360) % 360).padStart(3, '0');
@@ -16,6 +17,9 @@ export interface FleetPanelContext {
   chartRoute(): RaceMark[];
   /** The water being sailed: a course id. */
   water: string;
+  /** The boats a race can be sailed in, in the picker's order, and the id of the player's own. */
+  classes: YardBoat[];
+  ownBoat: string;
 }
 
 /**
@@ -29,6 +33,8 @@ export class FleetPanel {
   private minutes = 10;
   /** Pace boats asked for. Until the player chooses: two when alone, none with friends, since each player's pace boats sail a little differently. */
   private pace: number | null = null;
+  /** The class chosen for a race called or fixed here. Until the player chooses: her own boat. */
+  private cls: string | null = null;
   private clock = 0;
   /** The time typed for a race to be fixed at, as HH:MM, and a word on how that went. */
   private atTime = '';
@@ -71,13 +77,14 @@ export class FleetPanel {
     else if (d.course) this.course = d.course;
     else if (d.minutes) this.minutes = Number(d.minutes);
     else if (d.pace) this.pace = Number(d.pace);
+    else if (d.cls) this.cls = d.cls;
     else if (d.join) {
       const offer = race.offers.get(d.join);
       if (offer) race.join(offer);
     } else if (d.act === 'leave') race.leave();
     else if (d.act === 'call') {
       const course = this.course === 'chart' ? { name: 'The route on the chart', marks: this.ctx.chartRoute() } : this.ctx.courses.find((c) => c.id === this.course);
-      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.paceNow());
+      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.paceNow(), this.clsNow());
     }
     this.render();
   };
@@ -105,7 +112,7 @@ export class FleetPanel {
     // A time already gone today means tomorrow.
     if (at.getTime() < Date.now() + 60e3) at.setDate(at.getDate() + 1);
     const me = this.ctx.me().name.trim();
-    const event = makeEvent(this.ctx.water, this.course, at.getTime(), me ? `${me}'s race` : 'Race');
+    const event = makeEvent(this.ctx.water, this.course, at.getTime(), me ? `${me}'s race` : 'Race', this.clsNow());
     addEvent(event);
     try {
       if (onWeb()) history.replaceState(null, '', eventLink(event));
@@ -128,6 +135,16 @@ export class FleetPanel {
     return this.pace ?? (this.ctx.boats().length ? 0 : 2);
   }
 
+  private clsNow(): string {
+    return this.cls ?? this.ctx.ownBoat;
+  }
+
+  /** The class of a race, in words for the middle of a sentence: " in 38 ft sloops", or nothing when everyone sails her own boat. */
+  private inClass(cls: string | undefined): string {
+    const boat = this.ctx.classes.find((b) => b.id === cls);
+    return boat ? `, everyone in ${classText(boat)}` : '';
+  }
+
   private roster(): string {
     const me = this.ctx.me();
     const rows = this.ctx.boats().map((b) => {
@@ -146,10 +163,11 @@ export class FleetPanel {
   /** With no race on: what is on offer (which can change by itself), and the form for calling one (which only changes when touched). */
   private setup(): { live: string; form: string } {
     const race = this.ctx.race;
-    const offers = [...race.offers.values()].map((o) => `<div class="offer"><p><b>${esc(o.host)}</b> has called <b>${esc(o.name)}</b>. ${esc(String(o.marks.length))} marks, start at ${esc(o.marks[0].name)}.</p><button type="button" class="primary" data-join="${esc(o.id)}">Join</button></div>`).join('');
+    const offers = [...race.offers.values()].map((o) => `<div class="offer"><p><b>${esc(o.host)}</b> has called <b>${esc(o.name)}</b>. ${esc(String(o.marks.length))} marks, start at ${esc(o.marks[0].name)}${esc(this.inClass(o.cls))}.</p><button type="button" class="primary" data-join="${esc(o.id)}">Join</button></div>`).join('');
     const chart = this.ctx.chartRoute();
     const options = [...this.ctx.courses.map((c) => ({ id: c.id, name: c.name, blurb: c.blurb })), ...(chart.length >= 2 ? [{ id: 'chart', name: 'The route on your chart', blurb: `${chart.length} marks, from ${chart[0].name} to ${chart[chart.length - 1].name}. Plan it on the chart (M), then race it.` }] : [])];
     const courses = options.map((c) => `<button type="button" class="course" data-course="${c.id}" aria-pressed="${c.id === this.course}"><b>${esc(c.name)}</b><span>${esc(c.blurb)}</span></button>`).join('');
+    const own = this.ctx.classes.find((b) => b.id === this.clsNow()) ?? this.ctx.classes[0];
     const chips = (label: string, key: string, values: number[], now: number, unit: string) => `<div class="chips"><span>${label}</span>${values.map((v) => `<button type="button" data-${key}="${v}" aria-pressed="${v === now}">${v}${unit}</button>`).join('')}</div>`;
     // A race fixed for later: say when, where to be, and when it opens.
     const event = nextEvent();
@@ -161,14 +179,16 @@ export class FleetPanel {
         : '<p class="lede">Everyone on the water with you is told. A link to send only works on bajaregatta.com.</p>')
       : '';
     const fixed = event && evCourse
-      ? `<div class="offer fixed"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. ${isOpen(event) ? 'It is open: join below.' : `It opens for joining here ${OPENS_BEFORE} minutes before, and joining tows you to the start.`}</p>${invite}</div>`
+      ? `<div class="offer fixed"><p><b>${esc(event.name)}</b>: ${esc(evCourse.name)}${esc(this.inClass(event.cls))}. The gun goes at <b>${esc(whenText(event))}</b>, ${esc(inText(event))}. ${isOpen(event) ? 'It is open: join below.' : `It opens for joining here ${OPENS_BEFORE} minutes before, and joining tows you to the start.`}</p>${invite}</div>`
       : '';
     return { live: `${fixed}${offers}`, form: `
       <h3>Call a race</h3>
       <div class="courses">${courses}</div>
+      <div class="chips"><span>Class</span>${this.ctx.classes.map((b) => `<button type="button" data-cls="${esc(b.id)}" aria-pressed="${b.id === this.clsNow()}" title="${esc(b.name)}">${esc(b.lengthFt ? `${b.lengthFt} ft` : b.name)}</button>`).join('')}</div>
+      <p class="lede">One design: everyone who joins races the ${esc(own.name)}, whatever boat she came in, and has her own back afterwards.</p>
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
       ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
-      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the same boat as yours; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
+      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the race's class; with friends racing, leave them at 0 so everyone sees the same race. The first mark is the start: be there at the gun and pass it after.</p>
       <button type="button" class="primary" data-act="call">Call the race</button>
       <h3>Or fix a time and send a link</h3>
       <div class="fixrow"><label for="race-at">Gun at</label><input id="race-at" type="time" value="${esc(this.atTime)}"><button type="button" data-act="fix">Fix the race</button></div>
@@ -193,7 +213,8 @@ export class FleetPanel {
       : race.finish !== null
         ? `<p class="count">${clockText(race.finish)}</p><p class="lede">Your time. ${table.length > 1 ? `You placed ${race.place} of ${table.length}.` : ''}</p>`
         : `<p class="count">${clockText(race.elapsed)}</p><p class="lede">Racing. Next mark <b>${esc(race.nextMark?.name ?? '')}</b>.</p>`;
-    return { live: `<h3>${esc(call.name)}</h3>${head}
+    const cls = race.classOf(call);
+    return { live: `<h3>${esc(call.name)}${cls ? ` · one design, ${esc(cls.name)}` : ''}</h3>${head}
       <table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Marks</th><th></th></tr></thead><tbody>${rows}</tbody></table>
       <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>`, form: `<button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>` };
   }

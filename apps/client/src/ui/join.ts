@@ -202,8 +202,9 @@ export class JoinFlow {
     // A race fixed for later today: tell everyone on the way in where to start from.
     const event = alone() ? null : nextEvent(this.choice.water);
     const from = event && this.water.spots.find((sp) => sp.id === event.spot);
+    const cls = event?.cls ? this.opts.boats[event.cls] : undefined;
     const race = event
-      ? `<p class="racenight"><b>${esc(event.name)}</b> The gun goes at ${esc(whenText(event))}, ${esc(inText(event))}. ${from ? `To race, start from <b>${esc(from.name)}</b>. ` : ''}Once you are sailing, press R: the race opens for joining 25 minutes before the gun, and joining tows you to the start.</p>`
+      ? `<p class="racenight"><b>${esc(event.name)}</b> The gun goes at ${esc(whenText(event))}, ${esc(inText(event))}. ${from ? `To race, start from <b>${esc(from.name)}</b>. ` : ''}${cls ? `Everyone races the ${esc(cls.name)}: you are given one for the race, whatever boat you choose here. ` : ''}Once you are sailing, press R: the race opens for joining 25 minutes before the gun, and joining tows you to the start.</p>`
       : '';
     return `${race}<h2>Where do you want to sail?</h2>
       ${waters}

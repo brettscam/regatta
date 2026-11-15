@@ -20,6 +20,7 @@ export interface AboardContext {
   stage: Stage;
   hud: Hud;
   passage: Passage;
+  /** The boat as drawn, and what she is. Both change when she changes boats for a one-design race, so read them when needed rather than keeping them. */
   boatView: BoatView;
   drone: DroneCamera;
   spec: YardBoat;
@@ -72,5 +73,10 @@ export interface Feature {
   focus?(): { x: number; y: number; heading: number; height: number } | null;
   /** A few short fields to tell the other boats along with this boat's position. Keys of two or three letters. */
   wire?(): Record<string, unknown>;
+  /**
+   * She has changed boats where she lies, for a race sailed in one class. `ctx.boatView` and `ctx.spec` are already the new ones.
+   * Anything hung on the old boat's model has to be hung on the new one here.
+   */
+  reboat?(): void;
   dispose?(): void;
 }

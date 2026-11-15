@@ -148,6 +148,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     races: data.races,
     boardOpen: () => board.isOpen,
     boats: BOATS,
+    classes: Object.fromEntries(LINEUP.filter((e) => e.status === 'ready').map((e) => [e.id, BOATS[e.id]])),
     resume,
   });
   board.context = () => ({ ...session!.report(), spot: choice.spot, startTime: choice.time });

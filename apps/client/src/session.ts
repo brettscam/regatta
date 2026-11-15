@@ -16,8 +16,8 @@ import { Hud, TIME_RATES } from './ui/hud';
 import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
-import type { Feature } from './aboard/feature';
-import { Fleet } from './net/fleet';
+import type { AboardContext, Feature } from './aboard/feature';
+import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
 import { Race, type RaceCourse } from './race/race';
 import { FleetPanel } from './ui/fleetpanel';
@@ -48,6 +48,8 @@ export interface SessionOptions {
   tutorial: boolean;
   /** Every boat that can turn up in company, by id. */
   boats: Record<string, YardBoat>;
+  /** The boats a race can be sailed in: the ones ready to sail, by id, in the picker's order. */
+  classes: Record<string, YardBoat>;
   /** A saved sim state to carry on from, when the page was republished mid-sail. */
   resume?: SimState;
   /** What the skipper is called. */
@@ -68,7 +70,7 @@ const mixAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b 
 /** One sail: the boat, her instruments, the chart, the pilot, and anyone sailing in company. */
 export class Session {
   readonly sim: Sim;
-  readonly boatView: BoatView;
+  boatView: BoatView;
   readonly drone: DroneCamera;
   readonly hud = new Hud();
   readonly passage: Passage;
@@ -95,10 +97,17 @@ export class Session {
   private acc = 0;
   private readonly motion = { heave: 0, pitch: 0, roll: 0 };
   private readonly boatPos = new THREE.Vector3();
+  /** The boat she is sailing now: her own (`opts.spec`), or the class of the race she is in. */
+  private spec: YardBoat;
+  /** What the fleet is told she is. The fleet reads it each time it reports, so a change of boat goes out with the next one. */
+  private readonly identity: Identity;
+  /** What the features aboard are handed. Its boat is kept current. */
+  private aboard!: AboardContext;
   private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0 };
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
     const world = stage.world;
+    this.spec = opts.spec;
     const wind = world.wind(opts.x, opts.y, 0);
     this.sim = new Sim(opts.spec, world, { x: opts.x, y: opts.y, headingDeg: opts.headingDeg ?? wind.dir * R2D + 50, speedKt: 5 });
     this.sim.trimForWind();
@@ -137,14 +146,16 @@ export class Session {
     });
 
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
-    this.fleet = new Fleet(opts.boats, { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper }, world, stage.scene);
+    this.identity = { boat: opts.spec.id, colour: opts.livery.topsides ?? '', name: opts.livery.name ?? '', skipper: opts.skipper };
+    this.fleet = new Fleet(opts.boats, this.identity, world, stage.scene);
     this.fleet.clockLimit = world.seasonLength;
     this.fleet.water = stage.course.id;
     this.gusts = new GustWatch(world, this.sim);
     void this.fleet.connect();
     this.fleet.onHail = (from, text) => this.heard(from, text);
     this.race = new Race({
-      sim: this.sim, world, passage: this.passage, fleet: this.fleet, spec: opts.spec, scene: stage.scene, logbook: opts.logbook,
+      sim: this.sim, world, passage: this.passage, fleet: this.fleet, scene: stage.scene, logbook: opts.logbook,
+      own: opts.spec, boat: () => this.spec, classes: opts.classes, setBoat: (boat) => this.changeBoat(boat),
       skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       alarm: (text) => this.alarm(text),
@@ -166,6 +177,8 @@ export class Session {
       me: () => ({ x: this.sim.state.x, y: this.sim.state.y, sog: this.sim.out.sog, name: opts.skipper, boatName: opts.livery.name ?? '', status: this.status() }),
       chartRoute: () => this.passage.marks.map((m) => ({ name: m.name, x: m.x, y: m.y })),
       water: stage.course.id,
+      classes: Object.values(opts.classes),
+      ownBoat: opts.spec.id,
     });
     this.bindHail();
     opts.logbook.identify(opts.skipper, opts.spec.id, opts.livery.name ?? '', opts.livery.topsides ?? '');
@@ -216,7 +229,7 @@ export class Session {
       featureKey: (code, shift) => this.features.some((f) => f.key?.(code, shift) ?? false),
     });
 
-    this.features = createFeatures({
+    this.aboard = {
       sim: this.sim, world, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
       spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
@@ -228,6 +241,41 @@ export class Session {
       held: (code) => this.controls.isHeld(code),
       sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
+    };
+    this.features = createFeatures(this.aboard);
+  }
+
+  /**
+   * Put her in a different boat where she lies: a race is sailed in one class, and afterwards she has her own back.
+   * The sim carries on in the new boat, so everything that holds the sim (the pilot, the race, the instruments) needs
+   * no telling. What is built for one particular boat is built again: her model, and what hangs on it.
+   * Her name and colours stay. The other boats are told with the next report and draw the new hull.
+   */
+  changeBoat(spec: YardBoat): void {
+    if (spec.id === this.spec.id) return;
+    const { sim, stage } = this;
+    const old = this.boatView;
+    this.spec = spec;
+    sim.setBoat(spec);
+    this.boatView = new BoatView(spec, this.opts.livery);
+    stage.scene.add(this.boatView.root);
+    this.boatView.update({ x: sim.state.x, z: -sim.state.y, heading: sim.state.heading, heel: sim.state.heel, pitch: 0, heave: 0, rudder: sim.state.rudder, boom: sim.state.boomAngle, jib: sim.state.jibAngle }, sim.state, sim.out, sim.state.t, 0);
+    this.controls.setBoat(this.boatView);
+    this.aboard.boatView = this.boatView;
+    this.aboard.spec = spec;
+    for (const f of this.features) f.reboat?.();
+    this.identity.boat = spec.id;
+    this.passage.setPolar(spec.polar, sim.state, sim.state.t);
+    // The old model goes, with everything made for it.
+    stage.scene.remove(old.root);
+    old.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry.dispose();
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+        (mat as THREE.MeshStandardMaterial).map?.dispose();
+        mat.dispose();
+      }
     });
   }
 
@@ -367,7 +415,7 @@ export class Session {
   }
 
   frame(dtReal: number): void {
-    const { sim, stage, passage, pilot, hud, chart, fleet, drone, boatView, motion } = this;
+    const { sim, stage, passage, pilot, hud, chart, fleet, drone, motion } = this;
     const world = stage.world;
     const rate = TIME_RATES[this.rateIndex];
     const paused = this.paused;
@@ -417,7 +465,7 @@ export class Session {
     const z = -mix(before.y, after.y, alpha);
 
     // Let the hull ride the long waves: heave, pitch and a little roll.
-    const half = this.opts.spec.dimensions.loa * 0.36;
+    const half = this.spec.dimensions.loa * 0.36;
     const fx = Math.sin(heading);
     const fz = -Math.cos(heading);
     const sea = (px: number, pz: number) => stage.seaLevel(px, pz, seaTime, 4);
@@ -440,6 +488,8 @@ export class Session {
       boom: mix(before.boomAngle, after.boomAngle, alpha),
       jib: mix(before.jibAngle, after.jibAngle, alpha),
     };
+    // Read here, after the steps: joining or leaving a one-design race changes the boat.
+    const boatView = this.boatView;
     boatView.update(pose, sim.state, sim.out, seaTime, paused ? 0 : dtReal);
     boatView.root.updateMatrixWorld(true);
 
@@ -473,7 +523,7 @@ export class Session {
       drift: Math.hypot(stream.x, stream.y),
       height: world.tide(sim.state.t),
       rate: world.tideRate(sim.state.t),
-      depth: sim.out.underKeel === null ? null : sim.out.underKeel + this.opts.spec.dimensions.draft,
+      depth: sim.out.underKeel === null ? null : sim.out.underKeel + this.spec.dimensions.draft,
     }, world.dateAt(sim.state.t), stage.course.timeZone, paused, rate, dtReal, fleet.boats.length);
     const gust = this.gusts.update(paused ? 0 : dtReal);
     if (gust.alert) this.alarm(gust.alert);
@@ -499,7 +549,7 @@ export class Session {
     const o = this.sim.out;
     const r1 = (n: number) => Math.round(n * 10) / 10;
     return {
-      boat: this.opts.spec.id,
+      boat: this.spec.id,
       clock: this.stage.world.dateAt(s.t).toISOString(),
       minutesSailed: Math.round(s.t / 60),
       x: Math.round(s.x), y: Math.round(s.y),
@@ -513,10 +563,14 @@ export class Session {
 
   /** Handles for play testing from the browser console. */
   debug(): Record<string, unknown> {
+    const session = this;
     return {
+      // Read each time: she may have changed boats for a race.
+      get boatView() { return session.boatView; },
+      get spec() { return session.spec; },
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
       sim: this.sim, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
-      boatView: this.boatView, coach: this.coach, hints: this.hints, gusts: this.gusts, race: this.race, fleetPanel: this.fleetPanel, features: this.features, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      coach: this.coach, hints: this.hints, gusts: this.gusts, race: this.race, fleetPanel: this.fleetPanel, features: this.features, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
     };
   }
 }
