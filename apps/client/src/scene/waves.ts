@@ -73,6 +73,22 @@ export function setSeaState(waves: Wave[], twsKt: number): void {
   }
 }
 
+/**
+ * How a water's sea is made and how it follows the wind. The Bay's chop is the default. A water with a different sea
+ * (an ocean swell, say) brings its own and gives it to the stage.
+ */
+export interface SeaModel {
+  build(windFrom: number, twsKt: number): Wave[];
+  /**
+   * Bring the waves to the wind of the moment.
+   * @param x, z where the viewer is, so a sea that turns with the wind can turn about that point
+   * @param seconds game time since the last call
+   */
+  follow(waves: Wave[], twsKt: number, windFrom: number, x: number, z: number, seconds: number): void;
+}
+
+export const BAY_SEA: SeaModel = { build: buildWaves, follow: (waves, twsKt) => setSeaState(waves, twsKt) };
+
 /** Height of the long waves at a point. Good enough for floating the hull and keeping the camera dry. */
 export function waveHeight(waves: Wave[], x: number, z: number, t: number, count = 4): number {
   let y = 0;

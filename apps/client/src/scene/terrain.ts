@@ -70,6 +70,13 @@ function evergreenUse(x: number, y: number, z: number, slope: number, north: num
  */
 export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Mesh {
   const bay = cover !== 'evergreen';
+  // Sub-Antarctic islands at the start of winter: snow and glacier ice to within a few hundred feet of the sea,
+  // black rock where it is too steep to lie, a little tussock on the low ground.
+  const ice = cover === 'ice';
+  const snow = new THREE.Color(0.8, 0.84, 0.9);
+  const glacier = new THREE.Color(0.6, 0.72, 0.8);
+  const crag = new THREE.Color(0.13, 0.13, 0.14);
+  const tussock = new THREE.Color(0.27, 0.29, 0.19);
   const g = course.terrain;
   const { nx, ny, dx } = g;
   const pos = new Float32Array(nx * ny * 3);
@@ -115,6 +122,21 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       const slope = Math.hypot(e, n);
       const broad = smoothNoise(x / 900, y / 900);
       const patch = smoothNoise(x / 420, y / 420) * 0.6 + smoothNoise(x / 130, y / 130) * 0.4;
+      if (ice) {
+        const line = 90 + 160 * smoothNoise(x / 3100, y / 3100);
+        const lying = THREE.MathUtils.smoothstep(z, line * 0.5, line * 1.4);
+        c.copy(crag).lerp(tussock, (1 - lying) * THREE.MathUtils.clamp(1.2 - slope * 4, 0, 1) * (0.4 + 0.6 * broad));
+        c.lerp(snow, lying);
+        // Glacier ice shows blue on the gentle middle slopes.
+        c.lerp(glacier, lying * THREE.MathUtils.clamp(1 - slope * 3.5, 0, 1) * THREE.MathUtils.smoothstep(patch, 0.45, 0.75) * 0.7);
+        // Rock breaks through where it is steep.
+        c.lerp(crag, THREE.MathUtils.smoothstep(slope, 0.38, 0.8) * (0.55 + 0.45 * patch));
+        const lightSide = (0.9 + 0.16 * hash(i, j)) * (1 - 0.2 * THREE.MathUtils.clamp((-e - n) * 1.4, 0, 1));
+        col[k * 3] = c.r * lightSide;
+        col[k * 3 + 1] = c.g * lightSide;
+        col[k * 3 + 2] = c.b * lightSide;
+        continue;
+      }
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
       const sheltered = THREE.MathUtils.clamp(0.5 - (e + n) * 2.2, 0, 1);
       // Near the open ocean the fog keeps the hills green-grey. Inland they dry to gold by July.

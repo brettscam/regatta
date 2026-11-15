@@ -1,4 +1,4 @@
-import type { CourseData, ReplayData } from '@slack-tide/world';
+import type { CourseData, GridSpec, ReplayData } from '@slack-tide/world';
 import type { RaceCourse } from '../race/race';
 import type { TrafficSpec } from '../scene/traffic';
 import type { Place } from '../session';
@@ -37,6 +37,8 @@ export interface LoadedCourse extends ReplayData {
   places: Place[];
   races: RaceCourse[];
   traffic: TrafficSpec;
+  /** More land than the one terrain grid holds, each patch on a grid of its own. Only a made sea (an Expedition's) has these. */
+  lands?: Array<{ grid: GridSpec & { max: number }; heights: Uint8Array }>;
 }
 
 const ROOT = '../../../../courses/';

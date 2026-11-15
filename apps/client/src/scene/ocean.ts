@@ -180,6 +180,7 @@ const fragmentShader = /* glsl */ `
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
   uniform float uBoatSpeed;
   uniform float uBoatHeel;
+  uniform vec3 uHull;      // the boat against the 38 ft sloop these shapes were drawn for: beam, length, rig height. All 1 for her.
   uniform vec4 uTrail[NT]; // x, z, age 0..1, strength
   uniform vec4 uShipA[NS]; // x, z, sin(heading), cos(heading)
   uniform vec4 uShipB[NS]; // speed m/s, length, beam, 1 when the slot is in use
@@ -266,11 +267,11 @@ const fragmentShader = /* glsl */ `
     float shade = 0.0;
     vec2 relB = vBase - uBoat.xy;
     if (uSunDir.y > 0.06 && dot(relB, relB) < 110.0 * 110.0) {
-      vec2 lb = vec2(relB.x * uBoat.w + relB.y * uBoat.z, -relB.x * uBoat.z + relB.y * uBoat.w); // x starboard, y astern
+      vec2 lb = vec2(relB.x * uBoat.w + relB.y * uBoat.z, -relB.x * uBoat.z + relB.y * uBoat.w) / uHull.xy; // x starboard, y astern
       vec2 sunFlat = uSunDir.xz / uSunDir.y;
       // Where a point one metre up throws its shadow, in the boat's frame.
-      vec2 thrown = -vec2(sunFlat.x * uBoat.w + sunFlat.y * uBoat.z, -sunFlat.x * uBoat.z + sunFlat.y * uBoat.w);
-      float lean = sin(uBoatHeel);
+      vec2 thrown = -vec2(sunFlat.x * uBoat.w + sunFlat.y * uBoat.z, -sunFlat.x * uBoat.z + sunFlat.y * uBoat.w) * uHull.z / uHull.xy;
+      float lean = sin(uBoatHeel) * uHull.z / uHull.x;
       float up = cos(uBoatHeel);
       vec2 head = vec2(lean * 15.6, -1.2) + thrown * (15.6 * up);
       vec2 stem = vec2(lean * 1.4, -5.6) + thrown * (1.4 * up);
@@ -297,12 +298,17 @@ const fragmentShader = /* glsl */ `
     // Thin streaks of old foam lined up with the wind.
     float streak = texture2D(uDetail, vec2(wUV.x / 90.0, wUV.y / 6.0) - vec2(uTime * 0.01, 0.0)).a;
     float streaks = smoothstep(0.7, 0.95, streak) * smoothstep(0.45, 0.7, foamTex) * clamp((uWindKt - 13.0) / 14.0, 0.0, 0.45) * foamFine;
+    // Above gale force the foam is blown in long dense streaks down the wind, and in a storm the sea is white with it.
+    // Nothing below 34 knots changes, so a bay looks as it did.
+    float storm = clamp((uWindKt - 34.0) / 26.0, 0.0, 1.0);
+    float blown = texture2D(uDetail, vec2(wUV.x / 140.0, wUV.y / 9.0) - vec2(uTime * 0.03, 0.0)).a;
+    streaks = max(streaks, storm * smoothstep(0.72 - 0.3 * storm, 0.9 - 0.2 * storm, blown * 0.7 + streak * 0.3) * (0.35 + 0.65 * foamTex));
     float foam = max(caps, streaks);
 
     // The boat's own white water: along the hull, off the bow, and trailing astern.
     vec2 rel = vBase - uBoat.xy;
     if (dot(rel, rel) < 85.0 * 85.0) {
-      vec2 local = vec2(rel.x * uBoat.w + rel.y * uBoat.z, -rel.x * uBoat.z + rel.y * uBoat.w);
+      vec2 local = vec2(rel.x * uBoat.w + rel.y * uBoat.z, -rel.x * uBoat.z + rel.y * uBoat.w) / uHull.xy;
       float way = clamp(uBoatSpeed / 3.2, 0.0, 1.3);
       float noise = foamTex * 0.55 + foamFine * 0.45;
       // Heel pushes the leeward side down, so the foam is wider there.
@@ -415,6 +421,7 @@ export class Ocean {
       uBoat: { value: new THREE.Vector4() },
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
+      uHull: { value: new THREE.Vector3(1, 1, 1) },
       uTrail: { value: this.trail },
       uShipA: { value: vec4s(SHIP_SLOTS) },
       uShipB: { value: vec4s(SHIP_SLOTS) },
@@ -458,6 +465,27 @@ export class Ocean {
     }
   }
 
+  /**
+   * The size of the boat whose white water and shadow are drawn, as ratios of the 38 ft sloop's beam, length and rig height.
+   * Left alone, everything is drawn for that sloop, as it always was.
+   */
+  setHull(beam: number, length: number, rig: number): void {
+    (this.uniforms.uHull.value as THREE.Vector3).set(beam, length, rig);
+  }
+
+  /** Back to the 38 ft sloop and the Bay's water, as the sea is first made. */
+  resetLook(): void {
+    this.setHull(1, 1, 1);
+    (this.uniforms.uDeep.value as THREE.Color).setRGB(0.012, 0.05, 0.062);
+    (this.uniforms.uScatter.value as THREE.Color).setRGB(0.03, 0.15, 0.13);
+  }
+
+  /** The colour of the water itself: deep, and the light scattered back out of the crests. The Bay's green-grey unless a water says otherwise. */
+  setWater(deep: THREE.Color, scatter: THREE.Color): void {
+    (this.uniforms.uDeep.value as THREE.Color).copy(deep);
+    (this.uniforms.uScatter.value as THREE.Color).copy(scatter);
+  }
+
   setSun(dir: THREE.Vector3, color: THREE.Color): void {
     (this.uniforms.uSunDir.value as THREE.Vector3).copy(dir);
     (this.uniforms.uSunColor.value as THREE.Color).copy(color);
@@ -477,8 +505,9 @@ export class Ocean {
     u.uBoatHeel.value = boat.heel;
 
     // Drop a wake point at the stern every couple of metres. Newest first.
-    const sx = boat.x - Math.sin(boat.heading) * 5.0;
-    const sz = boat.z + Math.cos(boat.heading) * 5.0;
+    const astern = 5.0 * (u.uHull.value as THREE.Vector3).y;
+    const sx = boat.x - Math.sin(boat.heading) * astern;
+    const sz = boat.z + Math.cos(boat.heading) * astern;
     if (Math.hypot(sx - this.lastDrop.x, sz - this.lastDrop.y) > 2.2) {
       this.lastDrop.set(sx, sz);
       for (let i = TRAIL_POINTS - 1; i > 0; i--) {

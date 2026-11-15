@@ -7,7 +7,7 @@ import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
 import { clearCityNight, setCityNight } from './scene/massing';
-import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
+import { BAY_SEA, waveHeight, type SeaModel, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
 
 export interface StageBoat {
@@ -35,9 +35,22 @@ export class Stage {
   readonly waves: Wave[] = [];
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
-  private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
+  readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
+  // ---- seams for a water far bigger than a bay (Expedition). Regatta leaves every one of them alone. ----
+  /** How the sea is built and follows the wind. Set before `setCourse`. */
+  sea: SeaModel = BAY_SEA;
+  /**
+   * Where the scene's zero sits in course metres. An ocean is too wide for the precision the water shader has,
+   * so a session far from the course origin draws near zero and tells the stage where that is.
+   */
+  readonly origin = { x: 0, y: 0 };
+  /** Where the sun is worked out for, when that is not the course origin. */
+  sunPlace: { lat: number; lon: number } | null = null;
+  /** Low cloud over the whole sky, 0 clear to 1 solid. */
+  overcast = 0;
   private buoys: Buoy[] = [];
   private readonly focus = new THREE.Vector3();
+  private readonly grey = new THREE.Color();
   private seaKt = 0;
   private pixelRatio = Math.min(window.devicePixelRatio, 2);
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
@@ -86,6 +99,7 @@ export class Stage {
     const land = new THREE.Group();
     land.name = 'course';
     land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
+    for (const patch of data.lands ?? []) land.add(buildTerrain({ ...this.course, terrain: { ...this.course.terrain, ...patch.grid } }, patch.heights, scenery.landCover));
     if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
@@ -99,8 +113,21 @@ export class Stage {
 
     // The sea runs with the wind of the hour. Its height follows the wind after that.
     const wind = world.wind(0, 0, 0);
-    this.waves.splice(0, this.waves.length, ...buildWaves(wind.dir, wind.speed / KT));
+    this.waves.splice(0, this.waves.length, ...this.sea.build(wind.dir, wind.speed / KT));
     this.seaKt = wind.speed / KT;
+    this.setOrigin(0, 0);
+  }
+
+  /** Say where the scene's zero is, in course metres. The land moves to suit. The caller draws everything else relative to it. */
+  setOrigin(x: number, y: number): void {
+    this.origin.x = x;
+    this.origin.y = y;
+    this.land?.position.set(-x, 0, y);
+  }
+
+  /** The scene's zero has jumped by this much (scene metres) and the viewer with it: keep every wave where it was under them. */
+  shiftSea(dx: number, dz: number): void {
+    for (const w of this.waves) w.phase = (w.phase + w.k * (w.dx * dx + w.dz * dz)) % (Math.PI * 2);
   }
 
   /** Height of the sea at a scene position. */
@@ -153,9 +180,9 @@ export class Stage {
     if (!covered) this.keepPace(dtReal);
     const world = this.world;
     // The sea follows the hourly wind: slowly, as a real sea does.
-    const hourly = world.wind(boat.x, -boat.z, t);
+    const hourly = world.wind(boat.x + this.origin.x, -boat.z + this.origin.y, t);
     this.seaKt += (hourly.speed / KT - this.seaKt) * Math.min(1, dtReal * rate * 0.004);
-    setSeaState(this.waves, this.seaKt);
+    this.sea.follow(this.waves, this.seaKt, hourly.dir, boat.x, boat.z, dtReal * rate);
     this.ocean.setWaves(this.waves, hourly.dir, windKt);
 
     this.traffic.update(t, seaTime, this.waves);
@@ -164,16 +191,20 @@ export class Stage {
       b.update(waveHeight(this.waves, b.x, -b.y, seaTime), Math.atan2(c.x, c.y), Math.hypot(c.x, c.y), seaTime);
     }
 
-    this.sky.setTime(world.dateAt(t), this.course.origin.lat, this.course.origin.lon);
+    this.sky.setOvercast(this.overcast);
+    const sun = this.sunPlace ?? this.course.origin;
+    this.sky.setTime(world.dateAt(t), sun.lat, sun.lon);
     this.focus.set(boat.x, 0, boat.z);
     this.sky.follow(this.focus);
     // Haze takes the colour of the low sky: pale by day, warm toward sunset, dark after.
     const el = this.sky.elevation;
     const up = THREE.MathUtils.clamp(Math.sin(el) * 3, 0, 1);
     this.haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(el) * 6 + 0.3, 0, 1));
+    // Under cloud the distance is grey, not the colour of a low sun.
+    if (this.overcast > 0) this.haze.color.lerp(this.grey.setScalar(0.5 * (0.2 + 0.8 * THREE.MathUtils.clamp(Math.sin(el) * 5 + 0.25, 0, 1))), this.overcast * 0.85);
     // The lights of the shore come on as the sun goes down: first at two degrees up, all of them by four below.
     setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
-    this.ocean.setSun(this.sky.sunDir, this.sky.sunColor);
+    this.ocean.setSun(this.sky.sunDir, this.overcast > 0 ? this.grey.copy(this.sky.sunColor).multiplyScalar(this.sky.sunStrength) : this.sky.sunColor);
     this.ocean.setShips(ships);
     this.ocean.update(seaTime, camera, boat);
 

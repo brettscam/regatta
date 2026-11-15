@@ -64,6 +64,58 @@ const cirrusFragment = /* glsl */ `
   }
 `;
 
+// ---- low cloud: a grey deck over the whole sky, broken or solid ------------------------------------
+// Only a water that asks for it gets it (`setOvercast`): the Southern Ocean, not the Bay.
+const overcastFragment = /* glsl */ `
+  uniform vec3 uSunDir;
+  uniform float uDay;
+  uniform float uDrift;
+  uniform float uCover;
+  varying vec3 vWorld;
+
+  float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 4; i++) {
+      v += a * noise(p);
+      p = p * 2.03 + vec2(17.1, 9.2);
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vec3 d = normalize(vWorld - cameraPosition);
+    if (d.y < -0.01) discard;
+    float up = max(d.y, 0.0);
+    // A flat deck not far overhead: it closes up toward the horizon as a real one does.
+    vec2 p = d.xz / (up + 0.13);
+    float n = fbm(p * 0.55 + vec2(uDrift, uDrift * 0.35));
+    float fine = fbm(p * 1.9 - vec2(uDrift * 1.6, 0.4));
+    float body = smoothstep(1.02 - uCover * 1.1, 1.22 - uCover * 0.95, n * 0.7 + fine * 0.3 + 0.2);
+    float alpha = body * (0.6 + 0.4 * uCover);
+    alpha = mix(alpha, max(alpha, uCover), smoothstep(0.3, 0.02, up));
+    // Grey, darker where it is thick, with a pale patch where the sun stands behind it.
+    float toSun = pow(max(dot(d, uSunDir), 0.0), 6.0);
+    float shade = mix(0.62, 0.3, uCover) * (0.78 + 0.44 * fine) + 0.35 * toSun * (1.0 - 0.6 * uCover);
+    vec3 col = vec3(0.86, 0.9, 0.97) * shade * uDay;
+    gl_FragColor = vec4(col, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;
+
 // ---- the marine layer: a bank of fog built from wide, soft-edged mounds ---------------------------
 const fogVertex = /* glsl */ `
   varying vec3 vNormal;
@@ -155,6 +207,10 @@ export class SkySystem {
   readonly reflection: THREE.WebGLCubeRenderTarget;
   elevation = 0;
   azimuth = 0;
+  /** Share of the sun's light that gets through the cloud: 1 unless `setOvercast` has been used. */
+  sunStrength = 1;
+  /** Least time between re-bakes of the reflection maps, ms. Raised while time runs very fast, when the sun moves every frame. */
+  bakeGapMs = 0;
 
   private readonly envScene = new THREE.Scene();
   private readonly envSky = new Sky();
@@ -163,9 +219,14 @@ export class SkySystem {
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private lastBaked = new THREE.Vector3();
   private readonly cirrus: THREE.Mesh;
+  private readonly envCirrus: THREE.Mesh;
   private readonly cirrusMaterial: THREE.ShaderMaterial;
   private readonly fogMaterial: THREE.ShaderMaterial;
   private readonly marineLayer: THREE.Group[] = [];
+  private overcast = 0;
+  private bakedOvercast = 0;
+  private bakedAt = 0;
+  private overcastMaterial: THREE.ShaderMaterial | null = null;
   private readonly lit = new THREE.Color();
   private readonly shade = new THREE.Color();
 
@@ -223,6 +284,7 @@ export class SkySystem {
     const envCirrus = new THREE.Mesh(dome, this.cirrusMaterial);
     envCirrus.scale.setScalar(17000);
     this.envScene.add(envCirrus);
+    this.envCirrus = envCirrus;
 
     // The marine layer: fixed in the world, out past the Golden Gate.
     this.fogMaterial = new THREE.ShaderMaterial({
@@ -267,6 +329,35 @@ export class SkySystem {
     for (const g of this.marineLayer) g.visible = on;
   }
 
+  /**
+   * Cover the sky with low grey cloud: 0 leaves it clear, 1 is a solid deck. The sun dims with it.
+   * Nothing is built until a water first asks for cloud, so waters that never do are drawn exactly as before.
+   */
+  setOvercast(amount: number): void {
+    const cover = THREE.MathUtils.clamp(amount, 0, 1);
+    if (!this.overcastMaterial) {
+      if (cover <= 0) return;
+      this.overcastMaterial = new THREE.ShaderMaterial({
+        vertexShader: cirrusVertex,
+        fragmentShader: overcastFragment,
+        uniforms: { uSunDir: { value: this.sunDir }, uDay: { value: 1 }, uDrift: { value: 0 }, uCover: { value: 0 } },
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+      });
+      for (const parent of [this.cirrus, this.envCirrus]) {
+        const deck = new THREE.Mesh(this.cirrus.geometry, this.overcastMaterial);
+        deck.scale.setScalar(0.97);
+        deck.frustumCulled = false;
+        deck.renderOrder = -4;
+        parent.add(deck);
+      }
+    }
+    this.overcast = cover;
+    this.overcastMaterial.uniforms.uCover.value = cover;
+    this.sunStrength = 1 - 0.88 * cover;
+  }
+
   /** Place the sun for a moment in time. Re-bakes the reflection maps only when the sun has moved enough to see. */
   setTime(date: Date, latDeg: number, lonDeg: number): void {
     const { azimuth, elevation } = sunAngles(date, latDeg, lonDeg);
@@ -281,14 +372,18 @@ export class SkySystem {
     const warm = 1 - THREE.MathUtils.smoothstep(h, 0.05, 0.55);
     this.sunColor.setRGB(1, 1 - 0.32 * warm, 1 - 0.62 * warm);
     this.sunLight.color.copy(this.sunColor);
-    this.sunLight.intensity = 3.4 * THREE.MathUtils.smoothstep(h, 0.0, 0.25) + 0.05;
-    this.fill.intensity = 0.2 + 0.25 * h;
+    this.sunLight.intensity = (3.4 * THREE.MathUtils.smoothstep(h, 0.0, 0.25) + 0.05) * this.sunStrength;
+    this.fill.intensity = 0.2 + 0.25 * h + 0.25 * this.overcast * h;
 
     // Clouds and fog take their light from the same sun: white by day, warm toward sunset, dim after.
     const day = 0.12 + 0.88 * THREE.MathUtils.smoothstep(Math.sin(elevation), -0.05, 0.22);
     this.cirrusMaterial.uniforms.uDay.value = day;
     // High cloud drifts a little over an afternoon.
     this.cirrusMaterial.uniforms.uDrift.value = ((date.getTime() / 1000) % 86400) * 0.00006;
+    if (this.overcastMaterial) {
+      this.overcastMaterial.uniforms.uDay.value = day;
+      this.overcastMaterial.uniforms.uDrift.value = ((((date.getTime() / 1000) % 864000) + 864000) % 864000) * 0.0004;
+    }
     this.lit.copy(this.sunColor).multiplyScalar(0.98 * day);
     this.shade.setRGB(0.6, 0.65, 0.72).lerp(this.sunColor, 0.25).multiplyScalar(0.72 * day);
     // The bank fades into the same haze as the land.
@@ -300,7 +395,8 @@ export class SkySystem {
       fu.uHazeFar.value = fog.far;
     }
 
-    if (this.lastBaked.distanceToSquared(this.sunDir) > 2e-5 || !this.envTarget) this.bake();
+    const stale = this.lastBaked.distanceToSquared(this.sunDir) > 2e-5 || Math.abs(this.overcast - this.bakedOvercast) > 0.04;
+    if (!this.envTarget || (stale && (this.bakeGapMs <= 0 || performance.now() - this.bakedAt >= this.bakeGapMs))) this.bake();
   }
 
   /** Keep the shadow box centred on the boat. */
@@ -309,10 +405,14 @@ export class SkySystem {
     this.sunLight.position.copy(target).addScaledVector(this.sunDir, 60);
     // The cloud dome is all direction and no place, so it rides along with the boat.
     this.cirrus.position.set(target.x, 0, target.z);
+    // So is the sky itself. It only matters on a water wider than the sky's box, where the boat would sail out of it.
+    this.sky.position.set(target.x, 0, target.z);
   }
 
   private bake(): void {
     this.lastBaked.copy(this.sunDir);
+    this.bakedOvercast = this.overcast;
+    this.bakedAt = performance.now();
     this.cubeCamera.update(this.renderer, this.envScene);
     const next = this.pmrem.fromScene(this.envScene, 0, 1, 40000);
     this.scene.environment = next.texture;
