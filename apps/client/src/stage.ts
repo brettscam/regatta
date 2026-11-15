@@ -6,6 +6,8 @@ import { SkySystem } from './scene/sky';
 import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
+import { buildShoreside, type ShoreSpot } from './scene/shoreside';
+import { groundHeight, type HeightGrid } from './aboard/paddle';
 import { clearCityNight, setCityNight } from './scene/massing';
 import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
 import type { LoadedCourse } from './world/loadCourse';
@@ -33,6 +35,8 @@ export class Stage {
   course!: CourseData;
   world!: ReplayWorld;
   readonly waves: Wave[] = [];
+  /** The venue standing on the shore at each place there is to go ashore: where it is, and its deck, dock and named spots. */
+  shore: ShoreSpot[] = [];
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
@@ -85,10 +89,27 @@ export class Stage {
     const pieces = new Set(scenery.pieces ?? []);
     const land = new THREE.Group();
     land.name = 'course';
-    land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
-    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
+    const terrain = buildTerrain(this.course, data.terrain, scenery.landCover);
+    land.add(terrain);
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
+    // Something to steer for at every place there is to go ashore. They stand on the shore as it is drawn, so the
+    // heights are read back off the land's own mesh, as the kayak reads them.
+    const t = this.course.terrain;
+    const drawn: HeightGrid = { x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: terrain.geometry.getAttribute('position').array, stride: 3, offset: 1 };
+    const shore = buildShoreside(this.course.depth, data.depth, (x, y) => groundHeight(drawn, x, y), (x, y) => world.chartDepth(x, y), data.places, scenery.landCover);
+    land.add(shore.group);
+    this.shore = shore.spots;
+    // The moored boats of the scenery keep out of the way in to each guest dock.
+    const approaches: Array<[number, number, number]> = [];
+    for (const spot of shore.spots) {
+      const { dock, berth } = spot.layout;
+      if (dock) approaches.push([dock.x, dock.y, 170]);
+      if (berth) approaches.push([berth.x, berth.y, 170]);
+    }
+    for (const place of data.places) approaches.push([place.x, place.y, 150]);
+    const plots = shore.spots.map((spot): [number, number, number] => [spot.x + Math.sin(spot.layout.heading) * 8, spot.y + Math.cos(spot.layout.heading) * 8, 44]);
+    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth, approaches, plots));
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
     for (const b of this.buoys) land.add(b.group);
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.
