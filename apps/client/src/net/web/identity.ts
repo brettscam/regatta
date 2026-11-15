@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { SUPABASE_KEY, SUPABASE_URL } from './config';
 import type { Account, AccountResult, UserApi } from '../platform';
 import { SIGNIN_CODE } from './config';
 
@@ -48,6 +49,16 @@ export function makeIdentity(client: SupabaseClient, arrivedWith: string): Ident
   const ready = client.auth.getSession().then(({ data }) => take(data.session), () => {}).then(() => { settled = true; });
   client.auth.onAuthStateChange((_event, session) => take(session));
 
+  // Which other ways of signing in the project has switched on. Asked once, quietly: until it answers, only email is offered.
+  let google = false;
+  void fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d: { external?: Record<string, boolean> } | null) => {
+      // The answer is here long before anyone opens the sign-in form, so nothing needs telling.
+      if (d?.external?.google) google = true;
+    })
+    .catch(() => { /* email it is */ });
+
   // A link that had run out, or had been used already, comes back with the reason in the address. Tidy it away.
   const expired = /(^|[#&])error(_code|_description)?=/.test(arrivedWith);
   const fromLink = /(^|[#&])access_token=/.test(arrivedWith);
@@ -90,6 +101,16 @@ export function makeIdentity(client: SupabaseClient, arrivedWith: string): Ident
         return error ? { ok: false, reason: reason(error, true) } : { ok: true };
       } catch {
         return { ok: false, reason: reason({}, true) };
+      }
+    },
+    google: () => google,
+    withGoogle: async (): Promise<AccountResult> => {
+      try {
+        // Google sends the player back to this page, wherever the game is being served from.
+        const { error } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+        return error ? { ok: false, reason: 'Google sign-in could not be started. Try the email link instead.' } : { ok: true };
+      } catch {
+        return { ok: false, reason: 'Google sign-in could not be started. Try the email link instead.' };
       }
     },
     verify: async (to, code): Promise<AccountResult> => {
