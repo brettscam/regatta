@@ -17,6 +17,8 @@ interface Other extends Hull {
   vy: number;
   slop: number;
   heavy: boolean;
+  /** True for something that cannot hurt a yacht's hull: a kayak. */
+  soft?: boolean;
 }
 
 /**
@@ -114,7 +116,7 @@ export class Contact implements Feature {
       if (!near(v.x, v.y, v.length)) continue;
       others.push({
         id: v.id, name: v.name, x: v.x, y: v.y, heading: v.heading, length: v.length, beam: v.beam,
-        vx: Math.sin(v.heading) * v.sog, vy: Math.cos(v.heading) * v.sog, slop: CONTACT.slopLocal, heavy: v.heavy,
+        vx: Math.sin(v.heading) * v.sog, vy: Math.cos(v.heading) * v.sog, slop: CONTACT.slopLocal, heavy: v.heavy, soft: v.kind === 'paddle',
       });
     }
     return others;
@@ -152,7 +154,7 @@ export class Contact implements Feature {
         me.heading = s.heading;
       }
       if (!hit) continue;
-      const damage = hitDamage(hit.closing, other.heavy);
+      const damage = other.soft ? 0 : hitDamage(hit.closing, other.heavy);
       s.damage = Math.min(1, s.damage + damage);
       const holed = s.damage >= 1;
       this.news.push({ name: other.name, closing: hit.closing, damage, holed });

@@ -69,6 +69,8 @@ export class Residents implements Feature {
   private readonly lag: number[] = [];
   private readonly pace: number[] = [];
   private readonly shown: number[] = [];
+  /** The sim time at which each one's heading was last moved on. */
+  private readonly turned: number[] = [];
   private readonly twa: number[] = [];
   private readonly windKt: number[] = [];
   private readonly range: number[] = [];
@@ -83,7 +85,6 @@ export class Residents implements Feature {
   private labelText = '';
   private on = true;
   private frame = 0;
-  private lastT: number;
   private talkAt = -1e9;
   private watch = 0;
   private pending: { index: number; at: number; text: string } | null = null;
@@ -112,6 +113,7 @@ export class Residents implements Feature {
       this.lag.push(0);
       this.pace.push(1);
       this.shown.push(NaN);
+      this.turned.push(0);
       this.twa.push(1);
       this.windKt.push(8);
       this.range.push(Infinity);
@@ -122,14 +124,13 @@ export class Residents implements Feature {
     this.label.className = 'boat-label resident-label';
     this.label.style.display = 'none';
     document.body.appendChild(this.label);
-    this.lastT = ctx.sim.state.t;
-    this.place(ctx.seasonNow(), 0, true);
+    this.place(ctx.seasonNow(), true);
   }
 
   // ---- where they are ----------------------------------------------------------------------------
 
   /** Work out where each boat is. `only` near ones when called between frames. */
-  private place(season: number, dt: number, everyone: boolean): void {
+  private place(season: number, everyone: boolean): void {
     const s = this.ctx.sim.state;
     if (everyone) this.vessels.length = 0;
     for (let i = 0; i < this.all.length; i++) {
@@ -146,8 +147,10 @@ export class Residents implements Feature {
       v.sog = st.sog * this.pace[i];
       // She is shown to turn at a seamanlike rate, not to spin on the spot at a tack.
       const now = this.shown[i];
-      if (Number.isNaN(now) || dt <= 0 || dt > 20) this.shown[i] = st.heading;
-      else {
+      const dt = s.t - this.turned[i];
+      this.turned[i] = s.t;
+      if (Number.isNaN(now) || dt < 0 || dt > 20) this.shown[i] = st.heading;
+      else if (dt > 0) {
         const d = wrap(st.heading - now);
         const most = TURN_RATE * dt;
         this.shown[i] = now + Math.max(-most, Math.min(most, d));
@@ -182,17 +185,14 @@ export class Residents implements Feature {
       if (Math.abs(this.pace[i] - 1) < 0.02 && want === 1) this.pace[i] = 1;
       this.lag[i] = lagAfter(this.lag[i], this.pace[i], dt);
     }
-    this.place(this.ctx.seasonNow(), dt, false);
+    this.place(this.ctx.seasonNow(), false);
   }
 
   update(dt: number, seaTime: number): void {
     const { ctx } = this;
-    const s = ctx.sim.state;
     if (!this.on) return;
-    const gameDt = Math.max(0, s.t - this.lastT);
-    this.lastT = s.t;
     this.frame++;
-    this.place(ctx.seasonNow(), gameDt, true);
+    this.place(ctx.seasonNow(), true);
     this.draw(seaTime);
     this.watch -= dt;
     if (this.watch <= 0) {

@@ -109,7 +109,6 @@ export class Radio implements Feature {
     this.pool = null;
     this.casts.clear();
   };
-  private bulletins = 0;
   private passClock = 0;
   private lastCallAt = -1e9;
   private readonly passed = new Map<string, number>();
@@ -416,7 +415,7 @@ export class Radio implements Feature {
       const c = fallen[fallen.length - 1];
       if (c) {
         const at = this.whereIs(c.vessel);
-        const text = c.kind === 'bulletin' ? bulletin(this.outlook(), this.bulletins++) : c.text;
+        const text = c.kind === 'bulletin' ? bulletin(this.outlook(), Math.floor(c.t / 3600)) : c.text;
         this.air({
           from: c.from, text, voice: c.vessel, role: c.role, accent: c.accent, x: at?.x, y: at?.y,
           answer: c.answer ? { from: c.answer.from, text: c.answer.text, voice: c.answer.vessel, role: c.answer.role } : undefined,
@@ -587,6 +586,8 @@ export class Radio implements Feature {
 
   /** Stop a call that is being spoken, and let go of any that were waiting: a real voice has the channel. */
   private hush(): void {
+    // What was waiting to be said is at least written down.
+    for (const w of this.waiting) this.ctx.heard(w.from, w.text);
     this.waiting.length = 0;
     if (this.nextTimer !== null) clearTimeout(this.nextTimer);
     this.nextTimer = null;
