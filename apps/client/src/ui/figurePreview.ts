@@ -116,10 +116,10 @@ export class FigurePreview {
 
   private draw(aspect: number, yaw: number, close: number): void {
     this.pose(yaw);
-    const tall = this.figure.tall;
-    const headY = 0.08 + 1.405 * tall + 0.19;
-    const lookY = THREE.MathUtils.lerp(0.98 * tall + 0.06, headY, close);
-    const dist = THREE.MathUtils.lerp(4.9, 1.75, close) / Math.min(1, aspect * 1.9);
+    // The whole figure is framed for a middling one, so a tall figure looks tall. Close in, the camera goes to the head wherever it is.
+    const headY = 0.08 + 1.405 * this.figure.tall + 0.26;
+    const lookY = THREE.MathUtils.lerp(1.02, headY, close);
+    const dist = THREE.MathUtils.lerp(5.6, 1.45, close) / Math.min(1, aspect * 1.9);
     this.camera.aspect = aspect;
     this.camera.position.set(0, lookY + 0.25 * (1 - close), -dist);
     this.camera.lookAt(0, lookY, 0);

@@ -580,3 +580,10 @@ body:not(.lobby):has(#readout.hidden) .boardlink { left: var(--edge-left); }
   body.has-account:not(.lobby) .hails { bottom: calc(var(--edge-bottom) + 86px); }
   body.has-account:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 84px); }
 }
+/* The board on a phone: six tabs take a row of their own under the name. */
+@media (max-width: 560px) {
+  .board-frame > header { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
+  .board-frame h2 { flex: 1; }
+  .board-frame nav { order: 3; flex: 1 0 100%; }
+  .board-frame nav button { padding: 6px 9px; font-size: 12.5px; }
+}
