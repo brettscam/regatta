@@ -366,7 +366,8 @@ export class Wildlife implements Feature {
     if (nearest && this.quiet <= 0) {
       this.met.add(nearest);
       this.quiet = BETWEEN_REMARKS;
-      sight(nearest);
+      // The first time ever for this kind, on this device, goes in the logbook.
+      if (sight(nearest) === 1) ctx.logbook.count('seen');
       ctx.say(`${where}: ${FIELD_GUIDE[nearest].first}`, 12);
     }
     this.room(now);
