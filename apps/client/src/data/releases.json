@@ -1,6 +1,18 @@
 {
   "notes": [
     {
+      "id": "v19",
+      "date": "2026-11-14",
+      "title": "One boat for the race, a spinnaker, and wind that bites",
+      "items": [
+        "One-design racing. Whoever calls or fixes a race chooses the class, and everyone who joins sails that boat for the race, in their own name and colours. Pace boats too. You get your own boat back afterwards.",
+        "A spinnaker. N hoists and douses it once the wind is aft of the beam; Q and E work its sheet. It is worth up to a sixth more speed on a broad reach. Carry it too close to the wind or in too much breeze and she broaches. It has to come down before a tack.",
+        "Hard wind knocks her down. On the blowy afternoon, full sail with the sheets pinned in 24 knots and more lays her flat. Ease the main with S as the gust hits, or reef.",
+        "Reefing. J puts a reef in the mainsail, Shift and J shakes it out. One reef makes 20 to 25 knots sailable.",
+        "Pace boats set spinnakers downwind and reef when it blows."
+      ]
+    },
+    {
       "id": "v18",
       "date": "2026-11-14",
       "title": "A blowy afternoon",

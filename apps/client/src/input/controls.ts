@@ -319,7 +319,7 @@ export class Controls {
         }
         break;
       case 'KeyN': this.spinnaker(); break;
-      case 'KeyV': this.reef(e.shiftKey ? -1 : 1); break;
+      case 'KeyJ': this.reef(e.shiftKey ? -1 : 1); break;
       case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
       case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
       case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
@@ -353,17 +353,17 @@ export class Controls {
     }
   }
 
-  /** V puts in the next reef, Shift+V shakes one out. */
+  /** J puts in the next reef, Shift+J shakes one out. (V is the radio.) */
   private reef(step: number): void {
     const sim = this.sim;
     const reefs = sim.boat.sails.main.reefs;
     const now = sim.state.reef;
     const next = Math.max(0, Math.min(reefs.length - 1, now + step));
     if (sim.state.hold !== 'none') return this.host.announce('The main is stowed. Reef once she is under way');
-    if (next === now) return this.host.announce(step > 0 ? `${reefs[now].name} is as small as the main goes. Shift+V shakes a reef out` : 'Full main already. V puts a reef in');
+    if (next === now) return this.host.announce(step > 0 ? `${reefs[now].name} is as small as the main goes. Shift+J shakes a reef out` : 'Full main already. J puts a reef in');
     sim.setControl('reef', next);
     this.host.controlUsed('reef');
-    this.host.announce(next === 0 ? 'Reef shaken out. Full main' : step > 0 ? `${reefs[next].name} in: less sail, less heel. Shift+V shakes it out when the wind eases` : `Back to ${reefs[next].name.toLowerCase()}`);
+    this.host.announce(next === 0 ? 'Reef shaken out. Full main' : step > 0 ? `${reefs[next].name} in: less sail, less heel. Shift+J shakes it out when the wind eases` : `Back to ${reefs[next].name.toLowerCase()}`);
   }
 
   /** True while a key is down. */

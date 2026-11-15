@@ -181,6 +181,20 @@
           "area": "world",
           "title": "The real skyline",
           "text": "The towers, piers, Alcatraz and both bridges a Bay sailor steers by, lit at dusk."
+        },
+        {
+          "id": "onedesign",
+          "status": "shipped",
+          "area": "multiplayer",
+          "title": "One-design racing",
+          "text": "Everyone in a race sails the same boat, chosen by whoever calls it."
+        },
+        {
+          "id": "spin1",
+          "status": "shipped",
+          "area": "experience",
+          "title": "Spinnaker, reefing and knockdowns",
+          "text": "An asymmetric spinnaker for off the wind, a reef for when it blows, and a boat that goes over if you carry too much."
         }
       ],
       "theme": ""
@@ -419,8 +433,8 @@
         {
           "id": "reef",
           "status": "next",
-          "title": "Jib alone, main alone, or both",
-          "text": "Roll the jib away or drop the main by hand and sail under either sail. The physics already reefs and furls; it needs the controls, and a main that can come right down.",
+          "title": "Jib alone or main alone",
+          "text": "Roll the jib away or drop the main right down and sail under either sail.",
           "area": "experience"
         },
         {
@@ -443,13 +457,6 @@
           "title": "Night and fog",
           "text": "Navigation lights, lit buoys, the city at night, and San Francisco's fog.",
           "area": "world"
-        },
-        {
-          "id": "spinnaker",
-          "status": "later",
-          "title": "Spinnakers",
-          "text": "An asymmetric first, then a pole, guys and a preventer.",
-          "area": "experience"
         },
         {
           "id": "wildlife",
@@ -516,7 +523,7 @@
         },
         {
           "id": "engine",
-          "status": "later",
+          "status": "building",
           "area": "experience",
           "title": "The engine",
           "text": "Motor in and out of harbour and through a calm, with a fuel gauge and a battery to keep an eye on."

@@ -368,7 +368,7 @@ export class Session {
     // The boom came across on its own.
     const windKt = Math.round(o.tws / KT);
     if (sim.state.broaches > watch.broaches) this.alarm(`Broached under the spinnaker in ${windKt} kt. It has collapsed and she will come up. Get it down with N${windKt >= (this.spec.sails.spinnaker?.maxTwsKt ?? 21) ? ': this is too much wind for it' : ', or bear away before it fills again'}`);
-    else if (sim.state.knockdowns > watch.knockdowns && sim.state.crashGybes === watch.crashGybes) this.alarm(`Knocked down: ${windKt} kt on ${this.spec.sails.main.reefs[sim.state.reef]?.name.toLowerCase() ?? 'this much sail'} with the sheets in. She will come up. Let the main out with S, and reef with V before the next gust`);
+    else if (sim.state.knockdowns > watch.knockdowns && sim.state.crashGybes === watch.crashGybes) this.alarm(`Knocked down: ${windKt} kt on ${this.spec.sails.main.reefs[sim.state.reef]?.name.toLowerCase() ?? 'this much sail'} with the sheets in. She will come up. Let the main out with S, and reef with J before the next gust`);
     else if (sim.state.knockdowns > watch.knockdowns) this.alarm(`Knocked down. Crash gybe in ${windKt} kt with the main let out. She will come up: ease the sheets`);
     else if (sim.state.crashGybes > watch.crashGybes) this.alarm('Crash gybe. Haul the main in before the boom comes across, or press T and the crew tends it');
     if (sim.state.spinWraps > watch.wraps && sim.state.broaches === watch.broaches) this.alarm('The spinnaker has wrapped round the forestay. It is doing nothing: take it down with N, then set it again');
