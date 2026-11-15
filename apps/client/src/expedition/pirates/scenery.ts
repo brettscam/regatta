@@ -26,7 +26,7 @@ export class Towns {
       node.rotation.y = Math.PI - port.seaward;
       // The town stands on a spit run out from the shore toward the anchorage, as Port Royal does on the Palisadoes:
       // the made coast is drawn too coarsely, and shelves too slowly, for a ship to lie under houses on the shore itself.
-      const reach = Math.max(900, Math.hypot(port.x - port.townX, port.y - port.townY) - 1100);
+      const reach = Math.hypot(port.headX - port.townX, port.headY - port.townY);
       const head = 900 + reach;
       const mole = new THREE.Mesh(new THREE.BoxGeometry(420, 7, head + 250), quay);
       mole.position.set(0, 0.2, (head - 250) / 2);

@@ -87,7 +87,7 @@ function handle(h: Hand, foe: LiveShip, wantBoard: boolean): GameEvent[] {
   for (const side of ['port', 'starboard'] as const) {
     if (h.game.reload[side] <= 0 && h.game.bearsOn(side, h.me()) === foe && foe.mood !== 'struck' && !(boardNow && foe.range < 60)) h.game.fire(side, h.me(), h.env);
   }
-  if (boardNow && h.game.boardable(h.me()).ship === foe) h.game.board(h.me());
+  if ((boardNow || foe.mood === 'struck') && h.game.boardable(h.me()).ship === foe) h.game.board(h.me());
   void me;
   return h.game.drain();
 }

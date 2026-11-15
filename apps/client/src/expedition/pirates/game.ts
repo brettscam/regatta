@@ -1,4 +1,4 @@
-import { board, boardingOdds, BOARD_RANGE, BOARD_SPEED, type BoardingResult, type Party } from './boarding';
+import { board, boardingOdds, BOARD_RANGE, BOARD_SPEED, POSSESS_RANGE, type BoardingResult, type Party } from './boarding';
 import { PORT_REACH, type Caribbean, type LanePath, type PortPlace } from './caribbean';
 import { saveCareer, type Career, type ShipState } from './career';
 import { bearing, bears, broadside, driveLeft, gunsServed, reloadSeconds, roll, MAX_RANGE, type Harm, type Mark, type Side } from './gunnery';
@@ -84,7 +84,7 @@ export interface LiveShip extends Mark {
 
 export type GameEvent =
   | { kind: 'say'; text: string; seconds?: number; wake?: boolean }
-  | { kind: 'sight'; ship: LiveShip; text: string }
+  | { kind: 'sight'; ship: LiveShip; text: string; first: boolean }
   | { kind: 'fire'; mine: boolean; from: { x: number; y: number; heading: number }; side: Side; at: { x: number; y: number }; range: number; harm: Harm; fort?: boolean }
   | { kind: 'boarding'; mine: boolean; ship: LiveShip; result: BoardingResult; odds: number }
   | { kind: 'prize'; ship: LiveShip; prize: Prize; taken: Hold; gunsTaken: number; joined: number }
@@ -277,7 +277,7 @@ export class PirateGame {
     const rank = (s: Sight | null) => (s === null ? 0 : s === 'tops' ? 1 : s === 'hull' ? 2 : s === 'colours' ? 3 : 4);
     if (rank(now) > rank(ship.seen)) {
       // The first sight of her calls the skipper. So does the moment her colours can be read.
-      if (ship.seen === null || now === 'colours') this.events.push({ kind: 'sight', ship, text: describe(now!, ship.cls, ship.nation, ship.range, ship.bearing, ship.heading) });
+      if (ship.seen === null || now === 'colours') this.events.push({ kind: 'sight', ship, first: ship.seen === null, text: describe(now!, ship.cls, ship.nation, ship.range, ship.bearing, ship.heading) });
       ship.seen = now;
     } else if (now === null) ship.seen = null;
   }
@@ -432,21 +432,21 @@ export class PirateGame {
     this.events.push({ kind: 'lost', why });
   }
 
-  /** The guns of a port that is shut to her open when she comes within a mile. */
+  /** The guns of a port that is shut to her open when she comes within a mile and a half of its fort. */
   private forts(dt: number, me: Me): void {
     this.fortClock -= dt;
     if (this.fortClock > 0) return;
     this.fortClock = 26;
     for (const port of this.sea.ports) {
       if (!portShut(port, this.career.notoriety)) continue;
-      const range = Math.hypot(port.townX - me.x, port.townY - me.y);
-      if (range > 2600) continue;
+      const range = Math.hypot(port.headX - me.x, port.headY - me.y);
+      if (range > 2800) continue;
       // Heavy guns on a steady platform: they reach four times as far as a sloop's, and hit harder.
       const harm = broadside(6, 18, {
-        range: range / 4.5, side: 'port', heel: 0, sea: 0, gunnery: 0.8, aspect: wrap(Math.atan2(me.x - port.townX, me.y - port.townY) - me.heading),
+        range: range / 4.5, side: 'port', heel: 0, sea: 0, gunnery: 0.8, aspect: wrap(Math.atan2(me.x - port.headX, me.y - port.headY) - me.heading),
         targetLoa: this.cls.loa, targetBeam: this.cls.beam,
       }, this.seed + 500 * ++this.salvo);
-      this.events.push({ kind: 'fire', mine: false, fort: true, from: { x: port.townX, y: port.townY, heading: 0 }, side: 'port', at: { x: me.x, y: me.y }, range, harm });
+      this.events.push({ kind: 'fire', mine: false, fort: true, from: { x: port.headX, y: port.headY, heading: 0 }, side: 'port', at: { x: me.x, y: me.y }, range, harm });
       this.say(`The fort at ${port.name} has opened on us. That port is shut to this ship`, 7, true);
       this.hurt(harm);
     }
@@ -499,13 +499,13 @@ export class PirateGame {
       this.say(`${capital(tell)}. She is going down, and all she carried with her`, 8);
       return true;
     }
-    if (ship.mood === 'struck') return this.say(`${capital(tell)}. She has struck: B boards her`, 5), true;
+    if (ship.mood === 'struck') return this.say(`${capital(tell)}. She has struck: B sends the boat`, 5), true;
     const mine = this.ownParty();
     const hers = this.party(ship);
     const overmatch = ship.range < 260 ? (mine.men * mine.fight) / Math.max(1, hers.men * hers.fight) : 0;
     if (strikes(ship.cls, ship.hull / ship.cls.hull, ship.crew / ship.cls.crew, ship.rigging / 100, overmatch, ship.seed + ship.salvo + this.salvo)) {
       ship.mood = 'struck';
-      this.say(`${capital(tell)}. She has struck her colours. Lay her alongside and B takes possession`, 9);
+      this.say(`${capital(tell)}. She has struck her colours. Come within ${POSSESS_RANGE} yards and B sends the boat to take possession`, 9);
     } else {
       if (ship.cls.kind !== 'merchant') ship.mood = 'fight';
       else if (ship.mood === 'cruise') ship.mood = 'flee';
@@ -522,6 +522,8 @@ export class PirateGame {
       if (!near || ship.range < near.range) near = ship;
     }
     if (!near) return { ship: null, why: 'No ship near to board' };
+    // A ship that has struck waits for the boat: there is no need to lay her aboard.
+    if (near.mood === 'struck') return near.range <= POSSESS_RANGE ? { ship: near, why: '' } : { ship: null, why: `She has struck. Come within ${POSSESS_RANGE} yards and the boat will be sent across: she is ${Math.round(near.range)} off` };
     if (near.range > BOARD_RANGE) return { ship: null, why: `Too far to board: ${Math.round(near.range)} yards, and the grapnels reach ${BOARD_RANGE}` };
     const closing = Math.hypot(Math.sin(me.heading) * me.speed - Math.sin(near.heading) * near.speed, Math.cos(me.heading) * me.speed - Math.cos(near.heading) * near.speed);
     if (closing > BOARD_SPEED) return { ship: null, why: 'She is going by too fast to grapple. Come onto her course and ease sheets' };

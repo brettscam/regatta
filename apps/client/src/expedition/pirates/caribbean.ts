@@ -140,8 +140,9 @@ export function squallAt(x: number, y: number, hours: number, seed: number): num
     for (let i = ci - 1; i <= ci + 1; i++) {
       // More of them in the afternoon would be truer. One cell in four has one at any time.
       if (hash2(i * 31 + slot, j * 17 - slot, seed + 60) > 0.26) continue;
-      const sx = (i + 0.2 + 0.6 * hash2(i, j + slot, seed + 61)) * SQUALL_CELL;
-      const sy = (j + 0.2 + 0.6 * hash2(i + slot, j, seed + 62)) * SQUALL_CELL;
+      // Anywhere in its cell: kept to the middle, there would be latitudes no squall ever crossed.
+      const sx = (i + hash2(i, j + slot, seed + 61)) * SQUALL_CELL;
+      const sy = (j + hash2(i + slot, j, seed + 62)) * SQUALL_CELL;
       const reach = 5000 + 5000 * hash2(i, j, seed + 63 + slot);
       const d = Math.hypot(mx - sx, y - sy) / reach;
       if (d >= 1) continue;
@@ -273,6 +274,9 @@ export interface PortPlace extends Port {
   y: number;
   /** The bearing of the open sea from the town, radians. */
   seaward: number;
+  /** The head of the spit the town and its fort stand on, between the shore and the anchorage. */
+  headX: number;
+  headY: number;
 }
 
 export interface LanePath extends Lane {
@@ -332,7 +336,8 @@ export function buildCaribbean(seed: number): Caribbean {
         break;
       }
     }
-    return { ...p, townX: town.x, townY: town.y, x: best.x, y: best.y, seaward: best.seaward };
+    const reach = Math.max(900, Math.hypot(best.x - town.x, best.y - town.y) - 1100);
+    return { ...p, townX: town.x, townY: town.y, x: best.x, y: best.y, seaward: best.seaward, headX: town.x + Math.sin(best.seaward) * reach, headY: town.y + Math.cos(best.seaward) * reach };
   });
 
   const lanes = LANES.map((lane): LanePath => {

@@ -8,8 +8,10 @@ import { roll } from './gunnery';
 // one and its heart fails the roll. At most six rounds: then whoever has more strength left carries it.
 
 /** Metres within which grapnels will reach, and the most she may be moving through the water relative to the other, m/s. */
-export const BOARD_RANGE = 55;
-export const BOARD_SPEED = 2.6;
+export const BOARD_RANGE = 65;
+export const BOARD_SPEED = 3.2;
+/** Metres within which a boat can be sent to take possession of a ship that has struck. */
+export const POSSESS_RANGE = 160;
 
 /** What men fighting on their own deck are worth against men coming over the rail. */
 export const OWN_DECK = 1.4;

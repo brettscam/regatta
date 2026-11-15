@@ -12,7 +12,7 @@ import type { Stage } from '../../stage';
 import { PeriodHud } from '../instruments';
 import { significantHeight } from '../swell';
 import { sightingRange } from '../wake';
-import { WATCH_RATE, WATCH_STEP, HOVE_TO_DRIFT, measurePerformance, sailPlanFor, watchStep, type Performance, type WatchRig } from '../watch';
+import { WATCH_RATE, WATCH_STEP, HOVE_TO_DRIFT, measurePerformance, sailPlanFor, watchStep, type Performance } from '../watch';
 import { boardingOdds } from './boarding';
 import { CARIBBEAN, PORT_REACH, SEA_GAIN, squallAt, type Caribbean } from './caribbean';
 import { afterLoss, saveCareer, type Career } from './career';
@@ -22,6 +22,7 @@ import { PirateGame, heart, type Env, type GameEvent, type LiveShip, type Me } f
 import { driveLeft, gunsServed, heelEffect, type Side } from './gunnery';
 import { holdTons } from './loot';
 import { Palms, ShoalMap, Towns } from './scenery';
+import { SLOOP_RIG } from './rig';
 import { PeriodShip, lookOf } from './shipModel';
 import { describe as describeSail, visibility } from './sighting';
 import { SloopView } from './sloopView';
@@ -33,21 +34,11 @@ const NM = 1852;
 const REBASE = 6000;
 /** Game seconds between points kept on her track. */
 const TRACK_EVERY = 900;
-/** The fastest the clock is run while the helmsman is cutting off a chase, and the range at which it comes back to real time. */
-const CHASE_RATE = 5;
-const CHASE_REAL = 420;
+/** How fast the clock runs by itself while the helmsman is cutting off a chase (indexes into the time rates: 64 and 16 times), and the range in metres at which it comes back to real time. */
+const CHASE_FAR = 6;
+const CHASE_NEAR = 4;
+const CHASE_REAL = 400;
 const EARTH = 6371000;
-
-/** How the sloop is sailed through a watch. */
-export const SLOOP_RIG: WatchRig = {
-  fullAndBy: 52,
-  plans: [{ reef: 0, furl: 1, name: 'All plain sail' }, { reef: 1, furl: 1, name: 'A reef in the main' }, { reef: 2, furl: 0, name: 'Double-reefed, jib handed' }],
-  shorten: [22, 30],
-  shakeOut: [18, 26],
-  heaveTo: 48,
-  makeSail: 40,
-  tws: [4, 8, 12, 16, 21.9, 22, 26, 29.9, 30, 36, 44],
-};
 
 // Camera views sized for a 60 ft sloop. The yachts' views are put back when the cruise is left.
 const SLOOP_VIEWS: Record<string, ViewPreset> = {
@@ -598,6 +589,11 @@ export class PirateSession {
     const env = this.env();
     this.game.step(seconds, this.me(), env, this.see(env));
     let quiet = this.pump(true);
+    // The chase is nearly within shot: no more watch below.
+    if (quiet && her && her.range < 1000) {
+      this.alarm(`The ${her.cls.name} is half a mile off, ${compassWords(her.bearing)}. All hands. The helmsman still has the chase: Z and C when she bears, B alongside`, 10);
+      quiet = false;
+    }
     if (quiet) quiet = this.lookOut(env, res.aground);
     return quiet && this.phase === 'sailing';
   }
@@ -693,8 +689,8 @@ export class PirateSession {
       if (e.kind === 'say') {
         if (e.wake) { this.alarm(e.text, e.seconds); quiet = false; } else this.say(e.text, e.seconds);
       } else if (e.kind === 'sight') {
-        this.alarm(`Sail ho. ${e.text}`, 10);
-        quiet = false;
+        // A new sail calls the skipper. A sail already in sight coming near enough to read her colours is only reported.
+        if (e.first) { this.alarm(`Sail ho. ${e.text}`, 10); quiet = false; } else this.say(e.text, 8);
       } else if (e.kind === 'fire') {
         quiet = false;
         if (this.onWatch) this.endWatch();
@@ -805,7 +801,7 @@ export class PirateSession {
     if (this.chasing && (!her || this.hoveTo)) this.chasing = false;
     // In chase the clock runs on by itself until she is within long gunshot.
     if (sailing && this.chasing && her && !this.onWatch) {
-      const want = her.range > 2500 ? CHASE_RATE : her.range > CHASE_REAL ? 3 : 0;
+      const want = her.range > 2500 ? CHASE_FAR : her.range > CHASE_REAL ? CHASE_NEAR : 0;
       if (want !== this.rateIndex) { this.rateIndex = want; this.hud?.setRate(want); }
     }
     const rate = this.onWatch ? WATCH_RATE : TIME_RATES[this.rateIndex];
@@ -1053,7 +1049,7 @@ export class PirateSession {
       const close = seen === 'close' || seen === 'colours';
       const ours = { men: own.crew, fight: game.cls.fight, heart: heart(own.hull / game.cls.hull, Math.min(1, own.crew / game.cls.crew)) };
       const hers = { men: g.crew, fight: g.cls.fight, heart: heart(g.hull / g.cls.hull, g.crew / g.cls.crew) };
-      const mood = g.mood === 'struck' ? 'She has struck. Lay her alongside: B takes possession' : g.mood === 'flee' ? 'Running from us' : g.mood === 'fight' ? 'Standing toward us to fight' : g.mood === 'sinking' ? 'Going down' : '';
+      const mood = g.mood === 'struck' ? 'She has struck. Come close: B sends the boat' : g.mood === 'flee' ? 'Running from us' : g.mood === 'fight' ? 'Standing toward us to fight' : g.mood === 'sinking' ? 'Going down' : '';
       glass = {
         title: seen === 'tops' ? 'A sail' : seen === 'hull' ? g.cls.rigWords.split(':').pop()!.trim() : g.cls.name,
         line: describeSail(seen, g.cls, g.nation, g.range, g.bearing, g.heading),
