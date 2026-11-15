@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { SimOutputs, SimState } from '@slack-tide/sim';
 import type { SloopModel } from './buildSloop';
 import type { BoatPose } from './boatView';
+import { DEFAULT_AVATAR, MATE_AVATAR, mateFor, type Avatar } from './avatar';
+import { SPINE, dress, type Look } from './wardrobe';
 
 // Two people on the boat: one at the wheel, one on the windward cockpit seat.
 // Each figure is a handful of fixed-length limbs laid between joints that are worked out every frame
@@ -21,14 +23,6 @@ const t2 = new THREE.Vector3();
 const t3 = new THREE.Vector3();
 const basis = new THREE.Matrix4();
 
-interface Kit {
-  jacket: number;
-  vest: number;
-  trousers: number;
-  skin: number;
-  cap: number;
-}
-
 // Shared shapes for both figures.
 const GEO = {
   thigh: new THREE.CapsuleGeometry(0.068, THIGH, 1, 5),
@@ -37,10 +31,6 @@ const GEO = {
   forearm: new THREE.CapsuleGeometry(0.044, FOREARM, 1, 5),
   torso: new THREE.CapsuleGeometry(0.13, 0.36, 2, 7),
   vest: new THREE.CapsuleGeometry(0.143, 0.14, 2, 7),
-  head: new THREE.SphereGeometry(0.105, 8, 6),
-  cap: new THREE.SphereGeometry(0.112, 8, 3, 0, Math.PI * 2, 0, Math.PI / 2),
-  brim: new THREE.BoxGeometry(0.15, 0.012, 0.1),
-  shades: new THREE.BoxGeometry(0.17, 0.036, 0.03),
   hand: new THREE.SphereGeometry(0.046, 6, 4),
   foot: new THREE.BoxGeometry(0.1, 0.075, 0.25),
 };
@@ -94,6 +84,13 @@ export class Figure {
   private readonly torso: THREE.Mesh;
   private readonly vest: THREE.Mesh;
   private readonly head = new THREE.Group();
+  /** What rides on the torso: stripes, a sash, coat tails. */
+  private readonly body = new THREE.Group();
+  private readonly mats: Record<'torso' | 'upperArm' | 'forearm' | 'thigh' | 'shin' | 'hand' | 'foot' | 'vest', THREE.MeshStandardMaterial>;
+  private kit: Look | null = null;
+  /** Limb length against a middling figure's. Whoever poses the figure stands or sits it this much taller. */
+  tall = 1;
+  private wide = 1;
   private readonly limbs: Record<'thighL' | 'thighR' | 'shinL' | 'shinR' | 'upperL' | 'upperR' | 'foreL' | 'foreR', THREE.Mesh>;
   private readonly hands: [THREE.Mesh, THREE.Mesh];
   private readonly feet: [THREE.Mesh, THREE.Mesh];
@@ -106,37 +103,55 @@ export class Figure {
   private readonly end = new THREE.Vector3();
   private readonly ankle = new THREE.Vector3();
 
-  constructor(name: string, kit: Kit) {
+  constructor(name: string, avatar: Avatar = DEFAULT_AVATAR) {
     this.group.name = name;
-    const mat = (color: number, roughness = 0.85) => new THREE.MeshStandardMaterial({ color, roughness });
-    const jacket = mat(kit.jacket, 0.7);
-    const vest = mat(kit.vest);
-    const trousers = mat(kit.trousers);
-    const skin = mat(kit.skin, 0.75);
-    const cap = mat(kit.cap);
-    const dark = mat(0x16181b, 0.5);
-    const part = (g: THREE.BufferGeometry, m: THREE.Material, parent: THREE.Object3D = this.group) => {
-      const mesh = new THREE.Mesh(g, m);
+    const mat = (roughness = 0.85) => new THREE.MeshStandardMaterial({ roughness });
+    const m = this.mats = { torso: mat(0.7), upperArm: mat(0.7), forearm: mat(0.7), thigh: mat(), shin: mat(), hand: mat(0.75), foot: mat(0.5), vest: mat() };
+    const part = (g: THREE.BufferGeometry, material: THREE.Material) => {
+      const mesh = new THREE.Mesh(g, material);
       mesh.castShadow = true;
-      parent.add(mesh);
+      this.group.add(mesh);
       return mesh;
     };
-    this.torso = part(GEO.torso, jacket);
-    this.vest = part(GEO.vest, vest);
+    this.torso = part(GEO.torso, m.torso);
+    this.vest = part(GEO.vest, m.vest);
     this.limbs = {
-      thighL: part(GEO.thigh, trousers), thighR: part(GEO.thigh, trousers),
-      shinL: part(GEO.shin, trousers), shinR: part(GEO.shin, trousers),
-      upperL: part(GEO.upperArm, jacket), upperR: part(GEO.upperArm, jacket),
-      foreL: part(GEO.forearm, jacket), foreR: part(GEO.forearm, jacket),
+      thighL: part(GEO.thigh, m.thigh), thighR: part(GEO.thigh, m.thigh),
+      shinL: part(GEO.shin, m.shin), shinR: part(GEO.shin, m.shin),
+      upperL: part(GEO.upperArm, m.upperArm), upperR: part(GEO.upperArm, m.upperArm),
+      foreL: part(GEO.forearm, m.forearm), foreR: part(GEO.forearm, m.forearm),
     };
-    this.hands = [part(GEO.hand, skin), part(GEO.hand, skin)];
-    this.feet = [part(GEO.foot, dark), part(GEO.foot, dark)];
-    // Head, built facing -Z: cap, brim and sunglasses show which way it is looking.
-    this.group.add(this.head);
-    part(GEO.head, skin, this.head);
-    part(GEO.cap, cap, this.head).position.y = 0.012;
-    part(GEO.brim, cap, this.head).position.set(0, 0.03, -0.14);
-    part(GEO.shades, dark, this.head).position.set(0, 0.005, -0.092);
+    this.hands = [part(GEO.hand, m.hand), part(GEO.hand, m.hand)];
+    this.feet = [part(GEO.foot, m.foot), part(GEO.foot, m.foot)];
+    // The head is built facing -Z: face, hair and hat show which way it is looking.
+    this.group.add(this.head, this.body);
+    this.wear(avatar);
+  }
+
+  /** Dress the figure as this avatar. Can be called again at any time: the pose is kept. */
+  wear(avatar: Avatar): void {
+    this.kit?.dispose();
+    this.head.clear();
+    this.body.clear();
+    const look = this.kit = dress(avatar);
+    this.tall = look.tall;
+    this.wide = look.wide;
+    const m = this.mats;
+    m.torso.color.setHex(look.torso);
+    m.upperArm.color.setHex(look.upperArm);
+    m.forearm.color.setHex(look.forearm);
+    m.thigh.color.setHex(look.thigh);
+    m.shin.color.setHex(look.shin);
+    m.hand.color.setHex(look.hand);
+    m.foot.color.setHex(look.foot);
+    this.vest.visible = look.vest !== null;
+    if (look.vest !== null) m.vest.color.setHex(look.vest);
+    this.head.add(look.head);
+    this.body.add(look.body);
+    // Limbs as long and as thick as the build says.
+    const limb = 0.5 + 0.5 * look.wide;
+    for (const mesh of Object.values(this.limbs)) mesh.scale.set(limb, look.tall, limb);
+    for (const hand of this.hands) hand.scale.setScalar(look.handScale * limb);
   }
 
   apply(): void {
@@ -149,27 +164,34 @@ export class Figure {
     basis.makeBasis(x, dir, z);
     this.torso.quaternion.setFromRotationMatrix(basis);
     this.torso.position.copy(this.pelvis).addScaledVector(dir, len * 0.5);
-    this.torso.scale.set(1.28, len / TORSO, 0.88);
+    const wide = this.wide;
+    // A stout figure carries more of it in front than across.
+    const deep = wide * (wide > 1 ? wide : 1);
+    const tall = this.tall;
+    this.torso.scale.set(1.28 * wide, len / TORSO, 0.88 * deep);
     this.vest.quaternion.copy(this.torso.quaternion);
     this.vest.position.copy(this.pelvis).addScaledVector(dir, len * 0.68);
-    this.vest.scale.set(1.28, 1, 0.92);
+    this.vest.scale.set(1.28 * wide, len / TORSO, 0.92 * deep);
+    this.body.quaternion.copy(this.torso.quaternion);
+    this.body.position.copy(this.pelvis);
+    this.body.scale.set(wide, len / SPINE, deep);
 
     for (const side of [-1, 1]) {
       const L = side < 0;
       // Leg.
-      this.root.copy(this.pelvis).addScaledVector(x, side * 0.095).addScaledVector(dir, -0.02);
+      this.root.copy(this.pelvis).addScaledVector(x, side * 0.095 * wide).addScaledVector(dir, -0.02);
       const foot = L ? this.footL : this.footR;
       this.ankle.copy(foot);
       this.ankle.y += ANKLE;
-      reach(this.root, this.ankle, THIGH, SHIN, this.kneeHint, this.joint, this.end);
+      reach(this.root, this.ankle, THIGH * tall, SHIN * tall, this.kneeHint, this.joint, this.end);
       layBetween(L ? this.limbs.thighL : this.limbs.thighR, this.root, this.joint);
       layBetween(L ? this.limbs.shinL : this.limbs.shinR, this.joint, this.end);
       const shoe = this.feet[L ? 0 : 1];
       shoe.position.set(this.end.x + this.fwd.x * 0.06, this.end.y - ANKLE + 0.04, this.end.z + this.fwd.z * 0.06);
       shoe.rotation.set(0, Math.atan2(-this.fwd.x, -this.fwd.z), 0);
       // Arm.
-      this.root.copy(this.neck).addScaledVector(x, side * 0.2).addScaledVector(dir, -0.05);
-      reach(this.root, L ? this.handL : this.handR, UPPER_ARM, FOREARM, L ? this.elbowHintL : this.elbowHintR, this.joint, this.end);
+      this.root.copy(this.neck).addScaledVector(x, side * 0.2 * (0.35 + 0.65 * wide)).addScaledVector(dir, -0.05);
+      reach(this.root, L ? this.handL : this.handR, UPPER_ARM * tall, FOREARM * tall, L ? this.elbowHintL : this.elbowHintR, this.joint, this.end);
       layBetween(L ? this.limbs.upperL : this.limbs.upperR, this.root, this.joint);
       layBetween(L ? this.limbs.foreL : this.limbs.foreR, this.joint, this.end);
       this.hands[L ? 0 : 1].position.copy(this.end);
@@ -203,12 +225,18 @@ export class Crew {
   private readonly w = new THREE.Vector3();
 
   constructor(private readonly model: SloopModel) {
-    this.helm = new Figure('crew_helm', { jacket: 0xc2281d, vest: 0x2a2d33, trousers: 0x1f2630, skin: 0xc99a7a, cap: 0x1b2a4a });
-    this.trim = new Figure('crew_trim', { jacket: 0xe3b21c, vest: 0x1d2a44, trousers: 0x2b2f36, skin: 0x8d5f43, cap: 0xe9e6dc });
+    this.helm = new Figure('crew_helm', DEFAULT_AVATAR);
+    this.trim = new Figure('crew_trim', MATE_AVATAR);
     for (const f of [this.helm, this.trim]) {
       model.root.add(f.group);
       model.nodes[f.group.name] = f.group;
     }
+  }
+
+  /** Dress the skipper at the wheel as this avatar. The hand on the seat keeps crew kit, or joins in a costume. */
+  setAvatar(avatar: Avatar): void {
+    this.helm.wear(avatar);
+    this.trim.wear(mateFor(avatar));
   }
 
   update(state: SimState, out: SimOutputs, pose: BoatPose, time: number, dt: number): void {
@@ -251,8 +279,8 @@ export class Crew {
     const sway = Math.sin(time * 0.61) * 0.012;
     f.footL.set(-0.17, sole, z + 0.03);
     f.footR.set(0.17, sole, z - 0.02);
-    f.pelvis.set(0, sole, z + 0.01).addScaledVector(f.up, 0.85).addScaledVector(f.right, sway);
-    f.neck.copy(f.pelvis).addScaledVector(f.up, TORSO + Math.sin(time * 1.7) * 0.005);
+    f.pelvis.set(0, sole, z + 0.01).addScaledVector(f.up, 0.85 * f.tall).addScaledVector(f.right, sway);
+    f.neck.copy(f.pelvis).addScaledVector(f.up, TORSO * f.tall + Math.sin(time * 1.7) * 0.005);
     f.neck.z -= 0.06;
     f.kneeHint.set(0, 0.2, -1);
 

@@ -7,6 +7,8 @@ import { Session } from './session';
 import { Stage } from './stage';
 import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
+import { myAvatar } from './boat/avatar';
+import { openHome } from './ui/home';
 import { JoinFlow, type Choice, type WaterView } from './ui/join';
 import { COURSES, DEFAULT_COURSE, hasCourse, loadCourse } from './world/loadCourse';
 
@@ -136,7 +138,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
   board.places = data.places;
   session = new Session(stage, {
     spec: BOATS[choice.boat],
-    livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort },
+    livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort, avatar: myAvatar() },
     x: num('x', spot.x),
     y: num('y', spot.y),
     headingDeg: params.has('hdg') ? num('hdg', 0) : undefined,
@@ -184,6 +186,29 @@ function begin(): void {
   }
   document.body.classList.add('lobby');
   lobby = new Lobby(stage, data.starts, BOATS);
+  // The front page first. A link to a race goes straight to the way in, as it always has.
+  if (params.has('race')) return wayIn();
+  const last = savedChoice();
+  openHome({
+    choice: raceNight(settle(last)),
+    returning: typeof last.spot === 'string' && typeof last.boat === 'string',
+    boats: BOATS,
+    waters: COURSES,
+    spots: data.starts,
+    show: (choice) => {
+      setClock(choice);
+      lobby?.show(choice, -1);
+    },
+    onSail: wayIn,
+    onCastOff: (choice) => castOff(choice),
+    onBoard: (tab) => board.toggle(true, tab),
+    // A second way to play is added here: { id, title, say, open }. See `HomeMode` in ui/home.ts.
+    modes: [],
+  });
+}
+
+/** The way in: where, lesson, boat. */
+function wayIn(): void {
   new JoinFlow({
     ...waterView(),
     waters: COURSES,

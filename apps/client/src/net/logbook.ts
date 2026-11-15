@@ -4,6 +4,7 @@
  * person's own id, where the rest of the fleet can read it. On the website the same happens once the person has
  * signed in, and anyone can read the fleet's. This is the seed of experience points and accounts.
  */
+import { myAvatarCode } from '../boat/avatar';
 import { account as askAccount, db as askDb, onWeb, user as askUser, type Db } from './platform';
 
 export interface LogTotals {
@@ -29,6 +30,8 @@ export interface Profile {
   boat: string;
   boatName: string;
   colour: string;
+  /** The skipper's figure, as `boat/avatar.ts` writes it. Check it with `readAvatar` before use. */
+  avatar?: string;
   log: LogTotals;
   updated: string;
 }
@@ -145,6 +148,7 @@ export class Logbook {
     const t = this.totals;
     const body: Profile = {
       ...this.who,
+      avatar: myAvatarCode(),
       log: { ...t, miles: r(t.miles, 100), hours: r(t.hours, 100), topKt: r(t.topKt, 10) },
       updated: new Date().toISOString(),
     };

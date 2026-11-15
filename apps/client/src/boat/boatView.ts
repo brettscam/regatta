@@ -5,6 +5,7 @@ import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './
 export type { BoatDisplay, Livery } from './buildSloop';
 import { Jib, Mainsail, type SailShape } from './sails';
 import { Crew } from './crew';
+import type { Avatar } from './avatar';
 
 const R2D = 180 / Math.PI;
 const KT = 0.514444;
@@ -124,6 +125,7 @@ export class BoatView {
     this.jib = new Jib(this.model.geo);
     this.root.add(this.main.mesh, this.jib.mesh);
     this.crew = new Crew(this.model);
+    if (livery.avatar) this.crew.setAvatar(livery.avatar);
     this.model.nodes.main = this.main.mesh;
     this.model.nodes.jib = this.jib.mesh;
 
@@ -466,6 +468,11 @@ export class BoatView {
    * Show the autopilot's state on its control head.
    * Redraws only when something changes.
    */
+  /** Dress the skipper at the wheel. */
+  setAvatar(avatar: Avatar): void {
+    this.crew.setAvatar(avatar);
+  }
+
   setPilot(info: { engaged: boolean; mode: 'heading' | 'wind' | 'route'; label: string }): void {
     const key = `${info.engaged}|${info.mode}|${info.label}`;
     if (key === this.pilotShown) return;

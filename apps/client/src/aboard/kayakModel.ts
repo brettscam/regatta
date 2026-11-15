@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Figure } from '../boat/crew';
+import type { Avatar } from '../boat/avatar';
 
 // The yacht's tender: a one-person sit-on kayak with a double-bladed paddle,
 // and a paddler built from the same limbs as the yacht's crew.
@@ -105,8 +106,11 @@ export class KayakModel {
   private readonly dir = new THREE.Vector3();
   private readonly low = new THREE.Vector3();
 
-  /** @param accent the yacht's topsides colour, for the deck */
-  constructor(accent: string | undefined) {
+  /**
+   * @param accent the yacht's topsides colour, for the deck
+   * @param avatar who is paddling: the skipper
+   */
+  constructor(accent: string | undefined, avatar?: Avatar) {
     this.root.name = 'kayak';
     this.root.rotation.order = 'YXZ';
     const mat = (color: THREE.ColorRepresentation, roughness = 0.6): THREE.MeshStandardMaterial => {
@@ -157,9 +161,14 @@ export class KayakModel {
     this.root.add(this.paddle);
 
     // The paddler is whoever was at the wheel: same jacket, same cap.
-    this.figure = new Figure('kayak_paddler', { jacket: 0xc2281d, vest: 0x2a2d33, trousers: 0x1f2630, skin: 0xc99a7a, cap: 0x1b2a4a });
+    this.figure = new Figure('kayak_paddler', avatar);
     this.root.add(this.figure.group);
     this.setManned(false);
+  }
+
+  /** Dress the paddler. */
+  setAvatar(avatar: Avatar): void {
+    this.figure.wear(avatar);
   }
 
   /** With nobody in her the paddle lies along the deck. */
@@ -229,7 +238,7 @@ export class KayakModel {
     const reach = e * (1 - along);
     const twist = -sgn * 0.38 * e * (0.5 - along) * 2 * (1 - crossing);
     f.right.set(Math.cos(twist), 0, Math.sin(twist));
-    f.neck.set(px, py + 0.52 - 0.05 * reach + Math.sin(time * 1.5) * 0.004, pz - 0.07 - 0.22 * reach);
+    f.neck.set(px, py + 0.52 * f.tall - 0.05 * reach + Math.sin(time * 1.5) * 0.004, pz - 0.07 - 0.22 * reach);
     f.footL.set(-0.085, 0.215, pz - 0.76);
     f.footR.set(0.085, 0.215, pz - 0.76);
     f.kneeHint.set(0, 1, -0.25);

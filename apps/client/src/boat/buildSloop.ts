@@ -18,6 +18,8 @@ export interface Livery {
   name?: string;
   /** Hailing port under the name. */
   homePort?: string;
+  /** The skipper at the wheel. The default figure where none is given. */
+  avatar?: import('./avatar').Avatar;
 }
 
 /** Fields a boat file carries for the boat picker and for her default livery. The sim ignores them. */

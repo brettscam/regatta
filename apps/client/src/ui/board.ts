@@ -6,6 +6,7 @@ import { sightings } from '../aboard/sightings';
 import type { Logbook } from '../net/logbook';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
+import { ProfilePane } from './profile';
 
 interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
 interface Release { id: string; name: string; theme: string; when: string; blurb: string; items: RoadmapItem[] }
@@ -36,7 +37,7 @@ const KINDS: Array<[string, string, string]> = [
   ['problem', 'Something is broken', 'What happened, and what did you expect?'],
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
-type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook';
+type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook' | 'profile';
 /**
  * Every control, in plain words, grouped by what the player is trying to do and in the order a newcomer needs them.
  * Each row: the keys (one string per key cap; "or" and "+" are joiners, anything else long is a gesture), what it is called, what it does.
@@ -89,7 +90,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 /**
  * The roadmap and the feedback form. Anyone can read the roadmap. Voting and sending feedback need the shared
  * database: the published claude.ai page's, or on the website the site's own, once the person has signed in with their
- * email address. The sign-in form is on the Logbook tab, on the website only. Where there is neither, each tab says so.
+ * email address. The sign-in form is on the Profile tab, on the website only. Where there is neither, each tab says so.
  */
 export class Board {
   private readonly el = document.getElementById('board') as HTMLElement;
@@ -117,6 +118,8 @@ export class Board {
   private signing: 'idle' | 'sending' | 'sent' | 'checking' = 'idle';
   private signNote = '';
   private unwatch: () => void = () => {};
+  /** The Profile tab's own panel: name and figure. It is kept between draws, so its 3D preview is not made again. */
+  private profile: ProfilePane | null = null;
 
   /** The places with somewhere to go ashore, for the bar-hop card. */
   places: Array<{ id: string; name: string; ashore?: { name: string; say: string } }> = [];
@@ -166,7 +169,7 @@ export class Board {
       // Arriving from the link in the sign-in email: say how it went.
       if (a.arrival) {
         this.signNote = a.arrival === 'expired' ? 'That sign-in link had run out or had already been used. Ask for a new one here.' : 'You are signed in.';
-        this.toggle(true, 'logbook');
+        this.toggle(true, 'profile');
       } else if (this.isOpen) this.render();
     }).catch(() => {});
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
@@ -260,7 +263,7 @@ export class Board {
   private async castVote(item: string, value: number): Promise<void> {
     const next = this.store.vote(item) === value ? 0 : value;
     const ok = await this.store.setVote(item, next);
-    if (!ok) this.note = onWeb() ? 'Your vote could not be saved. Check your connection, and on the Logbook tab that you are still signed in.' : 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
+    if (!ok) this.note = onWeb() ? 'Your vote could not be saved. Check your connection, and on the Profile tab that you are still signed in.' : 'Your vote could not be saved. Voting needs the page shared with you as a contributor.';
     this.render();
   }
 
@@ -305,7 +308,7 @@ export class Board {
       this.draft = '';
       this.note = 'Sent. Thank you: it goes straight to the people building Regatta.';
     } else {
-      this.note = onWeb() ? 'This could not be sent. Check your connection, and on the Logbook tab that you are still signed in. Or copy it and pass it on.' : 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
+      this.note = onWeb() ? 'This could not be sent. Check your connection, and on the Profile tab that you are still signed in. Or copy it and pass it on.' : 'This could not be sent from here. Copy it and pass it on to whoever shared the game with you.';
     }
     this.render();
   }
@@ -355,7 +358,7 @@ export class Board {
       : onWeb()
         ? this.store.signedIn
           ? 'Your votes cannot be saved just now. Check your connection.'
-          : `${this.store.online ? 'You can read the votes. ' : ''}To cast one, sign in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.`
+          : `${this.store.online ? 'You can read the votes. ' : ''}To cast one, sign in with your email address: <button type="button" class="link" data-tab="profile">the form is on the Profile tab</button>.`
         : this.store.online
           ? 'You can read the votes. Casting one needs the page shared with you as a contributor.'
           : alone()
@@ -383,7 +386,7 @@ export class Board {
         <button type="button" data-act="copy">Copy it instead</button>
       </div>
       ${canSend ? '' : onWeb()
-        ? `<p class="note">${this.store.signedIn ? 'Sending is not working just now. Check your connection.' : 'Sending from here needs a sign-in with your email address: <button type="button" class="link" data-tab="logbook">the form is on the Logbook tab</button>.'} Or copy your note and pass it on.</p>`
+        ? `<p class="note">${this.store.signedIn ? 'Sending is not working just now. Check your connection.' : 'Sending from here needs a sign-in with your email address: <button type="button" class="link" data-tab="profile">the form is on the Profile tab</button>.'} Or copy your note and pass it on.</p>`
         : `<p class="note">${this.store.online ? 'Sending from here needs the page shared with you as a contributor.' : alone() ? 'Feedback cannot be sent from this copy of the game.' : 'Sending works on the shared page when you are signed in.'} Until then, copy your note and pass it on.</p>`}
       ${this.note ? `<p class="note">${esc(this.note)}</p>` : ''}
       ${earlier}`;
@@ -437,11 +440,11 @@ export class Board {
     const kept = onWeb()
       ? this.account?.email()
         ? 'It is also kept with your sign-in, so it follows you to any device, and the fleet can see it below.'
-        : 'Sign in below and it is kept with your email address too, so it follows you to any device.'
+        : 'Sign in on the Profile tab and it is kept with your email address too, so it follows you to any device.'
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.signInForm()}${this.barHop()}${this.seenCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${mine}${this.barHop()}${this.seenCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */
@@ -483,11 +486,18 @@ export class Board {
       <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
         <header>
           <h2>Regatta</h2>
-          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button></nav>
+          <nav><button type="button" data-tab="roadmap" aria-pressed="${this.tab === 'roadmap'}">Roadmap</button><button type="button" data-tab="news" aria-pressed="${this.tab === 'news'}">What's new</button><button type="button" data-tab="keys" aria-pressed="${this.tab === 'keys'}">Keys</button><button type="button" data-tab="feedback" aria-pressed="${this.tab === 'feedback'}">Feedback</button><button type="button" data-tab="logbook" aria-pressed="${this.tab === 'logbook'}">Logbook</button><button type="button" data-tab="profile" aria-pressed="${this.tab === 'profile'}">Profile</button></nav>
           <button type="button" class="close" data-act="close" aria-label="Close">Close</button>
         </header>
-        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.log()}</div>
+        <div class="board-body ${this.tab}">${this.tab === 'roadmap' ? this.roadmap() : this.tab === 'news' ? this.news() : this.tab === 'keys' ? this.keys() : this.tab === 'feedback' ? this.feedback() : this.tab === 'profile' ? `<div data-profile></div>${this.signInForm()}` : this.log()}</div>
       </div>`;
+    // The profile's panel goes in whole, where its place was left.
+    const slot = this.el.querySelector('[data-profile]');
+    if (slot) {
+      this.profile ??= new ProfilePane(this.logbook);
+      slot.replaceWith(this.profile.el);
+      this.profile.show();
+    }
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();
     if (typing && caret !== null) {

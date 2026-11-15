@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sim, KT, R2D, type Environment } from '@slack-tide/sim';
+import { myAvatar, onMyAvatar } from './boat/avatar';
 import { BoatView, type BoatPose } from './boat/boatView';
 import type { YardBoat } from './boat/yard';
 import type { Stage } from './stage';
@@ -22,7 +23,12 @@ export class Lobby {
   private readonly look = new THREE.Vector3();
 
   /** @param spots the start spots of the water showing. Set again when the water changes. */
-  constructor(private readonly stage: Stage, public spots: StartSpot[], private readonly boats: Record<string, YardBoat>) {}
+  constructor(private readonly stage: Stage, public spots: StartSpot[], private readonly boats: Record<string, YardBoat>) {
+    // The skipper at the wheel is the player's own figure, and changes as they change it.
+    this.unwatch = onMyAvatar((a) => this.boat?.view.setAvatar(a));
+  }
+
+  private readonly unwatch: () => void;
 
   /** Show a choice. Rebuilds the boat only when something about her or her place has changed. */
   show(choice: Choice, step: number): void {
@@ -43,7 +49,7 @@ export class Lobby {
     sim.setCrewTrim(true);
     sim.trimForWind();
     sim.setHelm('wind', Number.isNaN(at.heading) ? undefined : sim.out.twa);
-    const view = new BoatView(spec, { topsides: choice.colour, name: choice.name });
+    const view = new BoatView(spec, { topsides: choice.colour, name: choice.name, avatar: myAvatar() });
     view.setPilot({ engaged: true, mode: 'wind', label: `${Math.round(Math.abs(sim.out.twa) * R2D)}° ${sim.out.twa >= 0 ? 'S' : 'P'}` });
     this.stage.scene.add(view.root);
     this.boat = { view, sim, key };
@@ -56,6 +62,7 @@ export class Lobby {
   }
 
   dispose(): void {
+    this.unwatch();
     this.clear();
     this.camera.clearViewOffset();
   }
@@ -83,11 +90,12 @@ export class Lobby {
 
     // Wide and high to choose the water, closer for the lesson question, alongside to choose the boat.
     const scale = sim.boat.dimensions.loa / 11.6;
-    const want = this.step === 0 ? { dist: 330, pitch: 0.2 } : this.step === 1 ? { dist: 78 * scale, pitch: 0.26 } : { dist: 25 * scale, pitch: 0.17 };
+    // On the home screen (step -1) she is close enough to see who is at the wheel.
+    const want = this.step < 0 ? { dist: 17 * scale, pitch: 0.2 } : this.step === 0 ? { dist: 330, pitch: 0.2 } : this.step === 1 ? { dist: 78 * scale, pitch: 0.26 } : { dist: 25 * scale, pitch: 0.17 };
     const ease = Math.min(1, dt * 1.6);
     this.dist = Math.exp(Math.log(this.dist) + (Math.log(want.dist) - Math.log(this.dist)) * ease);
     this.pitch += (want.pitch - this.pitch) * ease;
-    this.yaw += dt * (this.step === 0 ? 0.035 : 0.07);
+    this.yaw += dt * (this.step === 0 ? 0.035 : this.step < 0 ? 0.05 : 0.07);
     const cp = Math.cos(this.pitch);
     this.look.set(x, 3.5 * scale, z);
     this.camera.position.set(x + Math.sin(this.yaw) * cp * this.dist, Math.max(2.5, 3.5 + Math.sin(this.pitch) * this.dist), z + Math.cos(this.yaw) * cp * this.dist);
