@@ -24,7 +24,26 @@ export interface BoatPose {
   jib: number;
 }
 
-class Rope {
+/**
+ * What the input layer and the camera need of a boat's drawing, whichever builder made her. `BoatView` draws the
+ * sloops. A boat of another kind (the James Caird, `cairdView.ts`) has a view of her own that also answers to this.
+ */
+export interface BoatDrawing {
+  readonly root: THREE.Group;
+  readonly spec: BoatSpec;
+  /** Everything the pointer can land on. */
+  readonly pickables: THREE.Object3D[];
+  /** Solid parts the camera keeps out of. */
+  readonly solids: THREE.Object3D[];
+  /** Thin parts the camera hops across. */
+  readonly thin: THREE.Object3D[];
+  resolve(hit: THREE.Intersection): { node: string; binding: ControlBinding | null; view: string };
+  setGlow(node: string | null): void;
+  handle(node: string, state: SimState, point: THREE.Vector3, tangent: THREE.Vector3): { metresPerUnit: number } | null;
+  update(pose: BoatPose, state: SimState, out: SimOutputs, time: number, dt: number): void;
+}
+
+export class Rope {
   readonly mesh: THREE.Mesh;
   private static readonly up = new THREE.Vector3(0, 1, 0);
   private readonly dir = new THREE.Vector3();
@@ -62,7 +81,7 @@ class Telltale {
   }
 }
 
-export class BoatView {
+export class BoatView implements BoatDrawing {
   readonly root: THREE.Group;
   readonly model: SloopModel;
   readonly main: Mainsail;

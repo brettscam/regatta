@@ -21,13 +21,20 @@ const t2 = new THREE.Vector3();
 const t3 = new THREE.Vector3();
 const basis = new THREE.Matrix4();
 
-interface Kit {
+export interface Kit {
   jacket: number;
   vest: number;
   trousers: number;
   skin: number;
   cap: number;
+  /** Dress of another age: a hood drawn close round the face in place of the cap and sunglasses. */
+  hood?: boolean;
+  /** How much thicker than a modern sailor the figure is drawn, for layers of wool under windproofs. 1 if left out. */
+  bulk?: number;
 }
+
+/** Length of the trunk, pelvis to neck, for posing a figure from outside this file. */
+export const FIGURE_TORSO = 0.54;
 
 // Shared shapes for both figures.
 const GEO = {
@@ -105,6 +112,7 @@ export class Figure {
   private readonly joint = new THREE.Vector3();
   private readonly end = new THREE.Vector3();
   private readonly ankle = new THREE.Vector3();
+  private readonly bulk: number;
 
   constructor(name: string, kit: Kit) {
     this.group.name = name;
@@ -134,9 +142,21 @@ export class Figure {
     // Head, built facing -Z: cap, brim and sunglasses show which way it is looking.
     this.group.add(this.head);
     part(GEO.head, skin, this.head);
-    part(GEO.cap, cap, this.head).position.y = 0.012;
-    part(GEO.brim, cap, this.head).position.set(0, 0.03, -0.14);
-    part(GEO.shades, dark, this.head).position.set(0, 0.005, -0.092);
+    if (kit.hood) {
+      // The hood covers all but the face: the head sphere again, larger, set back so the face shows at the front.
+      const hood = part(GEO.head, cap, this.head);
+      hood.scale.set(1.24, 1.26, 1.22);
+      hood.position.set(0, 0.012, 0.036);
+      const muffler = part(GEO.vest, cap, this.head);
+      muffler.scale.set(0.8, 0.5, 0.86);
+      muffler.position.set(0, -0.125, 0.02);
+    } else {
+      part(GEO.cap, cap, this.head).position.y = 0.012;
+      part(GEO.brim, cap, this.head).position.set(0, 0.03, -0.14);
+      part(GEO.shades, dark, this.head).position.set(0, 0.005, -0.092);
+    }
+    this.bulk = kit.bulk ?? 1;
+    if (this.bulk !== 1) for (const limb of Object.values(this.limbs)) limb.scale.set(this.bulk, 1, this.bulk);
   }
 
   apply(): void {
@@ -149,10 +169,10 @@ export class Figure {
     basis.makeBasis(x, dir, z);
     this.torso.quaternion.setFromRotationMatrix(basis);
     this.torso.position.copy(this.pelvis).addScaledVector(dir, len * 0.5);
-    this.torso.scale.set(1.28, len / TORSO, 0.88);
+    this.torso.scale.set(1.28 * this.bulk, len / TORSO, 0.88 * this.bulk);
     this.vest.quaternion.copy(this.torso.quaternion);
     this.vest.position.copy(this.pelvis).addScaledVector(dir, len * 0.68);
-    this.vest.scale.set(1.28, 1, 0.92);
+    this.vest.scale.set(1.28 * this.bulk, 1, 0.92 * this.bulk);
 
     for (const side of [-1, 1]) {
       const L = side < 0;

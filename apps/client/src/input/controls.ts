@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { D2R, R2D, type ControlBinding, type ControlName, type Sim } from '@slack-tide/sim';
-import type { BoatView } from '../boat/boatView';
+import type { BoatDrawing } from '../boat/boatView';
 import { VIEWS, type DroneCamera } from '../camera/drone';
 import type { Hud } from '../ui/hud';
 import type { Sound } from '../audio/sound';
@@ -63,33 +63,43 @@ export class Controls {
   private readonly t = new THREE.Vector3();
   private readonly s0 = new THREE.Vector3();
   private readonly s1 = new THREE.Vector3();
+  private readonly listeners = new AbortController();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly drone: DroneCamera,
-    private readonly boat: BoatView,
+    private readonly boat: BoatDrawing,
     private readonly sim: Sim,
-    private readonly hud: Hud,
+    private readonly hud: Pick<Hud, 'showTag' | 'hideTag' | 'toggleFps'>,
     private readonly sound: Sound,
     private readonly host: ControlHost,
   ) {
-    canvas.addEventListener('pointerdown', this.onPointerDown);
-    canvas.addEventListener('pointermove', this.onPointerMove);
-    canvas.addEventListener('pointerup', this.onPointerUp);
-    canvas.addEventListener('pointercancel', this.onPointerUp);
-    canvas.addEventListener('pointerleave', () => { this.pointer.inside = false; if (!this.drag) this.setHover(null); });
-    canvas.addEventListener('wheel', this.onWheel, { passive: false });
-    canvas.addEventListener('dblclick', this.onDoubleClick);
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', (e) => this.held.delete(e.code));
-    canvas.addEventListener('lostpointercapture', this.onPointerUp);
+    // Every listener is tied to one signal, so a session that ends (an Expedition left for Regatta) can take its hands off the page.
+    const signal = this.listeners.signal;
+    canvas.addEventListener('pointerdown', this.onPointerDown, { signal });
+    canvas.addEventListener('pointermove', this.onPointerMove, { signal });
+    canvas.addEventListener('pointerup', this.onPointerUp, { signal });
+    canvas.addEventListener('pointercancel', this.onPointerUp, { signal });
+    canvas.addEventListener('pointerleave', () => { this.pointer.inside = false; if (!this.drag) this.setHover(null); }, { signal });
+    canvas.addEventListener('wheel', this.onWheel, { passive: false, signal });
+    canvas.addEventListener('dblclick', this.onDoubleClick, { signal });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+    window.addEventListener('keydown', this.onKeyDown, { signal });
+    window.addEventListener('keyup', (e) => this.held.delete(e.code), { signal });
+    canvas.addEventListener('lostpointercapture', this.onPointerUp, { signal });
     window.addEventListener('blur', () => {
       this.held.clear();
       // Whatever was being dragged is let go: the release may never arrive.
       this.pointers.clear();
       this.drag = null;
-    });
+    }, { signal });
+  }
+
+  /** Stop listening. The boat is left as she is. */
+  dispose(): void {
+    this.listeners.abort();
+    this.canvas.style.cursor = 'default';
+    this.hud.hideTag();
   }
 
   // ---- picking --------------------------------------------------------------------------------

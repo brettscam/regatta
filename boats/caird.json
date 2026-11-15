@@ -1,0 +1,80 @@
+{
+  "id": "caird",
+  "name": "James Caird",
+  "lengthFt": 22.5,
+  "tagline": "A ship's lifeboat, decked with canvas for the Southern Ocean",
+  "role": "Expedition boat. Not in the Regatta lineup",
+  "defaultName": "James Caird",
+  "homePort": "London",
+  "topsides": "#d9d4c4",
+  "expedition": true,
+  "notes": "The James Caird as she left Elephant Island on 24 April 1916. A double-ended whaler built in London to Worsley's order: 22 ft 6 in long, 6 ft beam, Baltic pine planking on American elm and English oak. At Elephant Island McNish raised her sides about ten inches and decked her with canvas over sledge runners and box lids. About a ton of shingle and rocks for ballast. Jib, standing lug mainsail, lug mizzen. Length and beam are from the record. Draught, freeboard, displacement, spar lengths and sail areas are estimates for a boat of her kind so loaded. The polar is a judgement, not a measurement: she would not lie closer than about 60 degrees to the wind, made 2 to 4 knots in a breeze and perhaps 6 running hard, and the passage averaged a little over 2 knots including two days hove to. The sim has one mainsail and one headsail, so the mizzen's drive is counted in the main's. The polar is for full sail, which she could seldom carry: its top speeds are what she would do pressed hard before a gale. The three 'reefs' are full sail, reefed down (reefs in the main, the mizzen's share gone), and storm canvas (a scrap of main; the crew hands the jib as well). Their 'heel' figures stay high because a small boat shortened down in a gale still goes sideways, and the sim takes leeway from the same figure. Their 'drive' figures are set low so that shortened down in a gale she makes the three knots or so the record shows, not the six the full-sail polar would give.",
+  "dimensions": {
+    "loa": 6.86,
+    "lwl": 6.5,
+    "beam": 1.85,
+    "draft": 0.65,
+    "freeboard": 0.68,
+    "displacementKg": 2900,
+    "mastHeight": 4.6,
+    "boomLength": 3.0,
+    "boomHeight": 0.95,
+    "mastFromBow": 1.95,
+    "jibFoot": 1.9,
+    "forestayHeight": 4.0
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail",
+    "twa": [0, 45, 55, 60, 70, 90, 110, 130, 150, 165, 180],
+    "tws": [0, 6, 10, 15, 20, 28, 36, 45, 60],
+    "speeds": [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0.5, 0.8, 1.1, 1.3, 1.3, 1.2, 1.0, 0.9],
+      [0, 0, 0, 0.9, 1.4, 1.9, 2.1, 2.2, 2.0, 1.8, 1.7],
+      [0, 0, 0, 1.2, 1.8, 2.4, 2.8, 3.0, 2.9, 2.6, 2.4],
+      [0, 0, 0, 1.4, 2.1, 2.8, 3.2, 3.5, 3.5, 3.2, 3.0],
+      [0, 0, 0, 1.5, 2.3, 3.1, 3.7, 4.2, 4.3, 4.0, 3.9],
+      [0, 0, 0, 1.5, 2.4, 3.3, 4.0, 4.9, 5.2, 4.9, 4.7],
+      [0, 0, 0, 1.5, 2.4, 3.4, 4.2, 5.3, 6.0, 5.7, 5.5],
+      [0, 0, 0, 1.5, 2.4, 3.4, 4.2, 5.3, 6.0, 5.7, 5.5]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 12,
+      "reefs": [
+        { "name": "Full sail", "drive": 1.0, "heel": 1.0, "luff": 1.0 },
+        { "name": "Reefed down", "drive": 0.3, "heel": 0.7, "luff": 0.7 },
+        { "name": "Storm canvas", "drive": 0.08, "heel": 0.6, "luff": 0.46 }
+      ],
+      "sheetMinDeg": 6,
+      "sheetMaxDeg": 85
+    },
+    "jib": { "areaM2": 3.6, "sheetHardDeg": 12, "sheetMaxSlackDeg": 80 }
+  },
+  "heel": {
+    "comment": "An open boat with a ton of stones in her bottom: stiff enough, slow to heel, quick to slow down when she does.",
+    "perKnot": 1.05,
+    "offset": 5,
+    "mainShare": 0.6,
+    "jibShare": 0.4,
+    "penaltyStartDeg": 18,
+    "penaltyPerDeg": 0.03,
+    "penaltyFloor": 0.5,
+    "rudderFadeStartDeg": 26,
+    "rudderFadeRangeDeg": 10,
+    "maxDeg": 42
+  },
+  "rightingCurve": {
+    "comment": "Unused by the phase 1 model. A guess for a ballasted lifeboat.",
+    "deg": [0, 10, 20, 30, 40, 50, 60, 90, 120],
+    "gz": [0, 0.12, 0.22, 0.29, 0.32, 0.31, 0.27, 0.08, -0.15]
+  },
+  "helm": { "maxRudderDeg": 35, "turnGain": 0.3, "rudderDrag": 0.05 },
+  "controls": [
+    { "node": "tiller", "control": "rudder", "label": "Tiller", "view": "helm", "stepDeg": 2, "keys": { "dec": ["KeyA", "ArrowLeft"], "inc": ["KeyD", "ArrowRight"] } },
+    { "node": "main_sheet", "control": "mainsheet", "label": "Mainsheet", "view": "mast", "stepDeg": 2, "keys": { "dec": ["KeyW"], "inc": ["KeyS"] } },
+    { "node": "jib_sheet_port", "control": "jibsheet_port", "label": "Port jib sheet", "view": "foredeck", "stepDeg": 2 },
+    { "node": "jib_sheet_stbd", "control": "jibsheet_stbd", "label": "Starboard jib sheet", "view": "foredeck", "stepDeg": 2 }
+  ]
+}
