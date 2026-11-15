@@ -94,7 +94,22 @@ export class Radio implements Feature {
     if (this.web && !this.raising && this.ctx.company().length > 0) void this.raise();
 
     const state = this.voice?.state();
-    const transmitting = state?.transmitting ?? false;
+    this.sync();
+    if (state?.crowded && !this.toldCrowded) {
+      this.toldCrowded = true;
+      this.ctx.say('This water is too crowded for voice to reach everyone: the radio carries 8 boats at most, so some will not hear you', 9);
+    }
+    this.traffic(dt);
+    this.show(state);
+  }
+
+  /**
+   * Make the set sound the way things stand: the click of this boat's key, and the squelch open while anything is on
+   * the air, a voice or a ferry's call. Called when something changes as well as every frame, so the sound does not
+   * wait on the picture.
+   */
+  private sync(): void {
+    const transmitting = this.voice?.state().transmitting ?? false;
     if (transmitting !== this.wasTransmitting) {
       this.wasTransmitting = transmitting;
       const vhf = this.set();
@@ -102,19 +117,12 @@ export class Radio implements Feature {
       vhf?.transmitting(transmitting);
       if (transmitting) this.hush();
     }
-    if (state?.crowded && !this.toldCrowded) {
-      this.toldCrowded = true;
-      this.ctx.say('This water is too crowded for voice to reach everyone: the radio carries 8 boats at most, so some will not hear you', 9);
-    }
-    // The squelch: open while anything is on the air, a voice or a ferry's call.
     const open = this.talkers.size > 0 || this.speaking;
     if (open !== this.wasOpen) {
       this.wasOpen = open;
       if (open) this.set()?.open();
       else this.vhf?.close();
     }
-    this.traffic(dt);
-    this.show(state);
   }
 
   dispose(): void {
@@ -146,15 +154,18 @@ export class Radio implements Feature {
       this.ctx.say('The radio could not be switched on. Press Enter to type a message instead', 6);
       return;
     }
-    if (!this.down) return;
     if (!this.introduced) {
       this.introduced = true;
       this.ctx.say('Radio on, channel 16. Hold V to talk, let go to listen. Every boat on this water hears you while V is held. Nothing is recorded', 10);
-    } else if (!this.ctx.company().length && performance.now() - this.toldAlone > 15000) {
+      // A tap that was over before the radio was ready: the line above says what to do next time.
+      if (!this.down) return;
+    } else if (!this.down) return;
+    else if (!this.ctx.company().length && performance.now() - this.toldAlone > 15000) {
       this.toldAlone = performance.now();
       this.ctx.say('Nobody else is on this water to hear you', 4);
     }
     const mic = await v.transmit(true);
+    this.sync();
     if (this.toldMic || (mic !== 'refused' && mic !== 'missing')) return;
     this.toldMic = true;
     this.ctx.say(mic === 'refused'
@@ -165,9 +176,10 @@ export class Radio implements Feature {
   private talking(peer: string, on: boolean): void {
     if (on) this.talkers.add(peer);
     else this.talkers.delete(peer);
-    if (!on) return;
     // A voice has the air: the ferry's call gives way to it.
-    this.hush();
+    if (on) this.hush();
+    this.sync();
+    if (!on) return;
     if (!this.introduced) {
       this.introduced = true;
       this.ctx.say('Channel 16: another boat is on the radio. Hold V to answer. Every boat on this water hears you while V is held', 9);
@@ -196,8 +208,8 @@ export class Radio implements Feature {
     if (state?.transmitting) {
       kind = 'tx';
       label = 'TX 16';
-      const here = this.ctx.company().length;
-      note = here === 0 ? 'nobody else on this water' : state.raising > 0 ? `raising ${state.raising} ${state.raising === 1 ? 'boat' : 'boats'}` : '';
+      // Short, so the light stays clear of the line of text beside it.
+      note = state.raising > 0 ? `raising ${state.raising} ${state.raising === 1 ? 'boat' : 'boats'}` : '';
     } else if (this.talkers.size) {
       kind = 'rx';
       label = 'RX 16';
@@ -288,12 +300,14 @@ export class Radio implements Feature {
       if (this.speakTimer !== null) clearTimeout(this.speakTimer);
       this.speakTimer = null;
       this.speaking = false;
+      this.sync();
     };
     words.onend = done;
     words.onerror = done;
     this.speaking = true;
     // If the browser never says it has finished, close the squelch anyway.
     this.speakTimer = setTimeout(done, 3000 + text.length * 90);
+    this.sync();
     synth.speak(words);
   }
 
@@ -304,5 +318,6 @@ export class Radio implements Feature {
     if (this.speakTimer !== null) clearTimeout(this.speakTimer);
     this.speakTimer = null;
     this.speaking = false;
+    this.sync();
   }
 }

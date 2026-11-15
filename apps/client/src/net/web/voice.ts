@@ -19,7 +19,8 @@ import { ANNOUNCE_GAP, CONNECT_WAIT, DROPPED_WAIT, GATHER_WAIT, GONE_WAIT, SIGNA
  * - Every connection is made with a two-way audio line from the start, with nothing on it. When the player first
  *   keys up the microphone is put on that line, so nothing has to be agreed again. The microphone track is switched
  *   off except while the key is held. Who is keyed goes over the connection itself (a data channel), not over Supabase.
- * - A connection is closed when it fails, when it has been down for a few seconds, or when its boat has left the water.
+ * - A connection is closed when the far side closes it, when it fails, when it has been down for a few seconds, or
+ *   when its boat has been gone from the water for half a minute.
  *   A page hidden for half a minute stops its microphone and leaves altogether.
  *
  * What another page sends is that page's word, so every message is checked before use.
@@ -353,13 +354,23 @@ export class VoiceMesh implements Voice {
     pc.onconnectionstatechange = () => {
       if (this.links.get(peer) !== link) return;
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.drop(peer);
+      // A boat that vanishes with her key down cannot say she has let go.
+      else if (pc.connectionState === 'disconnected') this.setKeyed(link, false);
     };
-    dc.onopen = () => { if (this.transmitting) this.sayKeyed(link); };
+    let opened = false;
+    dc.onopen = () => {
+      opened = true;
+      if (this.transmitting) this.sayKeyed(link);
+    };
     dc.onmessage = (e) => {
       if (e.data === 'k1') this.setKeyed(link, true);
       else if (e.data === 'k0') this.setKeyed(link, false);
     };
-    dc.onclose = () => this.setKeyed(link, false);
+    // The far side closing its end is how a boat that has left is noticed at once, without waiting for the silence.
+    dc.onclose = () => {
+      this.setKeyed(link, false);
+      if (opened && this.links.get(peer) === link) this.drop(peer);
+    };
     return link;
   }
 

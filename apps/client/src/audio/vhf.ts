@@ -36,7 +36,7 @@ export class Vhf {
     squeeze.attack.value = 0.004;
     squeeze.release.value = 0.14;
     const level = ctx.createGain();
-    level.gain.value = 2.4;
+    level.gain.value = 1.5;
     // Shut while this boat is transmitting: a VHF cannot hear while it talks.
     this.gate = ctx.createGain();
     this.input

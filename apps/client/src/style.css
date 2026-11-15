@@ -496,3 +496,5 @@ body.lobby .cheat { display: none; }
 .hails .radio.tx i { background: #ff6b5e; box-shadow: 0 0 8px #ff6b5e; }
 .hails .radio b { letter-spacing: 0.1em; }
 .hails .radio span { color: var(--dim); }
+/* A ferry's call runs to three lines, so the hails sit clear of the line of text at the bottom of the screen. */
+.hails { bottom: calc(var(--edge-bottom) + 80px); }

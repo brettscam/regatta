@@ -21,7 +21,7 @@ export const CONNECT_WAIT = 20000;
 /** A connection that has dropped and not come back in this long is closed. */
 export const DROPPED_WAIT = 8000;
 /** A boat that has not been on the water for this long is no longer on the radio either. */
-export const GONE_WAIT = 15000;
+export const GONE_WAIT = 30000;
 
 /** True when this page may take on another connection. `links` is how many it has now. */
 export function hasRoom(links: number): boolean {
