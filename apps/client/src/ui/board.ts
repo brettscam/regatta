@@ -3,6 +3,7 @@ import roadmapJson from '../data/roadmap.json';
 import { visited } from '../aboard/visited';
 import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
 import { sightings } from '../aboard/sightings';
+import { HOW_A_RACE_WORKS } from '../race/startline';
 import type { Logbook } from '../net/logbook';
 import { KIND_NAMES, rankOf, topEarners } from '../xp/score';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
@@ -64,14 +65,14 @@ const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string,
   { title: 'See more', rows: [
     [['1', '2', '3', '4'], 'Camera', 'Jump to a view: the wheel, the mast, the bow, or above the boat.'],
     [['M'], 'Chart', 'The map. Plan a route and see the wind and tide forecast.'],
-    [['G'], 'Course guide', 'Buoys on the marks and a line on the water to the next one. On by itself in a race.'],
+    [['G'], 'Course guide', 'Buoys on the marks, a ring round each one in a race, and a line on the water to the next. On by itself in a race.'],
     [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
     [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
     [['C'], 'Coaching', 'Tips on or off.'],
     [['Y'], 'Award lines', 'Show or hide the line that says when you earn points.'],
     [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
   ] },
-  { title: 'Race and talk', rows: [
+  { title: 'Race and talk', note: `How a race works. ${HOW_A_RACE_WORKS.join(' ')}`, rows: [
     [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
     [['Enter'], 'Message', 'Type a message to the other boats.'],
     [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the ferry and ship calls off or on.'],

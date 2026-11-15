@@ -386,12 +386,14 @@ export class Session {
       this.opts.logbook.count('marks', reached - watch.marksReached);
       const done = passage.marks[reached - 1];
       const next = passage.marks[reached];
+      // In a race the race itself says when a mark is taken, and what comes next.
+      const quiet = this.race.call !== null;
       if (next) {
         // Work out the rest of the route again from here, so the plan stays honest.
         passage.replan({ x: sim.state.x, y: sim.state.y }, sim.state.t);
         const brg = Math.round((Math.atan2(next.x - sim.state.x, next.y - sim.state.y) * R2D + 360) % 360);
-        this.alarm(`${done.name} astern. Next mark ${next.name}, bearing ${String(brg).padStart(3, '0')}°`);
-      } else {
+        if (!quiet) this.alarm(`${done.name} astern. Next mark ${next.name}, bearing ${String(brg).padStart(3, '0')}°`);
+      } else if (!quiet) {
         this.alarm(`${done.name} reached. Route complete`);
       }
     }
