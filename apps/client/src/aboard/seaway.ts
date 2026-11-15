@@ -79,6 +79,7 @@ export class Seaway {
     }
     this.slams = s.slams;
     while (this.slamTimes.length && s.t - this.slamTimes[0] > 60) this.slamTimes.shift();
+    if (s.hold !== 'none') this.slatting = false;
     if (s.tick % EVERY !== 0 || s.hold !== 'none') return;
 
     // A wake going by checks her a little, more in light air when the roll shakes the wind out of the sails.

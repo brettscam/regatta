@@ -639,6 +639,7 @@ export class Session {
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
       sim: this.sim, air: this.air, seaway: this.seaway, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
       coach: this.coach, hints: this.hints, gusts: this.gusts, race: this.race, fleetPanel: this.fleetPanel, features: this.features, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      stage: this.stage, setRate: (index: number) => { this.rateIndex = index; this.hud.setRate(index); },
     };
   }
 }

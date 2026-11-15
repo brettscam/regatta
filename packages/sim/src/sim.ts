@@ -35,8 +35,8 @@ export const SEAWAY = {
   /** The most the sea alone takes, as a share of her speed. */
   resistCap: 0.35,
   /** Steepness below which she never slams, and the range above it over which the chance of slamming on a wave comes on. */
-  slamSteep: 0.04,
-  slamRange: 0.05,
+  slamSteep: 0.03,
+  slamRange: 0.04,
   /** `hl` below which the waves are too small to drop her, about 0.2 m for the 30 and 0.3 m for the 45. Full chance comes 0.05 above it. */
   slamFromHl: 0.025,
   /** The most likely she is to slam on any one wave. */
