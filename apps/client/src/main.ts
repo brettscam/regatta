@@ -8,6 +8,7 @@ import { Stage } from './stage';
 import { Logbook } from './net/logbook';
 import { Board } from './ui/board';
 import { myAvatar } from './boat/avatar';
+import { mySailStyle, onMySailStyle } from './boat/sailStyle';
 import { openHome } from './ui/home';
 import { JoinFlow, WEATHER, type Choice, type WaterView } from './ui/join';
 import { COURSES, DEFAULT_COURSE, hasCourse, loadCourse } from './world/loadCourse';
@@ -117,6 +118,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 let session: Session | null = null;
+/** Stops the current sail from following the Profile tab's sail choices. */
+let stopSails: (() => void) | undefined;
 let lobby: Lobby | null = null;
 let chosen: Choice | null = null;
 
@@ -141,7 +144,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
   board.places = data.places;
   session = new Session(stage, {
     spec: BOATS[choice.boat],
-    livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort, avatar: myAvatar() },
+    livery: { topsides: choice.colour, name: choice.name, homePort: BOATS[choice.boat].homePort, avatar: myAvatar(), sails: mySailStyle() },
     x: num('x', spot.x),
     y: num('y', spot.y),
     headingDeg: params.has('hdg') ? num('hdg', 0) : undefined,
@@ -156,6 +159,11 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     boats: BOATS,
     classes: Object.fromEntries(LINEUP.filter((e) => e.status === 'ready').map((e) => [e.id, BOATS[e.id]])),
     resume,
+  });
+  // Sails chosen on the Profile tab go up at once. The livery keeps them, since a class race rebuilds her from it.
+  stopSails?.();
+  stopSails = onMySailStyle((style) => {
+    session?.setSailStyle(style);
   });
   board.context = () => ({ ...session!.report(), spot: choice.spot, startTime: choice.time });
   const handles = session.debug();

@@ -6,6 +6,8 @@ import type { Logbook } from '../net/logbook';
 import { rankOf } from '../xp/score';
 import { db as askDb, user as askUser } from '../net/platform';
 import { figurePreview } from './figurePreview';
+import { CLOTHS, KITE_COLOURS, KITE_PATTERNS, mySailStyle, saveSailStyle, type SailStyle } from '../boat/sailStyle';
+import { kiteSwatch } from '../boat/sails';
 
 /**
  * Who you are: the skipper's name and the figure at the wheel, put together piece by piece with the figure turning
@@ -64,8 +66,8 @@ export async function adoptAvatar(): Promise<boolean> {
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
 
-type Page = 'outfit' | 'hat' | 'hair' | 'face' | 'build';
-const PAGES: Array<[Page, string]> = [['outfit', 'Outfit'], ['hat', 'Hat'], ['hair', 'Hair'], ['face', 'Face'], ['build', 'Build']];
+type Page = 'outfit' | 'hat' | 'hair' | 'face' | 'build' | 'sails';
+const PAGES: Array<[Page, string]> = [['outfit', 'Outfit'], ['hat', 'Hat'], ['hair', 'Hair'], ['face', 'Face'], ['build', 'Build'], ['sails', 'Sails']];
 
 export class ProfilePane {
   readonly el = document.createElement('section');
@@ -113,6 +115,14 @@ export class ProfilePane {
       this.page = d.page as Page;
       figurePreview()?.focus(this.page === 'outfit' || this.page === 'build' ? 'figure' : 'head');
       this.render();
+    } else if (d.sail) {
+      const now = mySailStyle();
+      const style: SailStyle = { cloth: now.cloth, kite: { pattern: now.kite.pattern, colours: [...now.kite.colours] as SailStyle['kite']['colours'] } };
+      if (d.sail === 'cloth') style.cloth = d.value ?? style.cloth;
+      else if (d.sail === 'pattern') style.kite.pattern = d.value ?? style.kite.pattern;
+      else if (/^c[0-2]$/.test(d.sail)) style.kite.colours[Number(d.sail[1])] = Number(d.value);
+      saveSailStyle(style);
+      this.render();
     } else if (d.act === 'surprise') this.change(randomAvatar(Math.random));
     else if (d.act === 'reset') this.change({ ...DEFAULT_AVATAR });
     else if (d.set) this.change({ [d.set]: /^\d+$/.test(d.value ?? '') && d.num ? Number(d.value) : d.value } as Partial<Avatar>);
@@ -123,6 +133,21 @@ export class ProfilePane {
     figurePreview()?.wear(myAvatar());
     window.dispatchEvent(new Event(PROFILE_CHANGED));
     if (redraw) this.render();
+  }
+
+  /** The boat's sails: the cloth of the main and jib, and the spinnaker's design and colours. Everyone on the water sees them. */
+  private sailsPage(): string {
+    const style = mySailStyle();
+    const pattern = KITE_PATTERNS.find((k) => k.id === style.kite.pattern) ?? KITE_PATTERNS[0];
+    const cloth = `<div class="pick" role="group" aria-label="Sailcloth"><span class="lab">Mainsail and jib</span><div class="chips">${CLOTHS.map((c) =>
+      `<button type="button" class="chip" data-sail="cloth" data-value="${c.id}" aria-pressed="${style.cloth === c.id}"><i class="dot" style="background:${css(c.base)}"></i>${esc(c.name)}</button>`).join('')}</div></div>`;
+    const kites = `<div class="pick" role="group" aria-label="Spinnaker design"><span class="lab">Spinnaker</span><div class="chips kites">${KITE_PATTERNS.map((k) =>
+      `<button type="button" class="chip kite" data-sail="pattern" data-value="${k.id}" aria-pressed="${pattern.id === k.id}" title="${esc(k.name)}"><span data-kite="${k.id}"></span>${esc(k.name)}</button>`).join('')}</div></div>`;
+    const colours = Array.from({ length: pattern.colours }, (_, n) =>
+      `<div class="pick" role="group" aria-label="Spinnaker colour ${n + 1}"><span class="lab">Colour ${n + 1}</span><div class="swatches">${KITE_COLOURS.map((c, i) =>
+        `<button type="button" class="swatch" data-sail="c${n}" data-value="${i}" aria-pressed="${style.kite.colours[n] === i}" aria-label="${c.name}" title="${c.name}" style="background:${css(c.hex)}"></button>`).join('')}</div></div>`).join('');
+    const note = pattern.colours === 0 ? '<p class="soon">This one is cut in the colour of your hull.</p>' : '';
+    return `${cloth}${kites}${colours}${note}<p class="soon">Everyone on the water sees your sails. N hoists the spinnaker when the wind is aft.</p>`;
   }
 
   private render(): void {
@@ -146,7 +171,9 @@ export class ProfilePane {
           ? `${words('hair', HAIR, 'Hair')}${shades('hairShade', HAIR_SHADES, 'Hair colour')}${words('beard', BEARDS, 'Facial hair')}`
           : this.page === 'face'
             ? `${shades('skin', SKINS, 'Skin')}${words('face', FACES, 'Mouth')}${words('specs', SPECS, 'Glasses')}`
-            : `${range('height', HEIGHTS, 'Height')}${range('girth', GIRTHS, 'Girth')}`;
+            : this.page === 'build'
+              ? `${range('height', HEIGHTS, 'Height')}${range('girth', GIRTHS, 'Girth')}`
+              : this.sailsPage();
 
     const t = this.logbook.totals;
     const sailing = 'regatta' in window;
@@ -159,6 +186,10 @@ export class ProfilePane {
       <nav class="profile-pages" aria-label="Parts of the figure">${PAGES.map(([id, name]) => `<button type="button" data-page="${id}" aria-pressed="${id === this.page}">${name}</button>`).join('')}</nav>
       <div class="profile-picks">${body}</div>
       <p class="profile-log"><span data-profile-rank>${rankOf(t.xp ?? 0).name} · ${Math.round(t.xp ?? 0)} points</span>${t.miles.toFixed(1)} miles · ${t.hours.toFixed(1)} hours · ${t.sails} ${t.sails === 1 ? 'sail' : 'sails'} · ${t.races} ${t.races === 1 ? 'race' : 'races'}, ${t.wins} won. The rest is on the Logbook tab.</p>`;
+    // Each spinnaker design drawn small, in the colours chosen.
+    for (const slot of this.form.querySelectorAll<HTMLElement>('[data-kite]')) {
+      slot.replaceChildren(kiteSwatch({ pattern: slot.dataset.kite!, colours: mySailStyle().kite.colours }, '#c0392b', 44));
+    }
     if (typing) {
       const input = this.form.querySelector<HTMLInputElement>('#profile-skipper');
       input?.focus();

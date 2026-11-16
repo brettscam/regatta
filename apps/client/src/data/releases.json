@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v35",
+      "date": "2026-11-16",
+      "title": "The water, the sails and the light",
+      "items": [
+        "The water now tells you what the wind is doing: gusts show as dark patches where the wind really is stronger, whitecaps build from about ten knots, and every boat, ferry and ship leaves a wake that curls behind her. Spray flies when she slams into a sea.",
+        "The sails take their shape from how you trim them, and shiver and flog when you pinch or let them go. Choose your own sailcloth and spinnaker design on the new Sails page of the Profile tab (B); everyone on the water sees them.",
+        "The day runs on through a golden evening into a starlit night with the moon in its real phase, and every boat shows her red, green and white lights, so you can tell which way she is heading.",
+        "Summer fog pours through the Golden Gate in the afternoon, and on the Extreme level rain squalls come down the wind at you. A Graphics setting on the way in (Auto, High, Low) helps slower machines."
+      ]
+    },
+    {
       "id": "v34",
       "date": "2026-11-16",
       "title": "A new water: the British Virgin Islands",

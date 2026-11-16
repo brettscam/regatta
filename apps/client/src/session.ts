@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Sim, SIM_DT, KT, R2D, initialState, type SimState } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import { BoatView, type BoatPose, type Livery } from './boat/boatView';
+import type { SailStyle } from './boat/sailStyle';
 import type { YardBoat } from './boat/yard';
 import { DroneCamera, VIEWS } from './camera/drone';
 import { Controls } from './input/controls';
@@ -125,6 +126,12 @@ export class Session {
   private residents: Residents | null = null;
   private readonly elsewhere: TrafficVessel[] = [];
   private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0, capsizes: 0 };
+
+  /** New sails from the Profile tab: hoisted now, and kept in the livery so a class race's boat flies them too. */
+  setSailStyle(style: SailStyle): void {
+    this.opts.livery.sails = style;
+    this.boatView.setSailStyle(style);
+  }
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
     const world = stage.world;
