@@ -1,0 +1,23 @@
+{
+  "note": "The ferry to the mainland. Her line stays in over 8 m at the lowest tide and off the race marks. The name is made up. A phase is seconds into the vessel's cycle at referenceHours into the season. The yachts and small craft are in residents.json.",
+  "referenceHours": 2.5,
+  "station": "Islands Radio",
+  "routes": [
+    {
+      "id": "ferry-anacortes",
+      "name": "Islands ferry",
+      "kind": "ferry",
+      "model": "carferry",
+      "length": 72,
+      "beam": 18,
+      "speedKt": 16,
+      "mode": "shuttle",
+      "dwell": 900,
+      "hideAtEnds": "last",
+      "phase": 300,
+      "color": "#1c6b45",
+      "ends": ["Friday Harbor", "Anacortes"],
+      "gate": {"at": 10, "name": "Thatcher Pass"},
+      "points": [[-900, -6850], [-950, -6400], [-450, -5950], [500, -5450], [1700, -5750], [4100, -6000], [5900, -4900], [8500, -2800], [9300, -2800], [14200, -7900], [14600, -8000], [20200, -8300]] }
+  ]
+}

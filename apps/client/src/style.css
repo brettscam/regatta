@@ -148,6 +148,8 @@ body { overscroll-behavior: none; touch-action: none; user-select: none; -webkit
   padding: 3px 9px; border-radius: 999px; background: rgba(9, 18, 24, 0.7); border: 1px solid var(--edge);
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
 }
+/* The boats that live on the water are named more quietly than other people. */
+.boat-label.resident-label { font-weight: 500; font-style: italic; background: rgba(9, 18, 24, 0.55); }
 
 /* ---- the way in: where, first sail, your boat -------------------------------------------------- */
 body.lobby .hud, body.lobby .tag { display: none; }

@@ -11,7 +11,7 @@ const KT = 0.514444;
 
 export type AwardKind =
   | 'tack' | 'gybe' | 'groove' | 'hand' | 'gust' | 'mark' | 'finish' | 'place'
-  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'lost';
+  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'met' | 'lost';
 
 export interface Award {
   kind: AwardKind;
@@ -39,6 +39,7 @@ export const KIND_NAMES: Record<AwardKind, string> = {
   fish: 'Fish landed',
   crabs: 'Crab landed',
   seen: 'First sightings',
+  met: 'Boats met',
   lost: 'Lost to knockdowns, crash gybes, groundings and collisions',
 };
 const KINDS = Object.keys(KIND_NAMES) as AwardKind[];
@@ -57,6 +58,8 @@ export const POINTS = {
   /** A gust ridden out on the pilot with the crew trimming, and with a hand on the wheel or the sheets. */
   gust: [3, 12],
   berth: 8,
+  /** Meeting one of the boats that live on a water, the first time. */
+  met: 10,
   knockdown: -15,
   crashGybe: -8,
   aground: -10,
@@ -302,6 +305,11 @@ export function collisionAward(closingKt: number, since: number, holed = false):
   if (holed) return { kind: 'lost', points: POINTS.holed, label: 'Holed' };
   if (!(closingKt >= COLLISION.least) || since < COLLISION.cooldown) return null;
   return { kind: 'lost', points: POINTS.collision, label: 'Collision' };
+}
+
+/** Meeting one of the boats that live on a water for the first time: sailing close enough to see who she is, or hailing her. */
+export function metAward(name: string): Award {
+  return { kind: 'met', points: POINTS.met, label: `Met ${name}` };
 }
 
 // ---- things the features count into the logbook ----------------------------------------------------

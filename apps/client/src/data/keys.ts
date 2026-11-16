@@ -39,9 +39,9 @@ export const KEY_GROUPS: KeyGroup[] = [
   ] },
   { id: 'racing', title: 'Racing and talking', note: `How a race works. ${HOW_A_RACE_WORKS.join(' ')}`, rows: [
     { keys: ['R'], name: 'Fleet and racing', since: 'v8', what: 'See who else is out, call a race, join one, or fix one for later and send the link.' },
-    { keys: ['Enter'], name: 'Hail', what: 'Type a message to the other boats on this water, then Enter again to send it.' },
+    { keys: ['Enter'], name: 'Hail', what: 'Type a message to the other boats on this water, then Enter again to send it. A boat that lives here answers too when she is within a few hundred metres: who she is, then the wind, the tide, a place to lie, the fishing.' },
     { keys: ['V'], name: 'Radio', since: 'v22', what: 'Hold to talk to every boat on this water on channel 16, let go to listen. Nothing is recorded. Voice works on the website only.' },
-    { keys: ['Shift', '+', 'V'], name: 'Ferry and ship calls', since: 'v22', what: 'The ferries and ships call on the radio as they leave a berth, and call you by name when they will pass close. This turns their calls off or on.' },
+    { keys: ['Shift', '+', 'V'], name: 'Ferry and ship calls', since: 'v22', what: 'The ferries and ships call on the radio as they leave a berth, and call you by name when they will pass close; the coast station reads the weather, and yachts call for a radio check. This turns the spoken calls off or on.' },
     { keys: ['G'], name: 'Course guide', since: 'v15', what: 'Buoys on the marks, a ring round each one in a race, and a line of arrows on the water to the next. On by itself in a race.' },
   ] },
   { id: 'anchor', title: 'At anchor and ashore', rows: [

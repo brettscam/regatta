@@ -1,6 +1,7 @@
 import { KT, SIM_DT } from '@slack-tide/sim';
 import { SHADOW, shadowAt, shadowEase, type ShadowSource } from '../race/shadow';
 import type { AboardContext, Feature } from './feature';
+import type { Residents } from './residents';
 
 /** Sim steps between looks at who is to windward. Ten looks a second. */
 const EVERY = 6;
@@ -30,14 +31,31 @@ export class BadAir implements Feature {
   private quiet = 0;
   private readonly sources: ShadowSource[] = [];
   private readonly names: string[] = [];
+  private readonly local: ShadowSource[] = [];
 
   constructor(private readonly ctx: AboardContext) {}
 
-  /** Everyone who could be taking wind: other people's boats, then the pace boats. */
+  /** Everyone who could be taking wind: the boats that live here, other people's boats, then the pace boats. */
   private gather(): void {
     const { sources, names } = this;
-    sources.length = 0;
+    const s = this.ctx.sim.state;
+    let n = 0;
     names.length = 0;
+    // Only the residents under sail and near enough to matter: a shadow reaches ten mast heights. Their sources are kept and used again.
+    for (const v of this.ctx.feature<Residents>('residents')?.vessels ?? []) {
+      if (!v.sailing || Math.abs(v.x - s.x) > 400 || Math.abs(v.y - s.y) > 400) continue;
+      const src = (this.local[n] ??= { x: 0, y: 0, sog: 0, cog: 0, length: 0, mast: 0, sails: true });
+      src.x = v.x;
+      src.y = v.y;
+      src.sog = v.sog;
+      src.cog = v.heading;
+      src.length = v.length;
+      src.mast = v.mast;
+      names.push(v.name);
+      n++;
+    }
+    sources.length = 0;
+    for (let i = 0; i < n; i++) sources.push(this.local[i]);
     for (const b of this.ctx.company()) {
       // A boat not yet placed on this screen is nowhere.
       if (b.x === 0 && b.y === 0) continue;

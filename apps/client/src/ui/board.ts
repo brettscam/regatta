@@ -3,6 +3,9 @@ import roadmapJson from '../data/roadmap.json';
 import { visited } from '../aboard/visited';
 import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
 import { sightings } from '../aboard/sightings';
+import { met } from '../aboard/met';
+import { residentWaters } from '../aboard/residentData';
+import { COURSES } from '../world/loadCourse';
 import { TIP_STORE, readMemory, writeMemory } from '../aboard/tipRules';
 import { KEY_GROUPS, isNewSince } from '../data/keys';
 import type { Logbook } from '../net/logbook';
@@ -445,6 +448,22 @@ export class Board {
     return `<h3>Seen on the water · ${n} of ${ANIMALS.length}</h3><p class="lede">The crew call out each animal the first time it comes in sight on a sail. Porpoise like the tide at the Gate, seals the quiet anchorages, and a whale needs the flood and some luck.</p><ul class="barhop seen">${cards}</ul>`;
   }
 
+  /** The boats that live on each water, each marked once the player has met her. */
+  private metCard(): string {
+    const seen = met();
+    const order = (id: string): number => { const i = COURSES.findIndex((c) => c.id === id); return i < 0 ? 99 : i; };
+    return residentWaters().filter((w) => w.file.boats.length).sort((a, b) => order(a.id) - order(b.id)).map((w) => {
+      const boats = w.file.boats;
+      const n = boats.filter((b) => seen.has(`${w.id}/${b.id}`)).length;
+      const where = COURSES.find((c) => c.id === w.id)?.name ?? w.id;
+      const cards = boats.map((b) => {
+        const been = seen.has(`${w.id}/${b.id}`);
+        return `<li class="${been ? 'been' : ''}"><b>${esc(b.name)}</b><span>${esc(b.type)}, ${esc(b.home)}</span><i>${been ? esc(b.skipper) : 'Not yet'}</i></li>`;
+      }).join('');
+      return `<h3>Boats met · ${esc(where)} · ${n} of ${boats.length}</h3><ul class="barhop met">${cards}</ul>`;
+    }).join('').replace('</h3>', '</h3><p class="lede">The boats that live on each water. Sail within a couple of hundred metres of one and she is named; press Enter near her to hail, and she answers. Each first meeting earns a few points.</p>');
+  }
+
   /** Experience: the rank, the points, how far to the next rank, and what has earned the most. */
   private xpCard(): string {
     const t = this.logbook.totals;
@@ -481,7 +500,7 @@ export class Board {
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${this.metCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */
