@@ -1,4 +1,4 @@
-import type { CourseData, ReplayData } from '@slack-tide/world';
+import type { CourseData, ReplayData, SeaSpec } from '@slack-tide/world';
 import type { RaceCourse } from '../race/race';
 import type { TrafficSpec } from '../scene/traffic';
 import type { Place } from '../session';
@@ -20,6 +20,12 @@ export interface CourseAbout {
   say: string;
   /** Place in the list: lowest first. */
   order?: number;
+  /**
+   * What the water says about its sea: `{ "swell": { "height": 2, "period": 12, "fromDeg": 290 }, "openFetchKm": 20 }`.
+   * A swell is an ocean swell coming in from outside; left out there is none. `openFetchKm` is the open water beyond the
+   * chart's edge for a wind blowing in off it. See `packages/world/src/sea.ts`.
+   */
+  sea?: SeaSpec;
   scenery?: {
     /** Which built-in ground cover colours the land: `sf-bay` or `evergreen`. */
     landCover?: string;

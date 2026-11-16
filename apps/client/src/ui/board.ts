@@ -6,7 +6,8 @@ import { sightings } from '../aboard/sightings';
 import { met } from '../aboard/met';
 import { residentWaters } from '../aboard/residentData';
 import { COURSES } from '../world/loadCourse';
-import { HOW_A_RACE_WORKS } from '../race/startline';
+import { TIP_STORE, readMemory, writeMemory } from '../aboard/tipRules';
+import { KEY_GROUPS, isNewSince } from '../data/keys';
 import type { Logbook } from '../net/logbook';
 import { KIND_NAMES, rankOf, topEarners } from '../xp/score';
 import { account as askAccount, alone, onWeb, type Account } from '../net/platform';
@@ -44,64 +45,6 @@ const KINDS: Array<[string, string, string]> = [
   ['idea', 'An idea', 'What should the game do that it does not?'],
 ];
 type Tab = 'roadmap' | 'news' | 'keys' | 'feedback' | 'logbook' | 'profile';
-/**
- * Every control, in plain words, grouped by what the player is trying to do and in the order a newcomer needs them.
- * Each row: the keys (one string per key cap; "or" and "+" are joiners, anything else long is a gesture), what it is called, what it does.
- * Sailing is done on the boat's own parts or with these keys: there are no sailing buttons.
- */
-const KEYS: Array<{ title: string; note?: string; rows: Array<[string[], string, string]> }> = [
-  { title: 'Steer and set the sails', note: 'These five are all you need to get going.', rows: [
-    [['A', 'D'], 'Steer', 'Turn the wheel left or right. The arrow keys do the same.'],
-    [['W', 'S'], 'Mainsail', 'The big sail. W pulls it in, S lets it out.'],
-    [['Q', 'E'], 'Jib', 'The front sail. Q pulls it in, E lets it out.'],
-    [['T'], 'Tack', 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.'],
-    [['P'], 'Autopilot', 'On or off. While it is on the boat steers herself and the crew looks after the sails.'],
-  ] },
-  { title: 'More sail, less sail', rows: [
-    [['N'], 'Spinnaker', 'The big coloured sail for when the wind is behind you. N puts it up or takes it down; while it is up, Q and E work its sheet. It will not go up with the wind ahead, must come down before a tack, and in more than about 20 knots it lays the boat over.'],
-    [['J'], 'Reef', 'Make the mainsail smaller when the wind gets up: the boat stands up straighter and steers again. Shift and J lets it back out.'],
-  ] },
-  { title: 'Or use the mouse', rows: [
-    [['Point and scroll'], 'Grab the boat', 'Point at the wheel, the boom (the pole along the bottom of the mainsail) or a winch, then scroll or drag to move it.'],
-    [['Drag'], 'Look around', 'Drag anywhere else to swing the camera. Scroll to move in and out.'],
-  ] },
-  { title: 'See more', rows: [
-    [['1', '2', '3', '4'], 'Camera', 'Jump to a view: the wheel, the mast, the bow, or above the boat.'],
-    [['M'], 'Chart', 'The map. Plan a route and see the wind and tide forecast.'],
-    [['G'], 'Course guide', 'Buoys on the marks, a ring round each one in a race, and a line on the water to the next. On by itself in a race.'],
-    [['F'], 'Wind tunnel', 'Shows the air flowing over your sails, and tells you whether they are set right.'],
-    [['Shift', '+', 'P'], 'Autopilot mode', 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.'],
-    [['C'], 'Coaching', 'Tips on or off.'],
-    [['Y'], 'Award lines', 'Show or hide the line that says when you earn points.'],
-    [['H'], 'Instruments', 'Hide or show the numbers on screen.'],
-  ] },
-  { title: 'Race and talk', note: `How a race works. ${HOW_A_RACE_WORKS.join(' ')}`, rows: [
-    [['R'], 'Fleet and racing', 'See who else is out, start a race, or join one.'],
-    [['Enter'], 'Hail', 'Type a message to the other boats. A boat that lives here answers too, when she is within a few hundred metres: who she is, then the wind, the tide, a place to lie, the fishing.'],
-    [['V'], 'Radio', 'Hold to talk to every boat on this water, let go to listen. On the website only. Shift+V turns the spoken calls from ferries, ships, the coast station and other boats off or on.'],
-  ] },
-  { title: 'Under power', note: 'The engine, for when there is no wind or no room to sail. It is not allowed in a race.', rows: [
-    [['I'], 'Engine', 'Start it or stop it. It takes a second or two to fire, and starts out of gear.'],
-    [['.'], 'Throttle up', 'One step at a time: ahead slow, half, cruise, full. From astern it comes back through neutral.'],
-    [[','], 'Throttle down', 'One step back: down to neutral, then astern slow and astern full. Astern is weak, and she steers badly backwards.'],
-  ] },
-  { title: 'Stop for a while', rows: [
-    [['X'], 'Stop here', 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.'],
-    [['Z'], 'Sleep', 'Skip to the morning. Only while stopped, and only when you are alone on the water.'],
-    [['O'], 'Go ashore', 'Tied up at a dock, O steps straight ashore. Anywhere else you have stopped, it launches the kayak: paddle with W A S D, press O at a beach or a bar to land, and O beside your boat to climb back aboard.'],
-  ] },
-  { title: 'Catch supper', rows: [
-    [['K'], 'Crab pot', 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.'],
-    [['L'], 'Fishing line', 'Line out or in. When "Fish on" appears, press L quickly to catch it.'],
-  ] },
-  { title: 'If you get stuck', rows: [
-    [['U'], 'Tow', 'Run aground? This tows you back to deep water.'],
-    [['Space'], 'Pause', 'Only when you are alone on the water.'],
-    [['Drag the clock'], 'Faster time', 'Drag the clock in the corner sideways to speed time up. Only when you are alone.'],
-    [['/'], 'Key reminder', 'Shows or hides the strip of main keys at the top of the screen.'],
-    [['B'], 'This board', 'Roadmap, what is new, these keys, feedback and your logbook.'],
-  ] },
-];
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /**
@@ -128,6 +71,10 @@ export class Board {
   private readonly flash = document.getElementById('newsflash');
   /** The newest release note this person has read. */
   private seen = '';
+  /** The same, as it was when the page opened: keys that came in since are marked new for the whole visit. */
+  private seenAtLoad = '';
+  /** What is typed in the Keys tab's search box. */
+  private keyFind = '';
   /** Signing in, on the website. Null on the shared page, which knows who is looking, and where there is no backend. */
   private account: Account | null = null;
   private email = '';
@@ -153,6 +100,10 @@ export class Board {
       if (t.id === 'board-context') this.withContext = (t as HTMLInputElement).checked;
       if (t.id === 'board-email') this.email = t.value;
       if (t.id === 'board-code') this.code = t.value;
+      if (t.id === 'board-keyfind') {
+        this.keyFind = t.value;
+        this.filterKeys();
+      }
     });
     // Keys typed into the form are not sailing commands.
     this.el.addEventListener('keydown', (e) => {
@@ -192,6 +143,11 @@ export class Board {
     for (const link of document.querySelectorAll('[data-open-board]')) link.addEventListener('click', () => this.toggle(true, (link as HTMLElement).dataset.openBoard as Tab));
     void this.store.ready.then(() => { if (this.isOpen) this.start(); });
     this.announce();
+    // Anything else on the page can ask for the board at a tab: the "see what changed" on a tip card does.
+    window.addEventListener('regatta:board', (e) => {
+      const tab = (e as CustomEvent<unknown>).detail;
+      this.toggle(true, typeof tab === 'string' && ['roadmap', 'news', 'keys', 'feedback', 'logbook', 'profile'].includes(tab) ? (tab as Tab) : undefined);
+    });
     mountAccountBadge(() => this.toggle(true, 'profile'));
   }
 
@@ -205,6 +161,7 @@ export class Board {
     let returning = false;
     try {
       this.seen = localStorage.getItem(SEEN) ?? '';
+      this.seenAtLoad = this.seen;
       returning = this.seen !== '' || localStorage.getItem('regatta.join') !== null;
     } catch { /* no storage: nothing is remembered, so nothing is announced */ }
     if (!returning) return this.markSeen();
@@ -268,6 +225,7 @@ export class Board {
     else if (d.vote && d.item) void this.castVote(d.item, Number(d.vote));
     else if (d.area) { this.area = d.area; this.render(); }
     else if (d.act === 'shipped') { this.showShipped = !this.showShipped; this.render(); }
+    else if (d.act === 'tips') { this.setTips(this.tipsOff()); this.render(); }
     else if (d.act === 'send') void this.send();
     else if (d.act === 'copy') void this.copy();
     else if (d.act === 'signin') void this.signIn();
@@ -417,11 +375,59 @@ export class Board {
     return `<p class="lede">What has changed, newest first. The game updates under you while you sail: your boat carries on where she was.</p>${list}`;
   }
 
+  /** True when the player has asked for no more pop-up tips (`aboard/tips.ts`). */
+  private tipsOff(): boolean {
+    try {
+      return readMemory(localStorage.getItem(TIP_STORE)).off;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Switch the pop-up tips on or off, here and in the sail going on behind the board. */
+  private setTips(on: boolean): void {
+    try {
+      const memory = readMemory(localStorage.getItem(TIP_STORE));
+      memory.off = !on;
+      localStorage.setItem(TIP_STORE, writeMemory(memory));
+    } catch { /* not remembered: the sail under way is still told */ }
+    window.dispatchEvent(new CustomEvent('regatta:tips', { detail: { off: !on } }));
+  }
+
   private keys(): string {
+    const ids = notes.map((n) => n.id);
     const caps = (keys: string[]): string => keys.map((k) => (k === '+' ? '<i>+</i>' : k.length > 6 ? `<span class="gesture">${esc(k)}</span>` : `<kbd>${esc(k)}</kbd>`)).join('');
-    const groups = KEYS.map((g) => `<section class="keygroup"><h3>${esc(g.title)}</h3>${g.note ? `<p class="lede">${esc(g.note)}</p>` : ''}
-      <ul class="keylist">${g.rows.map(([keys, name, what]) => `<li><span class="caps">${caps(keys)}</span><span class="what"><b>${esc(name)}</b>${esc(what)}</span></li>`).join('')}</ul></section>`).join('');
-    return `<div class="keypage">${groups}</div>`;
+    const groups = KEY_GROUPS.map((g) => `<section class="keygroup"><h3>${esc(g.title)}</h3>${g.note ? `<p class="lede">${esc(g.note)}</p>` : ''}
+      <ul class="keylist">${g.rows.map((r) => {
+        const fresh = isNewSince(r.since, this.seenAtLoad, ids);
+        return `<li data-find="${esc(`${r.keys.join(' ')} ${r.name} ${r.what} ${g.title}${fresh ? ' new' : ''}`.toLowerCase())}"><span class="caps">${caps(r.keys)}</span><span class="what"><b>${esc(r.name)}${fresh ? '<em class="fresh">New</em>' : ''}</b>${esc(r.what)}</span></li>`;
+      }).join('')}</ul></section>`).join('');
+    const off = this.tipsOff();
+    return `<div class="keypage">
+      <div class="keytools">
+        <input id="board-keyfind" type="search" placeholder="Find a key: anchor, radio, reef" aria-label="Find a key" autocomplete="off" spellcheck="false" maxlength="40" value="${esc(this.keyFind)}">
+        <span class="tipswitch">Tips while you sail are ${off ? 'off' : 'on'}. <button type="button" class="link" data-act="tips">${off ? 'Turn them on' : 'Turn them off'}</button></span>
+      </div>
+      <p class="note" data-nokeys hidden>No key matches that. Try another word.</p>
+      ${groups}</div>`;
+  }
+
+  /** Narrow the Keys tab to the rows that have every word typed in the search box. Nothing is drawn again, so the caret stays put. */
+  private filterKeys(): void {
+    const words = this.keyFind.toLowerCase().split(/\s+/).filter(Boolean);
+    let any = false;
+    for (const group of this.el.querySelectorAll<HTMLElement>('.keygroup')) {
+      let shown = 0;
+      for (const row of group.querySelectorAll<HTMLElement>('li')) {
+        const hit = words.every((w) => (row.dataset.find ?? '').includes(w));
+        row.hidden = !hit;
+        if (hit) shown++;
+      }
+      group.hidden = shown === 0;
+      any ||= shown > 0;
+    }
+    const none = this.el.querySelector<HTMLElement>('[data-nokeys]');
+    if (none) none.hidden = any;
   }
 
   /** Every place there is to go ashore, stamped once the player has been. */
@@ -530,7 +536,7 @@ export class Board {
   private render(): void {
     // Keep the caret where it was while votes arrive behind the form.
     const active = document.activeElement as HTMLTextAreaElement | HTMLInputElement | null;
-    const typing = active && ['board-text', 'board-email', 'board-code'].includes(active.id) ? active.id : null;
+    const typing = active && ['board-text', 'board-email', 'board-code', 'board-keyfind'].includes(active.id) ? active.id : null;
     const caret = typing ? active!.selectionStart : null;
     this.el.innerHTML = `
       <div class="board-frame ${this.tab === 'roadmap' ? 'wide' : ''}" role="dialog" aria-label="Roadmap and feedback">
@@ -550,6 +556,7 @@ export class Board {
     }
     // Reading the notes is what marks them read, after they have been drawn as new once.
     if (this.tab === 'news' && this.hasNews) this.markSeen();
+    if (this.tab === 'keys' && this.keyFind) this.filterKeys();
     if (typing && caret !== null) {
       const t = document.getElementById(typing) as HTMLTextAreaElement | HTMLInputElement | null;
       t?.focus();

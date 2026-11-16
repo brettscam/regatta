@@ -1,0 +1,146 @@
+{
+  "levels": [
+    {
+      "id": "ringer",
+      "name": "Ringer",
+      "says": "On the line at the gun, sails the shifts, makes no mistakes",
+      "start": { "backM": [135, 150], "lateS": [0, 0], "speedKt": 5.5 },
+      "trim": { "errDeg": 0, "lagS": 0, "rateDegS": 12, "gust": 1 },
+      "helm": { "wanderDeg": 0, "laylineDeg": 0, "extraTackS": 0, "wideS": 0 },
+      "fumbleS": 0,
+      "sails": { "reefLateKt": 0, "reefMax": 2, "kite": "yes", "kiteShyKt": 0 },
+      "blunderS": 0
+    },
+    {
+      "id": "sharp",
+      "name": "Front of the fleet",
+      "says": "A good start and tidy sailing, a couple of degrees off the best trim",
+      "start": { "backM": [150, 185], "lateS": [0, 5], "speedKt": 4.6 },
+      "trim": { "errDeg": 5, "lagS": 2, "rateDegS": 10, "gust": 1 },
+      "helm": { "wanderDeg": 2, "laylineDeg": 3, "extraTackS": 0, "wideS": 2 },
+      "fumbleS": 2,
+      "sails": { "reefLateKt": 1, "reefMax": 2, "kite": "yes", "kiteShyKt": 1 },
+      "blunderS": 0
+    },
+    {
+      "id": "steady",
+      "name": "Mid-fleet",
+      "says": "Starts a few lengths late, trims after the shift has gone, overstands a little",
+      "start": { "backM": [180, 235], "lateS": [4, 14], "speedKt": 3.6 },
+      "trim": { "errDeg": 10, "lagS": 8, "rateDegS": 6, "gust": 0.7 },
+      "helm": { "wanderDeg": 5, "laylineDeg": 6, "extraTackS": 900, "wideS": 5 },
+      "fumbleS": 5,
+      "sails": { "reefLateKt": 2.5, "reefMax": 2, "kite": "shy", "kiteShyKt": 3 },
+      "blunderS": 1300
+    },
+    {
+      "id": "casual",
+      "name": "Back of the fleet",
+      "says": "Late for the gun, sheets cleated and forgotten, wide round the marks, a reef too late",
+      "start": { "backM": [215, 270], "lateS": [12, 32], "speedKt": 2.6 },
+      "trim": { "errDeg": 13, "lagS": 14, "rateDegS": 4, "gust": 0.35 },
+      "helm": { "wanderDeg": 8, "laylineDeg": 10, "extraTackS": 420, "wideS": 9 },
+      "fumbleS": 9,
+      "sails": { "reefLateKt": 5, "reefMax": 1, "kite": "shy", "kiteShyKt": 7 },
+      "blunderS": 900
+    },
+    {
+      "id": "sunset",
+      "name": "Out for the sunset",
+      "says": "Still pouring drinks at the gun, steers by the view, never reefs, never sets the spinnaker",
+      "start": { "backM": [245, 290], "lateS": [30, 70], "speedKt": 1.6 },
+      "trim": { "errDeg": 19, "lagS": 30, "rateDegS": 2.5, "gust": 0 },
+      "helm": { "wanderDeg": 13, "laylineDeg": 14, "extraTackS": 300, "wideS": 16 },
+      "fumbleS": 16,
+      "sails": { "reefLateKt": 9, "reefMax": 0, "kite": "never", "kiteShyKt": 0 },
+      "blunderS": 520
+    }
+  ],
+  "mixes": [
+    { "id": "beer", "name": "Beer can", "says": "Mostly mid-fleet and back-markers, with maybe one good boat to chase", "weights": { "ringer": 0.35, "sharp": 0.8, "steady": 3, "casual": 3.2, "sunset": 3 } },
+    { "id": "mixed", "name": "Mixed", "says": "The whole club: a ringer or two, a solid middle, and the sunset cruisers", "weights": { "ringer": 1, "sharp": 1, "steady": 1, "casual": 1, "sunset": 1 } },
+    { "id": "hot", "name": "Hot fleet", "says": "Mostly good boats. Bring your best start", "weights": { "ringer": 5, "sharp": 4, "steady": 1.2, "casual": 0.3, "sunset": 0.15 } }
+  ],
+  "skippers": [
+    {
+      "id": "dex", "skipper": "Dex Halloran", "boat": "Bullet", "level": "ringer", "colour": "#b3202a", "sail": "101",
+      "character": "College sailing champion, twenty years ago, and still knows the rule book by number.",
+      "lines": { "start": "Starboard! Hold your course!", "mark": "Room at the mark! I have an overlap!", "passing": "Coming through to leeward. Do not bear away.", "passed": "Protest! I am flying the flag.", "finish": "First gun is ours. Protest hearing at the bar if anyone objects.", "oops": "That was a tactical luff." }
+    },
+    {
+      "id": "ingrid", "skipper": "Ingrid Sorensen", "boat": "Nordlys", "level": "ringer", "colour": "#1d2b3a", "sail": "7",
+      "character": "Says very little, misses nothing. Has not been on the wrong side of a shift since 2011.",
+      "lines": { "start": "Good start, everyone.", "mark": "Nordlys rounding.", "passing": "Lifted ten degrees over here.", "passed": "Nicely sailed. I will have you on the next shift.", "finish": "Nordlys, finished. Thank you, committee.", "oops": "Hm." }
+    },
+    {
+      "id": "marin", "skipper": "Marin Okafor", "boat": "Wind Dancer", "level": "sharp", "colour": "#1f4d7a", "sail": "214",
+      "character": "Sails every Wednesday without fail and trims like she means it. Wants the ringers' scalps.",
+      "lines": { "start": "Wind Dancer is on the line. Let us go!", "mark": "Clean rounding. Kite up, kite up!", "passing": "Sorry, not sorry!", "passed": "Oh, you are quick tonight.", "finish": "Wind Dancer across. Who is buying?", "oops": "Do not look at that. Nobody look at that." }
+    },
+    {
+      "id": "ines", "skipper": "Ines Carvalho", "boat": "Hard Tack", "level": "sharp", "colour": "#2e5d3a", "sail": "88",
+      "character": "Sailmaker by trade. Will tell you what is wrong with your jib leads, kindly, at length.",
+      "lines": { "start": "Hard Tack starting. Watch your leech, by the way.", "mark": "Mark! Ease, ease, ease.", "passing": "Your jib car wants to come forward two holes.", "passed": "That mainsail is setting beautifully. Who made it?", "finish": "Hard Tack finished. Bring your sails round on Saturday.", "oops": "That was the sail's fault. I should know." }
+    },
+    {
+      "id": "priya", "skipper": "Priya Raman", "boat": "Slipstream", "level": "sharp", "colour": "#d9d9de", "sail": "360",
+      "character": "New boat, new sails, matching crew shirts. Very fast whenever it all works.",
+      "lines": { "start": "Slipstream away on the gun!", "mark": "Rounding. Everyone remember their job, please.", "passing": "Feels good, this boat.", "passed": "We are still tuning the rig.", "finish": "Slipstream done. Team photo on the dock.", "oops": "Which of you was on that winch?" }
+    },
+    {
+      "id": "teo", "skipper": "Teo Marchetti", "boat": "Second Wind", "level": "steady", "colour": "#6b3a78", "sail": "52",
+      "character": "Took up sailing at fifty and has not stopped grinning since. Solid, steady, never first.",
+      "lines": { "start": "Second Wind is racing! I think that was the gun.", "mark": "Round we go. Mind the boom, everyone.", "passing": "Well, look at us!", "passed": "Go on then. Lovely evening for it.", "finish": "Second Wind is home. What a sail.", "oops": "Whoops. All part of the learning." }
+    },
+    {
+      "id": "walt", "skipper": "Walt Brannigan", "boat": "Old Grey Goose", "level": "steady", "colour": "#7b8086", "sail": "3",
+      "character": "Forty seasons on this water. Goes where the tide tells him and is right more often than not.",
+      "lines": { "start": "Goose is away. No rush, the tide does the work.", "mark": "Round the mark, same as in '84.", "passing": "Tide line, youngster. You have to read the water.", "passed": "I had a boat that quick once.", "finish": "Old Grey Goose, finished, same as every week.", "oops": "She has never done that before. Forty years." }
+    },
+    {
+      "id": "sunny", "skipper": "Sunny Park", "boat": "Knot Guilty", "level": "steady", "colour": "#c9861a", "sail": "419",
+      "character": "Four lawyers and a dog. They argue every tack and are surprisingly quick between arguments.",
+      "lines": { "start": "Knot Guilty is over the line. Allegedly on time.", "mark": "We have rounded, pending appeal.", "passing": "Objection overruled!", "passed": "We reserve the right to catch you later.", "finish": "Knot Guilty rests her case. Finished.", "oops": "The crew would like that struck from the record." }
+    },
+    {
+      "id": "bea", "skipper": "Bea Lindqvist", "boat": "Pegasus", "level": "steady", "colour": "#f0ede4", "sail": "1702",
+      "character": "Brings her two teenagers as crew. They are better than she is and all three know it.",
+      "lines": { "start": "Pegasus starting. Phones away, please!", "mark": "Mark rounded. Yes, I saw it, thank you, Freya.", "passing": "The kids are trimming. That is why.", "passed": "Somebody trim something!", "finish": "Pegasus is in. Homework, both of you.", "oops": "That one was me. I was steering." }
+    },
+    {
+      "id": "rafa", "skipper": "Rafa Dominguez", "boat": "Tequila Mockingbird", "level": "steady", "colour": "#13816b", "sail": "66",
+      "character": "Runs the taqueria by the marina. The fastest boat in the fleet when the food is not ready yet.",
+      "lines": { "start": "Mockingbird away! Tacos after, everybody.", "mark": "Round the mark. Who has the salsa?", "passing": "Light boat tonight. We ate everything already.", "passed": "Slow down, you will miss dinner.", "finish": "Tequila Mockingbird finished. Kitchen is open.", "oops": "Too many cooks on that winch." }
+    },
+    {
+      "id": "june", "skipper": "June Abernathy", "boat": "Slow Motion", "level": "casual", "colour": "#e7b7c1", "sail": "12",
+      "character": "Retired schoolteacher. Reads the sailing instructions aloud to the crew, twice, during the start.",
+      "lines": { "start": "Slow Motion here. Was that our gun or the five minute?", "mark": "Is this our mark? It says here it should be to port.", "passing": "Oh! Are we allowed to pass people?", "passed": "Well done, dear. Mind how you go.", "finish": "Slow Motion has finished, I believe. Does someone write it down?", "oops": "Sorry! Sorry, everyone. Sorry." }
+    },
+    {
+      "id": "gus", "skipper": "Gus Petrakis", "boat": "Pier Pressure", "level": "casual", "colour": "#274e9c", "sail": "740",
+      "character": "Bought the boat last spring. Has every gadget and is still looking for the mainsheet.",
+      "lines": { "start": "Pier Pressure starting. The app says we are early. Or late.", "mark": "Rounding! Which rope is the blue one?", "passing": "We are passing someone! Take a photo!", "passed": "My plotter says we are winning.", "finish": "Pier Pressure, finished. Recording saved.", "oops": "That is not what the video said would happen." }
+    },
+    {
+      "id": "moana", "skipper": "Moana Keawe", "boat": "Lazy Jack", "level": "casual", "colour": "#e06b2d", "sail": "29",
+      "character": "Here for the company. Will stop racing to look at a sea lion and consider it time well spent.",
+      "lines": { "start": "Lazy Jack is coming. Start without us.", "mark": "Mark. There was a seal on it. Did you see the seal?", "passing": "Do not worry, it will not last.", "passed": "Go get them. We are fine back here.", "finish": "Lazy Jack is in. Beautiful out there tonight.", "oops": "We were looking at a pelican." }
+    },
+    {
+      "id": "nigel", "skipper": "Nigel Farrow", "boat": "Scotch Mist", "level": "casual", "colour": "#4a3b2a", "sail": "1958",
+      "character": "Wooden-boat man in the wrong fleet. Blames the handicap, though this is one design.",
+      "lines": { "start": "Scotch Mist, under way. In my day the gun was a gun.", "mark": "Rounding. A proper boat would have carried her way.", "passing": "Ha! Seamanship, you see.", "passed": "Plastic boats. No soul.", "finish": "Scotch Mist finished. I shall be writing to the committee.", "oops": "The rating does not account for that." }
+    },
+    {
+      "id": "dot", "skipper": "Dot and Harold Finch", "boat": "Happy Hour", "level": "sunset", "colour": "#f2c230", "sail": "5",
+      "character": "Married fifty-one years. Out for the sunset and the gin. The race is somebody else's business.",
+      "lines": { "start": "Happy Hour here. Harold is just finding the ice.", "mark": "Is that the mark? Harold, is that the mark?", "passing": "Goodness, Harold, we have overtaken someone.", "passed": "Hello, dear! Lovely evening!", "finish": "Happy Hour is finished. Just in time for the second bottle.", "oops": "Harold spilled his drink." }
+    },
+    {
+      "id": "biff", "skipper": "Biff Tanaka", "boat": "Bottle Opener", "level": "sunset", "colour": "#7ec8e3", "sail": "0",
+      "character": "Six friends, two coolers, one winch handle. The speaker is louder than the sails.",
+      "lines": { "start": "Bottle Opener! We are racing? We are racing!", "mark": "Anyone seen our bottle opener?", "passing": "Whoa! How did that happen?", "passed": "Nice boat! Want a beer? Catch!", "finish": "Bottle Opener is DONE. Save us a table.", "oops": "Who was steering? No, seriously, who was steering?" }
+    }
+  ]
+}

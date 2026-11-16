@@ -5,6 +5,12 @@ export interface YardBoat extends BoatSpec {
   lengthFt?: number;
   tagline?: string;
   role?: string;
+  /** How hard she is to sail well, in a few words, where it is worth saying. */
+  difficulty?: string;
+  /** Which builder draws her: 'catamaran', or left out for a sloop. */
+  model?: string;
+  /** Working views of her own, by name (helm, mast, foredeck, drone), where a sloop's would look at the wrong place. */
+  views?: Record<string, import('../camera/drone').ViewPreset>;
   defaultName?: string;
   homePort?: string;
   topsides?: string;

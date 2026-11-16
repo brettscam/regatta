@@ -1,6 +1,50 @@
 {
   "notes": [
     {
+      "id": "v29",
+      "date": "2026-11-16",
+      "title": "A real sea",
+      "items": [
+        "The Bay now has a real sea. The chop builds with the wind and the open water to windward, stands up short and steep where the ebb runs against the breeze in the Golden Gate, and lies down in the lee of the land.",
+        "Your boat lives in it: she loses speed punching into a chop (the 30 far more than the 45), slams when she falls off a steep one, surfs a little running in a big sea, and is harder to steer and easier to gybe by accident downwind.",
+        "Ships and ferries leave a wake that reaches you a minute or so after they pass, rolling the boat and shaking the wind out of the sails in light air. In the kayak, turn your bow into a big ship's wake or it will put you over.",
+        "The instruments describe the sea beside the wind, and there are new tips for chop, slamming and wind against tide."
+      ]
+    },
+    {
+      "id": "v28",
+      "date": "2026-11-16",
+      "title": "Tips, and a radio you can see",
+      "items": [
+        "Small cards now pop up at the right moment to show a key you may not know: hold V to talk when another boat appears, J to reef when it blows, X near an anchorage, O to go ashore. Each goes away once you use the key, and Don't show tips turns them off.",
+        "The radio has a light at the bottom left. It shows RX when anyone is on the air and TX when you are. Click it to learn how the radio works.",
+        "The Keys tab on the board is grouped, searchable, and marks keys that are new since you last sailed.",
+        "The strip of keys at the start of a sail now changes with what you are doing: sailing, racing, at anchor or in the kayak."
+      ]
+    },
+    {
+      "id": "v27",
+      "date": "2026-11-16",
+      "title": "A catamaran and a bluewater 50",
+      "items": [
+        "Two new boats: a 42 ft cruising catamaran and a 50 ft bluewater cruiser.",
+        "The catamaran sails flat and fast on a reach, beating the 45 from about 16 knots, but will not point and is slow through a tack. She gives no heel to warn you: reef by the numbers on her placard, 18 knots apparent and again at 25, or risk a capsize she will not come back from.",
+        "Her two engines spin her on the spot, and she floats where the keelboats run aground.",
+        "The bluewater 50 is heavy and steady: slow to get going, hard to stop, and at her best when the wind gets up."
+      ]
+    },
+    {
+      "id": "v26",
+      "date": "2026-11-16",
+      "title": "The beer can league",
+      "items": [
+        "The pace boats are now the yacht club: sixteen skippers, from two ringers who never miss a shift to the couple out for the sunset.",
+        "Call a race with up to nine of them and pick the fleet: Beer can, Mixed or Hot. They sail the same boat as you. The weaker ones lose the way real crews do: late starts, sheets left cleated, wide roundings, a reef too late in a blow.",
+        "The race panel shows the whole fleet as cards: each boat in her colour with her skipper, and a real player's own figure. Places and gaps show while racing.",
+        "At the finish there is a results table that fills in as the back-markers come home. The skippers call across the water in character."
+      ]
+    },
+    {
       "id": "v25",
       "date": "2026-11-15",
       "title": "Choose your weather",

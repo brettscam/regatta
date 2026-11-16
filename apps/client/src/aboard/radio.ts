@@ -210,6 +210,11 @@ export class Radio implements Feature {
     this.light.remove();
   }
 
+  /** Who is on the air now, for the VHF light: her own transmission, other voices, and a traffic call being spoken. */
+  onAir(): { tx: boolean; rx: string[]; call: boolean; quiet: boolean } {
+    return { tx: this.voice?.state().transmitting ?? false, rx: [...this.talkers], call: this.speaking !== null, quiet: !this.trafficOn };
+  }
+
   /** The voice side, for looking at from the console while play testing. */
   debug(): Record<string, unknown> {
     return {
