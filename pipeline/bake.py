@@ -258,16 +258,58 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
     wxs, wys, wnx, wny = grid(CHART, WIND_DX)
     wgx, wgy = np.meshgrid(wxs, wys)
 
+    # A water can ask for two things of its wind (`wind.seaOnly`, `wind.lee`). Neither is on unless asked for.
+    wind_spec = c.spec.get("wind", {})
+    height_at = lambda x, y: np.clip(dem(*to_latlon(x, y)), 0, None)
+
+    def blocking(x, y, bearing, reach, rise):
+        """How much high ground stands in a direction from each point: 0 open, 1 fully in its shadow.
+        Ground of height h at distance d counts as h / (rise * d + 25), so a hill shelters ten times its height or so."""
+        most = np.zeros_like(x)
+        for dist in np.arange(150.0, reach + 1, 150.0):
+            most = np.maximum(most, height_at(x + np.sin(bearing) * dist, y + np.cos(bearing) * dist) / (rise * dist + 25.0))
+        return np.clip(most, 0, 1)
+
+    # Each wind cell is judged at five points, its middle and four round it, and only those that are afloat count.
+    if "lee" in wind_spec:
+        lee_x = wgx[..., None] + np.array([0, -0.25, 0.25, -0.25, 0.25]) * WIND_DX
+        lee_y = wgy[..., None] + np.array([0, -0.25, -0.25, 0.25, 0.25]) * WIND_DX
+        lee_afloat = height_at(lee_x, lee_y) < 1.0
+        lee_count = np.maximum(lee_afloat.sum(axis=-1), 1)
+
+    def island_effects(u, v, gust, lee):
+        """Wind shadow under high islands and a little more wind where it is squeezed past them, by rule.
+        The analysis grid is too coarse to hold either."""
+        from_ = np.arctan2(-u, -v)[..., None]
+        over_water = lambda a: (a * lee_afloat).sum(axis=-1) / lee_count
+        shade = over_water(blocking(lee_x, lee_y, from_, lee["reach"], lee["rise"]))
+        flanks = blocking(lee_x, lee_y, from_ + math.pi / 2, lee["reach"] / 2, lee["rise"]) + blocking(lee_x, lee_y, from_ - math.pi / 2, lee["reach"] / 2, lee["rise"])
+        squeeze = over_water(np.clip(flanks, 0, 2) / 2)
+        mean = (1 - lee["calm"] * shade) * (1 + lee["squeeze"] * squeeze * (1 - shade))
+        # Under a high island the mean wind drops away but the puffs still come down off the hill.
+        puffs = (1 - lee["calm"] * 0.45 * shade) * (1 + lee["squeeze"] * squeeze * (1 - shade))
+        return u * mean, v * mean, gust * puffs
+
     def wind_of(path):
         d = np.load(path)
         px, py = to_xy(d["lat"], d["lon"])
         pts = np.c_[px, py]
+        # Model points on or hard by the hills carry ridge-top wind, far stronger than the water below gets. Leave out
+        # every point with ground higher than `seaOnly` metres within 1.25 km, and fill in from the open water.
+        at_sea = np.ones(len(px), dtype=bool)
+        if "seaOnly" in wind_spec:
+            for reach in (0.0, 600.0, 1250.0):
+                for k in range(8 if reach else 1):
+                    at_sea &= height_at(px + reach * math.sin(k * math.pi / 4), py + reach * math.cos(k * math.pi / 4)) <= wind_spec["seaOnly"]
+        pts = pts[at_sea]
         fields = []
         for key in ("u", "v", "gust"):
-            lin = LinearNDInterpolator(pts, d[key])(wgx, wgy)
-            near = NearestNDInterpolator(pts, d[key])(wgx, wgy)
+            lin = LinearNDInterpolator(pts, d[key][at_sea])(wgx, wgy)
+            near = NearestNDInterpolator(pts, d[key][at_sea])(wgx, wgy)
             fields.append(np.where(np.isnan(lin), near, lin))
         u, v, gust = fields
+        if "lee" in wind_spec:
+            u, v, gust = island_effects(u, v, gust, wind_spec["lee"])
         # A gust is never less than the mean wind.
         gust = np.maximum(gust, np.hypot(u, v))
         tenths = lambda a: [int(round(float(x) * 10)) for x in a.ravel()]
@@ -308,7 +350,8 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
         station = np.load(fetch_ofs.forecast_tide_path(work))
         forecast_tide = [round(float(z), 3) for z in station["zeta"]]
         truth_source = f"Tide and stream: {c.model['title']}, the nowcast for each hour."
-        tide_source = f"Tide: {model} {FIRST_CYCLE:%H}z cycle, its station forecast nearest {TIDE_STATION[0]}."
+        where = "forecast at the mesh node" if c.model.get("reader") == "stofs" else "station forecast"
+        tide_source = f"Tide: {model} {FIRST_CYCLE:%H}z cycle, its {where} nearest {TIDE_STATION[0]}."
     forecast_wind = [wind_of(fetch_hrrr.forecast_path(hrrr_dir, h)) for h in range(fetch_hrrr.forecast_span(c) + 1)]
     with open(os.path.join(out, "current.bin"), "wb") as f:
         for current in currents:
@@ -339,6 +382,17 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
         for rx, ry, radius, _ in rocks:
             # A rock too small for the elevation tiles: dry out to its radius, and never less than the one cell nearest it.
             depth = np.where(np.hypot(dgx - rx, dgy - ry) <= max(radius, step * 0.55), 0.0, depth)
+        # Reefs the model's mesh is too coarse to hold, charted by hand in the definition: a round patch ("at" and
+        # "radius") or a band along a line ("line" and "width"), never deeper than "depth". Water only.
+        for shoal in c.spec.get("shoals", []):
+            pts = np.array([to_xy(la, lo) for la, lo in shoal.get("line", [shoal.get("at")])], dtype="f8")
+            reach = shoal.get("radius", shoal.get("width", 0) / 2)
+            away = np.full(dgx.shape, np.inf)
+            for a, b in zip(pts, pts[1:] if len(pts) > 1 else pts):
+                ab = b - a
+                t = np.clip(((dgx - a[0]) * ab[0] + (dgy - a[1]) * ab[1]) / (ab @ ab or 1.0), 0, 1)
+                away = np.minimum(away, np.hypot(dgx - a[0] - t * ab[0], dgy - a[1] - t * ab[1]))
+            depth = np.where((away <= reach) & (depth > 0), np.minimum(depth, shoal["depth"]), depth)
         return np.clip(np.round(depth * 2), 0, 255).astype("u1"), dnx, dny
 
     depth_cells, dnx, dny = depth_on(CHART, DEPTH_DX)
@@ -387,6 +441,11 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
         return [round(float(x)), round(float(y))]
 
     MARKS = c.spec["marks"]
+    # Waters outside HRRR name their own wind sources. The Bay and the San Juans do not, and bake as they always have.
+    wind = c.spec.get("wind", {})
+    wind_truth = wind.get("truth", "NOAA HRRR 3 km analyses, one an hour")
+    wind_forecast = wind.get("forecast", "HRRR")
+    wind_note = "HRRR 10 m wind" if not wind else "10 m wind"
     course = {
         "id": c.id,
         "name": c.name,
@@ -397,12 +456,12 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
             "start": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": TRUTH_HOURS,
             "stepSeconds": 3600,
-            "source": f"{truth_source} Wind and gusts: NOAA HRRR 3 km analyses, one an hour. Both from NOAA Open Data on AWS.",
+            "source": f"{truth_source} Wind and gusts: {wind_truth}. Both from NOAA Open Data on AWS.",
         },
         "forecast": {
             "issued": f"{FIRST_CYCLE:%Y-%m-%dT%H:%M:%SZ}",
             "hours": FORECAST_HOURS,
-            "source": f"Wind: HRRR {c.hrrr_forecast_cycle:%H}z cycle of {c.hrrr_forecast_cycle:%d %b %Y}. {tide_source} Both as issued.",
+            "source": f"Wind: {wind_forecast} {c.hrrr_forecast_cycle:%H}z cycle of {c.hrrr_forecast_cycle:%d %b %Y}. {tide_source} Both as issued.",
             "windIssued": f"{c.hrrr_forecast_cycle:%Y-%m-%dT%H:%M:%SZ}",
         },
         "current": {"x0": CHART[0], "y0": CHART[1], "dx": CURRENT_DX, "nx": cnx, "ny": cny, "scale": CURRENT_SCALE, "steps": TRUTH_HOURS + 1, "file": "current.bin"},
@@ -410,7 +469,7 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
         "terrain": {"x0": TERRAIN[0], "y0": TERRAIN[1], "dx": TERRAIN_DX, "nx": tnx, "ny": tny, "max": TERRAIN_MAX, "file": "terrain.bin",
                     "source": "Terrarium elevation tiles (Mapzen, AWS Open Data)."},
         "wind": {"x0": CHART[0], "y0": CHART[1], "dx": WIND_DX, "nx": wnx, "ny": wny, "scale": 0.1, "truth": truth_wind, "forecast": forecast_wind,
-                 "note": "HRRR 10 m wind in tenths of a metre per second, blowing toward east (u) and north (v), and surface gust speed (g)."},
+                 "note": f"{wind_note} in tenths of a metre per second, blowing toward east (u) and north (v), and surface gust speed (g)."},
         "tide": {"station": TIDE_STATION[0], "x": xy(TIDE_STATION[1:])[0], "y": xy(TIDE_STATION[1:])[1], "truth": truth_tide, "forecast": forecast_tide,
                  "note": "Water level in metres above the model datum, close to mean sea level."},
         "bridge": {"south": xy(c.spec["bridge"]["south"]), "north": xy(c.spec["bridge"]["north"])} if "bridge" in c.spec else None,
@@ -418,6 +477,8 @@ def main(name, work, tile_dir, out, hrrr_dir, outer_dir=None):
         "bounds": {"x0": CHART[0], "y0": CHART[1], "x1": CHART[2], "y1": CHART[3]},
         "coast": rings,
     }
+    if "modelled" in wind:
+        course["wind"]["modelled"] = wind["modelled"]
     if course["bridge"] is None:
         del course["bridge"]
     # Insets, where the course has them: listed on the grid they refine, in the order their cells follow it in the file.

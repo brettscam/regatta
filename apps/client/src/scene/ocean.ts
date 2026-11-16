@@ -177,6 +177,11 @@ const fragmentShader = /* glsl */ `
   uniform float uWindKt;
   uniform vec3 uDeep;
   uniform vec3 uScatter;
+  uniform sampler2D uShoal;   // red: how shoal the water is, 0 deep to 1 awash. green: reef or grass on the bottom. Unused unless uShoalOn is set
+  uniform vec4 uShoalBox;     // x, z of the map's north-west corner in scene metres, and one over its width and depth
+  uniform vec3 uShoalColor;
+  uniform vec3 uReefColor;
+  uniform float uShoalOn;
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
   uniform float uBoatSpeed;
   uniform float uBoatHeel;
@@ -261,6 +266,17 @@ const fragmentShader = /* glsl */ `
     float through = pow(max(dot(V, -normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0), 3.0);
     vec3 body = uDeep * (0.55 + 0.45 * sunUp) + uScatter * sunUp * (0.18 + 0.5 * crest + 0.9 * crest * through);
     body *= mix(1.0, 0.78, gust * 0.6);
+    // Clear shoal water over sand shows its bottom: turquoise, paler as it shoals, dark where reef or grass grows.
+    // Only a water that gives a map of its shoals has any.
+    if (uShoalOn > 0.0) {
+      vec2 suv = (vBase - uShoalBox.xy) * uShoalBox.zw;
+      if (suv.x > 0.0 && suv.y > 0.0 && suv.x < 1.0 && suv.y < 1.0) {
+        vec4 bed = texture2D(uShoal, suv);
+        float shoal = bed.r * uShoalOn;
+        vec3 lit = mix(uShoalColor, uReefColor, bed.g) * (0.3 + 0.7 * sunUp) * (0.75 + 0.6 * shoal);
+        body = mix(body, lit, shoal);
+      }
+    }
 
     // The boat's shadow on the water: hull and sails thrown down-sun. It dims the light coming up out of the water
     // and the sun's glitter, but not the reflected sky, which is how a shadow on water really looks.
@@ -421,6 +437,11 @@ export class Ocean {
       // Bay water: green-grey rather than tropical blue.
       uDeep: { value: new THREE.Color(0.012, 0.05, 0.062) },
       uScatter: { value: new THREE.Color(0.03, 0.15, 0.13) },
+      uShoal: { value: null },
+      uShoalBox: { value: new THREE.Vector4(0, 0, 1, 1) },
+      uShoalColor: { value: new THREE.Color(0.04, 0.5, 0.47) },
+      uReefColor: { value: new THREE.Color(0.05, 0.16, 0.13) },
+      uShoalOn: { value: 0 },
       uBoat: { value: new THREE.Vector4() },
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
@@ -466,6 +487,29 @@ export class Ocean {
       a[i].set(n.v.x, -n.v.y, Math.sin(n.v.heading), Math.cos(n.v.heading));
       b[i].set(n.v.sog, n.v.length, n.v.beam, 1);
     }
+  }
+
+  /**
+   * A map of shoal water, for a sea clear enough that its bottom shows through. Red is 0 over deep water and 1 where
+   * it is nearly awash, green is how much reef or grass darkens the bottom there. The map's first row is its northern
+   * edge. `x` and `z` are its north-west corner in scene metres, `width` and `depth` its size east and south.
+   * Pass null for a water with no such map, which is every water unless it asks.
+   */
+  setShoals(map: THREE.Texture | null, x = 0, z = 0, width = 1, depth = width): void {
+    const old = this.uniforms.uShoal.value as THREE.Texture | null;
+    if (old && old !== map) old.dispose();
+    this.uniforms.uShoal.value = map;
+    this.uniforms.uShoalOn.value = map ? 1 : 0;
+    (this.uniforms.uShoalBox.value as THREE.Vector4).set(x, z, 1 / width, 1 / depth);
+  }
+
+  /**
+   * The colour of the water itself: deep, and the light scattered back out of the crests.
+   * With no arguments it is the Bay's green-grey, as the sea is first made.
+   */
+  setWater(deep: THREE.ColorRepresentation = new THREE.Color(0.012, 0.05, 0.062), scatter: THREE.ColorRepresentation = new THREE.Color(0.03, 0.15, 0.13)): void {
+    (this.uniforms.uDeep.value as THREE.Color).set(deep);
+    (this.uniforms.uScatter.value as THREE.Color).set(scatter);
   }
 
   setSun(dir: THREE.Vector3, color: THREE.Color): void {

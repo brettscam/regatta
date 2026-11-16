@@ -7,6 +7,7 @@ import { Buoy, buildBridge, buildLand, landHeight } from './scene/terrain';
 import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
+import { buildMooringFields, buildPalms, buildVirginIslands, shoalMap } from './scene/tropics';
 import { buildShoreside, type ShoreSpot } from './scene/shoreside';
 import { groundHeight, type HeightGrid } from './aboard/paddle';
 import { clearCityNight, setCityNight } from './scene/massing';
@@ -145,6 +146,18 @@ export class Stage {
     for (const place of data.places) approaches.push([place.x, place.y, 150]);
     const plots = shore.spots.map((spot): [number, number, number] => [spot.x + Math.sin(spot.layout.heading) * 8, spot.y + Math.cos(spot.layout.heading) * 8, 44]);
     if (pieces.has('san-francisco')) land.add(buildScenery(...sceneryGround(this.course, data.terrain), data.depth, approaches, plots));
+    if (pieces.has('palms')) land.add(buildPalms(this.course, data.terrain));
+    if (pieces.has('mooring-fields')) land.add(buildMooringFields(this.course, data.terrain, data.depth, data.places, approaches));
+    if (pieces.has('virgin-islands')) land.add(buildVirginIslands(this.course, data.terrain));
+    // The water itself. Clear tropical water is blue where it is deep and shows its bottom where it is not.
+    if (scenery.water === 'clear') {
+      const shoals = shoalMap(this.course, data.depth);
+      this.ocean.setWater(new THREE.Color(0.006, 0.035, 0.085), new THREE.Color(0.02, 0.14, 0.2));
+      this.ocean.setShoals(shoals.texture, shoals.x, shoals.z, shoals.width, shoals.depth);
+    } else {
+      this.ocean.setWater();
+      this.ocean.setShoals(null);
+    }
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
     for (const b of this.buoys) land.add(b.group);
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.

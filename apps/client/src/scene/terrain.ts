@@ -24,6 +24,14 @@ export function smoothNoise(x: number, y: number): number {
   return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
 }
 
+/**
+ * Whether a stretch of tropical shore is sand or rock. The elevation data cannot tell, so it goes by broad patches:
+ * about half of any coast is beach. The ground cover and the palms both ask this, so palms stand behind sand.
+ */
+export function sandyShore(x: number, y: number): boolean {
+  return smoothNoise(x / 520 + 31, y / 520 - 17) > 0.48;
+}
+
 export type LandUse = 'city' | 'town' | 'forest' | 'open';
 
 const inBox = (x: number, y: number, x0: number, x1: number, y0: number, y1: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
@@ -99,11 +107,19 @@ export interface LandPart {
 /**
  * The land around the course, from real elevation data.
  * Sim coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
- * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen` or `gulf`
+ * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen`, `gulf` or `tropic`
  * @param part draw one grid of a course whose land has insets, with `heights` that grid's own cells. Left out, the whole of a plain course
  */
 export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay', part?: LandPart): THREE.Mesh {
   const bay = cover !== 'evergreen';
+  // Trade-wind islands: green bush to the ridges, drier and thornier low down and on the sunny side, bare rock where
+  // it is steep, and white coral sand wherever the shore is flat.
+  const tropic = cover === 'tropic';
+  const bush = new THREE.Color(0.1, 0.25, 0.08);
+  const canopy = new THREE.Color(0.17, 0.34, 0.11);
+  const thorn = new THREE.Color(0.36, 0.39, 0.19);
+  const coral = new THREE.Color(0.9, 0.86, 0.72);
+  const boulder = new THREE.Color(0.46, 0.43, 0.39);
   const gulf = cover === 'gulf';
   const g = part ? { ...course.terrain, ...part.grid } : course.terrain;
   const { nx, ny, dx } = g;
@@ -138,9 +154,10 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       pos[k * 3 + 2] = -y;
       if (z <= 0.4) {
         // Seabed colour only shows where a triangle crosses the waterline.
-        col[k * 3] = sand.r * 0.8;
-        col[k * 3 + 1] = sand.g * 0.8;
-        col[k * 3 + 2] = sand.b * 0.8;
+        const bed = tropic ? coral : sand;
+        col[k * 3] = bed.r * (tropic ? 1 : 0.8);
+        col[k * 3 + 1] = bed.g * (tropic ? 1 : 0.8);
+        col[k * 3 + 2] = bed.b * (tropic ? 1 : 0.8);
         continue;
       }
 
@@ -150,6 +167,23 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       const slope = Math.hypot(e, n);
       const broad = smoothNoise(x / 900, y / 900);
       const patch = smoothNoise(x / 420, y / 420) * 0.6 + smoothNoise(x / 130, y / 130) * 0.4;
+      if (tropic) {
+        // Wetter with height, drier on low ground and on slopes that face the sun to the south.
+        const dry = THREE.MathUtils.clamp((1 - z / 230) * (0.25 + broad * 0.9) + THREE.MathUtils.clamp(-n * 1.5, 0, 0.35), 0, 0.9);
+        c.copy(bush).lerp(canopy, patch).lerp(thorn, dry * (0.55 + 0.45 * patch));
+        c.lerp(boulder, THREE.MathUtils.smoothstep(slope, 0.55, 1.05) * 0.7);
+        let beach = 0;
+        for (let r = 1; r <= 1 && beach === 0; r++) {
+          if (wet(i - r, j) || wet(i + r, j) || wet(i, j - r) || wet(i, j + r) || wet(i - r, j - r) || wet(i + r, j + r) || wet(i - r, j + r) || wet(i + r, j - r)) beach = r === 1 ? 1 : 0.45;
+        }
+        // Sand on a flat shore, grey rock under a steep one.
+        if (beach > 0 && z < 22) c.lerp(slope > 0.22 || !sandyShore(x, y) ? boulder : coral, beach * (1 - THREE.MathUtils.smoothstep(z, 3, 22)) * (sandyShore(x, y) ? 1 : 0.7));
+        const lit = (0.9 + 0.18 * hash(i, j)) * (1 - 0.16 * THREE.MathUtils.clamp((-e - n) * 1.6, 0, 1));
+        col[k * 3] = c.r * lit;
+        col[k * 3 + 1] = c.g * lit;
+        col[k * 3 + 2] = c.b * lit;
+        continue;
+      }
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
       const sheltered = THREE.MathUtils.clamp(0.5 - (e + n) * 2.2, 0, 1);
       // Near the open ocean the fog keeps the hills green-grey. Inland they dry to gold by July.
