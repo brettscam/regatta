@@ -159,6 +159,7 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
   });
   board.context = () => ({ ...session!.report(), spot: choice.spot, startTime: choice.time });
   const handles = session.debug();
+  Object.assign(handles, { stage });
   Object.assign(window, { regatta: handles, slackTide: handles });
 }
 

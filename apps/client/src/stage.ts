@@ -13,6 +13,13 @@ import { groundHeight, type HeightGrid } from './aboard/paddle';
 import { clearCityNight, setCityNight } from './scene/massing';
 import { WakeField } from './scene/wakes';
 import { buildWaves, setSea, setSeaState, waveHeight, type Wave } from './scene/waves';
+import { SeaField } from './scene/seaField';
+import { Wake, type WakeVessel } from './scene/wake';
+import { Spray } from './scene/spray';
+import { graphics } from './scene/quality';
+import { NavLights } from './scene/navLights';
+import { Rain } from './scene/rain';
+import { SF_FOG_PATH, cloudCover, fogAt, fogReach, morningHaze, pathPoint, rainAt, solarHour, squallsAt, visibility, type FogPath, type Squall } from './scene/weatherRules';
 import type { LoadedCourse } from './world/loadCourse';
 
 export interface StageBoat {
@@ -22,6 +29,12 @@ export interface StageBoat {
   heading: number;
   speed: number;
   heel: number;
+  /** Her size, for the wake she leaves. A 38-footer if not given. */
+  length?: number;
+  beam?: number;
+  /** Under engine and in gear, or lying to an anchor or a mooring: for the lights she shows at night. */
+  power?: boolean;
+  held?: boolean;
   /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
   hulls?: number;
 }
@@ -55,6 +68,25 @@ export class Stage {
   readonly scene = new THREE.Scene();
   readonly sky: SkySystem;
   readonly ocean: Ocean;
+  /** The course's wind and depth as the sea's shader reads them. */
+  readonly field = new SeaField();
+  /** What every vessel leaves on the water, and the spray off their bows. */
+  readonly wake: Wake;
+  readonly spray = new Spray();
+  private readonly afloat: WakeVessel[] = [];
+  private readonly white = new THREE.Color();
+  private readonly tint = new THREE.Color();
+  private readonly seaAt = (x: number, z: number, count: number) => waveHeight(this.waves, x, z, this.seaTime, count);
+  private seaTime = 0;
+  private lastSea = 0;
+  /** Lights on everything afloat, and rain. */
+  readonly navLights = new NavLights();
+  readonly rain = new Rain();
+  /** The weather that can be seen, worked out each frame from the season's clock. For the curious and for tests. */
+  readonly weather = { fog: 0, haze: 0, rain: 0, cover: 0, reach: 0, see: 30000, squalls: [] as Squall[] };
+  private fogPath: FogPath | null = null;
+  private hazy = false;
+  private readonly fogColor = new THREE.Color();
   traffic!: Traffic;
   course!: CourseData;
   world!: ReplayWorld;
@@ -71,6 +103,8 @@ export class Stage {
   private buoys: Buoy[] = [];
   /** Lighthouses and lit marks, on a water that has them. */
   private seamarks: Seamarks | null = null;
+  /** Where the charted lights are, course metres. */
+  private litMarks: Array<[number, number]> = [];
   private readonly focus = new THREE.Vector3();
   private seaKt = 0;
   private seaSet = false;
@@ -92,8 +126,12 @@ export class Stage {
     // Haze takes the far shore, as it does on the Bay.
     this.scene.fog = this.haze;
     this.sky = new SkySystem(this.renderer, this.scene);
-    this.ocean = new Ocean(this.sky.reflection.texture);
-    this.scene.add(this.ocean.mesh);
+    this.wake = new Wake(graphics.level);
+    this.ocean = new Ocean(this.sky.reflection.texture, this.wake, this.field);
+    this.scene.add(this.ocean.mesh, this.spray.points, this.navLights.points, this.rain.group);
+    this.sky.setCloudTexture(this.ocean.detail);
+    this.applyQuality();
+    graphics.watch(() => this.applyQuality());
     this.setCourse(data, world);
     window.addEventListener('resize', () => this.resize());
   }
@@ -116,6 +154,7 @@ export class Stage {
     clearCityNight();
     this.course = data.course;
     this.world = world;
+    this.field.setCourse(data.course, data.depth);
     const scenery = data.about.scenery ?? {};
     const pieces = new Set(scenery.pieces ?? []);
     const land = new THREE.Group();
@@ -124,8 +163,12 @@ export class Stage {
     land.add(terrain);
     this.seamarks = data.features?.lights.length ? new Seamarks(data.features.lights, landHeight(this.course, data.terrain)) : null;
     if (this.seamarks) land.add(this.seamarks.group);
+    this.litMarks = (data.features?.lights ?? []).map((l): [number, number] => [l.x, l.y]);
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
+    // The weather that belongs to this water: the Bay's fog bank, the islands' morning haze.
+    this.fogPath = pieces.has('marine-layer') ? SF_FOG_PATH : null;
+    this.hazy = pieces.has('morning-haze');
     // Something to steer for at every place there is to go ashore. They stand on the shore as it is drawn, so the
     // heights are read back off the land's own mesh, as the kayak reads them.
     // One land grid is one mesh, read back exactly; land with insets is read through the same lookup the seamarks use.
@@ -163,8 +206,9 @@ export class Stage {
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.
     this.traffic = new Traffic(data.traffic, world);
     land.add(this.traffic.group);
+    // What a ship's wake does to the water a boat sails through. It is drawn by `scene/wake.ts` with every other wake,
+    // so its own crest lines are not added.
     this.wakes = new WakeField(data.traffic);
-    land.add(this.wakes.lines);
     // The water gets its sea state here: every sim sailed on this world feels it from now on.
     if (!world.seas) world.seas = new SeaState(world, data.about.sea ?? data.course.sea);
     this.seaSet = false;
@@ -175,6 +219,107 @@ export class Stage {
     const wind = world.wind(0, 0, 0);
     this.waves.splice(0, this.waves.length, ...buildWaves(wind.dir, wind.speed / KT));
     this.seaKt = wind.speed / KT;
+  }
+
+  /**
+   * The weather that can be seen, at the eye, now. Every rule is a function of the season's clock, the place and the
+   * recorded wind (`scene/weatherRules.ts`), so all players see the same.
+   */
+  private forecast(t: number, camera: THREE.Camera): typeof this.weather {
+    const world = this.world;
+    const w = this.weather;
+    const hour = solarHour(world.dateAt(t).getTime(), this.course.origin.lon);
+    const boost = world.windBoost;
+    const ex = camera.position.x;
+    const ey = -camera.position.z;
+    w.fog = 0;
+    w.reach = 0;
+    if (this.fogPath) {
+      // The recorded breeze in the Gate, whatever anyone has boosted it to: the fog is the same for all.
+      const gate = pathPoint(this.fogPath, 0.38);
+      w.reach = fogReach(hour, world.wind(gate.x, gate.y, t).speed / boost / KT);
+      w.fog = fogAt(this.fogPath, w.reach, ex, ey);
+    }
+    w.haze = this.hazy ? morningHaze(hour) : 0;
+    const b = this.course.bounds;
+    const cx = (b.x0 + b.x1) / 2;
+    const cy = (b.y0 + b.y1) / 2;
+    const mid = world.wind(cx, cy, t);
+    const toward = mid.dir + Math.PI;
+    squallsAt(world.seasonTime(t), boost, Math.sin(toward) * mid.speed, Math.cos(toward) * mid.speed, cx, cy, w.squalls);
+    w.rain = rainAt(w.squalls, ex, ey);
+    w.cover = cloudCover(hour, boost);
+    w.see = Math.min(visibility(w.fog), 30000 - 21000 * w.haze, 30000 * Math.pow(2600 / 30000, w.rain));
+    return w;
+  }
+
+  /** Navigation lights on everything afloat, and the buoys' flashes. Nothing is drawn until the sun is nearly down. */
+  private lights(seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[]): void {
+    const lights = this.navLights;
+    lights.begin(1 - THREE.MathUtils.smoothstep(this.sky.elevation, -0.1, 0.02), camera, this.renderer.domElement.height, this.weather.see);
+    if (lights.lit) {
+      const len = boat.length ?? 11.6;
+      lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
+      for (const s of ships) {
+        const y = this.seaAt(s.x, -s.y, 4);
+        if (s.kind === 'sail') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 1.4, s.sog < 0.25 ? 'anchor' : 'sail');
+        else if (s.kind === 'ship') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 0.12 + 14, 'ship');
+        // A paddler carries only a white light, seen all round.
+        else if (s.kind === 'paddle') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, 1.2, 'anchor');
+        else lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 0.2 + 5, 'power');
+      }
+      // Buoys flash every four seconds, each a little out of step with the next.
+      // A mark that is also a charted light is shown by `Seamarks` in its own rhythm, so it is not lit twice.
+      this.buoys.forEach((b, i) => {
+        if (!this.litMarks.some(([x, y]) => Math.hypot(x - b.x, y - b.y) < 120)) lights.buoy(b.x, 2.6, -b.y, i % 2 === 0, ((seaTime + i * 1.3) % 4) < 0.7 ? 1 : 0);
+      });
+    }
+    lights.end();
+  }
+
+  /** Every vessel's wake into the sea's maps, and spray off the bows near enough to see. */
+  private drawWakes(seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windFrom: number, windSpeed: number, windKt: number, day: number): void {
+    const list = this.afloat;
+    // A catamaran leaves a wake from each hull, each about its own centreline.
+    const hulls = boat.hulls && boat.hulls > 0 ? 2 : 1;
+    const n = ships.length + hulls;
+    while (list.length < n) list.push({ id: '', x: 0, z: 0, heading: 0, speed: 0, length: 11.6, beam: 3.8, lee: 0 });
+    list.length = n;
+    for (let h = 0; h < hulls; h++) {
+      const me = list[h];
+      const off = hulls === 2 ? (h === 0 ? -1 : 1) * boat.hulls! : 0;
+      me.id = h === 0 ? 'own' : 'own-stbd';
+      me.x = boat.x + Math.cos(boat.heading) * off;
+      me.z = boat.z + Math.sin(boat.heading) * off;
+      me.heading = boat.heading; me.speed = boat.speed;
+      me.length = boat.length ?? 11.6;
+      me.beam = hulls === 2 ? Math.max(1.2, (boat.beam ?? 3.8) * 0.28) : boat.beam ?? 3.8;
+      me.lee = hulls === 2 ? 0 : THREE.MathUtils.clamp(boat.heel / 0.3, -1, 1);
+    }
+    for (let i = 0; i < ships.length; i++) {
+      const s = ships[i];
+      const v = list[i + hulls];
+      v.id = s.id;
+      v.x = s.x; v.z = -s.y; v.heading = s.heading; v.speed = s.sog; v.length = s.length; v.beam = s.beam;
+      // A sailing boat heels away from the wind, and her leeward bow wave is the bigger one.
+      v.lee = s.kind === 'sail' ? -Math.sign(Math.sin(windFrom - s.heading)) * 0.7 * Math.min(1, s.sog / 2) : 0;
+    }
+    this.wake.update(this.renderer, seaTime, camera, list);
+
+    const dt = seaTime - this.lastSea;
+    this.lastSea = seaTime;
+    this.seaTime = seaTime;
+    const toward = windFrom + Math.PI;
+    for (let i = 0; i < n; i++) {
+      const v = list[i];
+      const dx = v.x - camera.position.x;
+      const dz = v.z - camera.position.z;
+      if (dx * dx + dz * dz > 220 * 220 + v.length * v.length * 9) continue;
+      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
+    }
+    // White water takes the colour of the light: bright by day, warm at sunset, a grey ghost at night.
+    this.white.copy(this.haze.color).multiplyScalar(0.3).add(this.tint.copy(this.sky.sunColor).multiplyScalar(0.62 * day + 0.05));
+    this.spray.update(seaTime, camera, this.renderer.domElement.height, Math.sin(toward) * windSpeed, -Math.cos(toward) * windSpeed, this.white);
   }
 
   /** Height of the sea at a scene position: the waves that are drawn, and any ship's wake going by. */
@@ -192,7 +337,18 @@ export class Stage {
     }
   }
 
-  /** Hold 60 frames a second: if frames run long for a while, render fewer pixels. It only ever steps down. */
+  /** Fit what is drawn to the graphics level: everything on high, the cheaper version of each effect on low. */
+  private applyQuality(): void {
+    const low = graphics.level === 'low';
+    this.wake.setDetail(graphics.level);
+    this.spray.amount = low ? 0.4 : 1;
+    this.rain.detail = low ? 0.4 : 1;
+  }
+
+  /**
+   * Hold 60 frames a second: if frames run long for a while, render fewer pixels, and when that is not enough
+   * drop the graphics to low (unless the player has asked for high). It only ever steps down.
+   */
   private keepPace(dtReal: number): void {
     const p = this.pace;
     if (p.warmup > 0) { p.warmup -= dtReal; return; }
@@ -209,7 +365,7 @@ export class Stage {
       this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);
       this.renderer.setPixelRatio(this.pixelRatio);
       this.resize();
-    }
+    } else if (p.slowWindows >= 3 && graphics.fallBack()) p.slowWindows = 0;
   }
 
   /**
@@ -242,10 +398,12 @@ export class Stage {
       this.seaSet = true;
       setSea(this.waves, height, steepness);
     } else setSeaState(this.waves, this.seaKt);
-    this.ocean.setWaves(this.waves, hourly.dir, windKt);
+    this.ocean.setWaves(this.waves, hourly.dir);
+    // Whitecaps follow how steep and broken the sea is, as well as the wind on it.
+    this.ocean.setSea(here ? this.sea.steepness : 0.045, here ? this.sea.breaking : 0);
+    this.field.update(world, t);
 
     this.wakes.advance(world.seasonTime(t));
-    this.wakes.draw(seaTime, this.waves);
     this.traffic.update(t, seaTime, this.waves);
     for (const b of this.buoys) {
       const c = world.current(b.x, b.y, t);
@@ -253,18 +411,43 @@ export class Stage {
     }
 
     this.seamarks?.update(world.seasonTime(t), camera);
-    this.sky.setTime(world.dateAt(t), this.course.origin.lat, this.course.origin.lon);
+    const sky = this.sky;
+    const w = this.forecast(t, camera);
+    sky.setTime(world.dateAt(t), this.course.origin.lat, this.course.origin.lon);
     this.focus.set(boat.x, 0, boat.z);
-    this.sky.follow(this.focus);
-    // Haze takes the colour of the low sky: pale by day, warm toward sunset, dark after.
-    const el = this.sky.elevation;
+    sky.follow(this.focus);
+    // Haze takes the colour of the low sky: pale by day, warm toward sunset, dark after. Fog and rain are their own grey.
+    const el = sky.elevation;
     const up = THREE.MathUtils.clamp(Math.sin(el) * 3, 0, 1);
-    this.haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(el) * 6 + 0.3, 0, 1));
+    const dayLight = (0.25 + 0.75 * THREE.MathUtils.clamp(Math.sin(el) * 6 + 0.3, 0, 1)) * (1 - 0.9 * sky.night);
+    this.haze.color.setRGB(0.5 + 0.22 * up, 0.42 + 0.37 * up, 0.38 + 0.46 * up).multiplyScalar(dayLight);
+    const thick = Math.max(w.fog, w.rain * 0.8);
+    this.fogColor.setRGB(0.8, 0.82, 0.85).lerp(this.tint.setRGB(0.42, 0.46, 0.5), w.rain * 0.8).multiplyScalar((0.2 + 0.8 * up) * (1 - 0.9 * sky.night) * (1 - 0.25 * w.rain));
+    this.haze.color.lerp(this.fogColor, Math.min(1, thick * 1.5));
+    this.haze.far = w.see;
+    this.haze.near = Math.min(1200, w.see * 0.08);
+    // Low cloud blows over from the west. Its shadow falls down-sun of it.
+    const season = world.seasonTime(t);
+    const driftX = season * 7;
+    const driftZ = season * -1.5;
+    const veil = THREE.MathUtils.smoothstep(7000 - w.see, 0, 6500) * 0.96;
+    const overcast = Math.min(1, w.rain * 1.7);
+    sky.setWeather(veil, overcast, w.cover * (1 - veil), w.reach, driftX, driftZ, this.fogColor);
+    sky.drawNight(camera, this.renderer.domElement.height);
+    // The eye opens up in the dark: enough to find the wheel and the winches by.
+    this.renderer.toneMappingExposure = 0.46 * (1 + 0.9 * sky.night);
+    const base = 1400;
+    const lean = Math.min(5, 1 / Math.max(sky.sunDir.y, 0.05));
+    const shadow = graphics.level === 'low' ? 0 : 0.72 * THREE.MathUtils.clamp(sky.lightPower * 1.5, 0, 1) * (1 - veil) * (1 - overcast);
+    this.ocean.setWeather(w.see, veil, this.fogColor, w.rain, w.cover, sky.sunDir.x * lean * base - driftX, sky.sunDir.z * lean * base - driftZ, shadow);
     // The lights of the shore come on as the sun goes down: first at two degrees up, all of them by four below.
     setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
-    this.ocean.setSun(this.sky.sunDir, this.sky.sunColor);
-    this.ocean.setShips(ships);
+    this.ocean.setSun(sky.sunDir, sky.sunColor, sky.lightPower, overcast, sky.night);
     this.ocean.update(seaTime, camera, boat);
+    this.drawWakes(seaTime, camera, boat, ships, hourly.dir, hourly.speed, windKt, up * (1 - 0.9 * sky.night));
+    this.lights(seaTime, camera, boat, ships);
+    const toward = hourly.dir + Math.PI;
+    this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));
 
     this.frameCount++;
     if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);

@@ -35,6 +35,7 @@ export interface CourseAbout {
     /**
      * Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`, and for the tropics `palms`,
      * `mooring-fields` (yachts lying off every place with moorings) and `virgin-islands` (the Baths' boulders, Road Town).
+     * `marine-layer` also brings the fog bank in through the Golden Gate; `morning-haze` is haze among islands at dawn.
      */
     pieces?: string[];
   };
