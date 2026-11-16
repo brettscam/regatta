@@ -477,7 +477,9 @@ export class Radio implements Feature {
     const pool = this.voices();
     let cast = this.casts.get(caller.key);
     if (!cast) {
-      cast = castVoice(pool, caller);
+      // Never the coast station's voice for anybody else, while there is another: she answers them.
+      const station = caller.key === 'station' ? null : this.casts.get('station')?.voice;
+      cast = castVoice(pool, caller, station ? new Set([station]) : undefined);
       if (this.pool) this.casts.set(caller.key, cast);
     }
     return cast;
