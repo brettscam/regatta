@@ -1,6 +1,16 @@
 {
   "notes": [
     {
+      "id": "v36",
+      "date": "2026-11-16",
+      "title": "Setting up a race is easier",
+      "items": [
+        "The race panel (R) scrolls again: on smaller screens its lower half was cut off, so the courses below the first few and the button to start could not be reached.",
+        "Setting up a race is three steps: the course (each shows its length and number of marks), when, and the boats. One button at the bottom is always in view and says exactly what it will do.",
+        "For a race later, pick a time in one tap: in 30 minutes, in an hour, tonight at 7:30, or tomorrow evening. Or choose Today or Tomorrow and type a time. Times are shown on your own clock."
+      ]
+    },
+    {
       "id": "v35",
       "date": "2026-11-16",
       "title": "The water, the sails and the light",

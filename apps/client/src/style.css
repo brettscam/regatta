@@ -743,3 +743,16 @@ body:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 78px); }
 .profile-pane .chip .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid rgba(238, 243, 244, 0.35); }
 .profile-pane .chips.kites .chip.kite { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px; font-size: 11px; }
 .profile-pane .chip.kite canvas { display: block; width: 44px; height: auto; }
+
+/* ---- race panel: the body scrolls (a flex child must be allowed to shrink), and the go button stays in reach ---- */
+.fleetpanel .fleet-body { flex: 1 1 auto; min-height: 0; }
+.fleetpanel .course b { display: flex; justify-content: space-between; gap: 10px; }
+.fleetpanel .course b em { font-style: normal; font-weight: 400; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.fleetpanel .chips.seg button { flex: 1; }
+.fleetpanel .fixrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.fleetpanel .fixrow > span { font-size: 12px; color: var(--dim); min-width: 78px; }
+.fleetpanel .fixrow input[type="time"] { font: inherit; font-size: 13px; color: var(--ink); background: rgba(238, 243, 244, 0.06); border: 1px solid var(--edge); border-radius: 8px; padding: 6px 8px; color-scheme: dark; }
+.fleetpanel .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.fleetpanel .go-bar { position: sticky; bottom: -16px; margin: 4px -14px -16px; padding: 10px 14px 14px; display: grid; gap: 8px; background: rgba(11, 21, 28, 0.98); border-top: 1px solid var(--edge); }
+.fleetpanel .go-bar .go { width: 100%; padding: 10px 12px; }
+.fleetpanel button[aria-disabled="true"] { opacity: 0.55; }
