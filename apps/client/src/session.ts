@@ -566,7 +566,7 @@ export class Session {
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
     this.sound.update(o.aws / KT, sim.state.speed / KT, loose, paused);
 
-    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower, held: sim.state.hold !== 'none' }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
 
   /** A short account of the boat and the conditions, for attaching to feedback. */

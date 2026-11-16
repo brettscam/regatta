@@ -187,6 +187,14 @@ const fragmentShader = /* glsl */ `
   uniform float uSeason;   // seconds into the season: the clock the world's gusts run on
   uniform float uTide;
   uniform float uOvercast; // 0 a clear sky, 1 under a squall
+  uniform float uLight;    // how strong the light from uSunDir is: 1 the sun, a few hundredths the moon
+  uniform float uNight;    // 0 by day, 1 at full night: the sky the sea reflects goes dark with it
+  uniform float uSee;      // how far you can see, metres
+  uniform vec3 uFogColor;
+  uniform float uFogMix;   // 0 the far water melts into the sky, 1 into fog
+  uniform float uRain;     // how hard it is raining on the eye
+  uniform float uCover;    // share of the sky under low cloud
+  uniform vec3 uCloudShift; // from a point on the sea to the cloud that shades it (x, z), and how dark its shadow is
   uniform sampler2D uWakeNear;
   uniform sampler2D uWakeFar;
   uniform vec4 uWakeNearRect; // centre x, centre z, one over the width, metres a texel
@@ -306,11 +314,11 @@ const fragmentShader = /* glsl */ `
     R = normalize(R);
     // Distant water averages many tiny facets, so it reflects a blurred sky.
     float blur = clamp(1.0 + log2(1.0 + dist * 0.02) + footprint * 0.6 + gust * 0.8, 1.0, 5.5);
-    vec3 sky = textureCube(uSky, R, blur).rgb;
+    vec3 sky = textureCube(uSky, R, blur).rgb * (1.0 - 0.93 * uNight);
 
     // Light scattered back out of the water, strongest through the thin tops of waves.
     float crest = smoothstep(-0.25, 0.55, vWorld.y / (0.25 * breeze + 0.05));
-    float sunUp = clamp(uSunDir.y * 2.5, 0.0, 1.0);
+    float sunUp = clamp(uSunDir.y * 2.5, 0.0, 1.0) * uLight;
     float through = pow(max(dot(V, -normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0), 3.0);
     vec3 body = uDeep * (0.55 + 0.45 * sunUp) + uScatter * sunUp * (0.18 + 0.5 * crest + 0.9 * crest * through);
     // A gust roughens the water and it goes dark. A lull lets it lie smooth and bright.
@@ -343,6 +351,13 @@ const fragmentShader = /* glsl */ `
       vec2 hq2 = (lb - thrown * 0.7) / vec2(1.9, 6.0);
       float hullShade = 1.0 - smoothstep(0.75, 1.25, dot(hq2, hq2));
       shade = max(sails * 0.75, hullShade * 0.9) * clamp(uSunDir.y * 6.0, 0.0, 1.0);
+    }
+    // Cloud shadows: the same clouds the sky draws, thrown down-sun onto the water.
+    if (uCloudShift.z > 0.01) {
+      vec2 cp = vBase + uCloudShift.xy;
+      float cn = texture2D(uDetail, cp / 9000.0).b * 0.62 + texture2D(uDetail, cp / 2300.0 + 0.37).a * 0.28 + 0.05;
+      float cedge = 0.5 + (0.5 - uCover) * 0.42;
+      shade = max(shade, smoothstep(cedge - 0.03, cedge + 0.09, cn) * uCloudShift.z);
     }
     body *= 1.0 - 0.62 * shade;
 
@@ -397,14 +412,21 @@ const fragmentShader = /* glsl */ `
     foam = max(foam, mix(lace, wk.r * 0.7, smoothstep(0.25, 1.6, footprint)));
     // Out where the fine map does not reach, a bow wave is only a paler line.
     col += sky * 0.07 * wk.g * (1.0 - inNear);
-    vec3 foamCol = (uSunColor * (0.55 * sunUp + 0.08) * (1.0 - 0.5 * uOvercast) + sky * 0.35) * 0.8 * (1.0 - 0.45 * shade);
+    if (uRain > 0.01) {
+      // Rain on the water: close to, each drop's ring shows for an instant; further off it only beats the sea flat and grey.
+      float beat = floor(uTime * 10.0);
+      float cell = texture2D(uDetail, vBase / 0.8 + vec2(beat * 0.37, beat * 0.61)).a;
+      foam += smoothstep(0.78 - 0.1 * uRain, 0.9, cell) * uRain * 0.6 * (1.0 - smoothstep(25.0, 130.0, dist));
+      col = mix(col, uFogColor * 0.75, uRain * 0.3 * smoothstep(30.0, 500.0, dist));
+    }
+    vec3 foamCol = (uSunColor * (0.55 * sunUp + 0.08 * uLight + 0.012) * (1.0 - 0.5 * uOvercast) + sky * 0.35) * 0.8 * (1.0 - 0.45 * shade);
     col = mix(col, foamCol, clamp(foam, 0.0, 1.0) * 0.92);
 
     // Melt into the sky at the horizon.
     vec3 hv = normalize(vec3(-V.x, 0.035, -V.z));
-    vec3 horizon = textureCube(uSky, hv, 2.5).rgb;
-    float haze = 1.0 - exp(-pow(dist / 5200.0, 1.35));
-    col = mix(col, horizon, clamp(haze, 0.0, 1.0));
+    vec3 horizon = textureCube(uSky, hv, 2.5).rgb * (1.0 - 0.93 * uNight);
+    float haze = 1.0 - exp(-pow(dist / (uSee * 0.1733), 1.35));
+    col = mix(col, mix(horizon, uFogColor, uFogMix), clamp(haze, 0.0, 1.0));
 
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
@@ -436,6 +458,14 @@ export class Ocean {
       uSeason: { value: 0 },
       uTide: { value: 0 },
       uOvercast: { value: 0 },
+      uLight: { value: 1 },
+      uNight: { value: 0 },
+      uSee: { value: 30000 },
+      uFogColor: { value: new THREE.Color(0.8, 0.82, 0.85) },
+      uFogMix: { value: 0 },
+      uRain: { value: 0 },
+      uCover: { value: 0 },
+      uCloudShift: { value: new THREE.Vector3() },
       uWindU: { value: field.windU },
       uWindV: { value: field.windV },
       uWindGrid: { value: field.windGrid },
@@ -474,11 +504,40 @@ export class Ocean {
     (this.uniforms.uWind.value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
   }
 
-  /** @param overcast 0 under a clear sky, 1 under a squall: the water goes dull and dark with it */
-  setSun(dir: THREE.Vector3, color: THREE.Color, overcast = 0): void {
+  /** The sea's noise, for the sky to cut its low cloud from so cloud and shadow agree. */
+  get detail(): THREE.Texture {
+    return this.uniforms.uDetail.value as THREE.Texture;
+  }
+
+  /**
+   * @param power how strong the light is against full daylight: 1 the sun, a few hundredths the moon
+   * @param overcast 0 under a clear sky, 1 under a squall: the water goes dull and dark with it
+   */
+  setSun(dir: THREE.Vector3, color: THREE.Color, power = 1, overcast = 0, night = 0): void {
+    this.uniforms.uNight.value = night;
     (this.uniforms.uSunDir.value as THREE.Vector3).copy(dir);
     (this.uniforms.uSunColor.value as THREE.Color).copy(color);
+    this.uniforms.uLight.value = power;
     this.uniforms.uOvercast.value = overcast;
+  }
+
+  /**
+   * The weather over the water.
+   * @param see how far you can see, metres
+   * @param fogMix 0 when the far water melts into the sky, 1 when into fog of `fogColor`
+   * @param rain how hard it is raining on the eye, 0 to 1
+   * @param cover share of the sky under low cloud
+   * @param shiftX from a point on the sea to the cloud that shades it, metres east and south
+   * @param shadow how dark a cloud's shadow is, 0 none
+   */
+  setWeather(see: number, fogMix: number, fogColor: THREE.Color, rain: number, cover: number, shiftX: number, shiftZ: number, shadow: number): void {
+    const u = this.uniforms;
+    u.uSee.value = see;
+    u.uFogMix.value = fogMix;
+    (u.uFogColor.value as THREE.Color).copy(fogColor);
+    u.uRain.value = rain;
+    u.uCover.value = cover;
+    (u.uCloudShift.value as THREE.Vector3).set(shiftX, shiftZ, shadow);
   }
 
   /**

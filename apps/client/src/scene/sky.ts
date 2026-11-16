@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { sunAngles, sunDirection } from './sun';
+import { moonAngles, sunAngles, sunDirection } from './sun';
+import { NightSky } from './nightSky';
+import { SF_FOG_PATH, pathLength, pathPoint } from './weatherRules';
 
 // ---- high cloud: thin streaks painted on the dome, by direction from the eye ----------------------
 const cirrusVertex = /* glsl */ `
@@ -18,6 +20,10 @@ const cirrusFragment = /* glsl */ `
   uniform vec3 uSunColor;
   uniform float uDay;
   uniform float uDrift;
+  uniform sampler2D uDetail;  // the sea's own noise, so the clouds and their shadows on the water agree
+  uniform float uCover;       // share of the sky under low cloud
+  uniform vec2 uCloudDrift;   // how far the low cloud has blown, metres
+  uniform float uCloudBase;   // its height, metres
   varying vec3 vWorld;
 
   float hash(vec2 p) {
@@ -58,6 +64,20 @@ const cirrusFragment = /* glsl */ `
     float toSun = max(dot(d, uSunDir), 0.0);
     // Ice cloud scatters light forward, so it brightens toward the sun.
     vec3 col = uSunColor * (0.82 + 0.9 * pow(toSun, 8.0)) + vec3(0.5, 0.58, 0.7) * 0.2;
+    // Low cloud: fair-weather cumulus on a flat deck, placed in the world so each one throws its shadow on the sea
+    // where the sea's shader expects it.
+    if (uCover > 0.01) {
+      vec2 P = cameraPosition.xz + d.xz * (uCloudBase / max(d.y, 0.03)) - uCloudDrift;
+      float n = texture2D(uDetail, P / 9000.0).b * 0.62 + texture2D(uDetail, P / 2300.0 + 0.37).a * 0.28 + texture2D(uDetail, P / 640.0).b * 0.1;
+      float edge = 0.5 + (0.5 - uCover) * 0.42;
+      float puff = smoothstep(edge, edge + 0.07, n) * smoothstep(0.025, 0.1, d.y);
+      // Bright where the sun is on them, grey in their thick middles and bases.
+      float thick = smoothstep(edge + 0.02, edge + 0.2, n);
+      vec3 cloud = mix(uSunColor * 1.02 + vec3(0.04, 0.05, 0.07), vec3(0.5, 0.54, 0.6) * (0.55 + 0.45 * uSunColor), thick * 0.75);
+      cloud *= 0.85 + 0.5 * pow(toSun, 6.0);
+      col = mix(col, cloud, puff);
+      alpha = alpha + (0.94 * puff) * (1.0 - alpha);
+    }
     gl_FragColor = vec4(col * uDay, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -155,6 +175,22 @@ export class SkySystem {
   readonly reflection: THREE.WebGLCubeRenderTarget;
   elevation = 0;
   azimuth = 0;
+  /** 0 by day, 1 when the sun is twelve degrees down. */
+  night = 0;
+  /**
+   * How strong the light that `sunDir` and `sunColor` describe is, against full daylight: 1 for the sun, a few
+   * hundredths for the moon, nothing in the dark of the moon. After sunset `sunDir` is the moon's direction.
+   */
+  lightPower = 1;
+  /** Where the sun really is, below the horizon included. */
+  readonly trueSun = new THREE.Vector3(0, 1, 0);
+  readonly moonDir = new THREE.Vector3(0, -1, 0);
+  readonly nightSky = new NightSky();
+  private weather = { fog: 0, overcast: 0, cover: 0.2, reach: -1 };
+  private readonly fogTongue: Array<{ at: number; meshes: THREE.Mesh[]; r: number; top: number }> = [];
+  private baked = { night: -1, fog: -1, overcast: -1, cover: -1 };
+  private turn = 0;
+  private latDeg = 0;
 
   private readonly envScene = new THREE.Scene();
   private readonly envSky = new Sky();
@@ -210,6 +246,10 @@ export class SkySystem {
         uSunColor: { value: this.sunColor },
         uDay: { value: 1 },
         uDrift: { value: 0 },
+        uDetail: { value: null },
+        uCover: { value: 0 },
+        uCloudDrift: { value: new THREE.Vector2() },
+        uCloudBase: { value: 1400 },
       },
       side: THREE.BackSide,
       transparent: true,
@@ -256,10 +296,34 @@ export class SkySystem {
         parent.add(m);
       }
     }
-    this.envScene.add(envBank);
+    // The tongue that comes in through the Gate in the afternoon: mounds along its path, each of which swells up
+    // as the front of the bank reaches it and sinks away when the bank burns back.
+    let seed = 4711;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const length = pathLength(SF_FOG_PATH);
+    for (let at = 0.27; at <= 1.0; at += 520 / length) {
+      const c = pathPoint(SF_FOG_PATH, at);
+      for (let k = 0; k < 2; k++) {
+        const x = c.x + (rnd() - 0.5) * 1700;
+        const y = c.y + (rnd() - 0.5) * 1500;
+        const r = 850 + rnd() * 550;
+        const top = 210 - 90 * at + rnd() * 50;
+        const meshes: THREE.Mesh[] = [];
+        for (const parent of [bank, envBank]) {
+          const m = new THREE.Mesh(mound, this.fogMaterial);
+          m.position.set(x, top * 0.25, -y);
+          m.frustumCulled = false;
+          m.visible = false;
+          parent.add(m);
+          meshes.push(m);
+        }
+        this.fogTongue.push({ at: at + (rnd() - 0.5) * 0.02, meshes, r, top });
+      }
+    }
+    this.envScene.add(envBank, this.nightSky.envVeil);
     this.marineLayer.push(bank, envBank);
 
-    scene.add(this.sky, this.cirrus, bank, this.sunLight, this.sunLight.target, this.fill);
+    scene.add(this.sky, this.cirrus, bank, this.sunLight, this.sunLight.target, this.fill, this.nightSky.group);
   }
 
   /** The fog bank offshore belongs to San Francisco Bay. Other waters do without it. */
@@ -267,25 +331,84 @@ export class SkySystem {
     for (const g of this.marineLayer) g.visible = on;
   }
 
-  /** Place the sun for a moment in time. Re-bakes the reflection maps only when the sun has moved enough to see. */
+  /** The sea's noise texture, which the low cloud is cut from so that it matches its shadows on the water. */
+  setCloudTexture(detail: THREE.Texture): void {
+    this.cirrusMaterial.uniforms.uDetail.value = detail;
+  }
+
+  /**
+   * The weather for this frame, from the rules in `weatherRules.ts`.
+   * @param fog how thick the fog is round the eye, 0 to 1
+   * @param overcast how far under a squall's cloud the eye is, 0 to 1
+   * @param cover share of the sky under fair-weather cloud
+   * @param reach how far the fog bank has come in along its path (San Francisco Bay only)
+   * @param driftX how far the low cloud has blown, metres east and south
+   */
+  setWeather(fog: number, overcast: number, cover: number, reach: number, driftX: number, driftZ: number, fogColor: THREE.Color): void {
+    const w = this.weather;
+    w.fog = fog; w.overcast = overcast; w.cover = cover;
+    const cu = this.cirrusMaterial.uniforms;
+    cu.uCover.value = cover;
+    (cu.uCloudDrift.value as THREE.Vector2).set(driftX, driftZ);
+    const v = this.nightSky.veilUniforms;
+    v.uFog.value = fog;
+    v.uFogColor.value.copy(fogColor);
+    v.uOvercast.value = overcast;
+    if (Math.abs(reach - w.reach) > 0.0005) {
+      w.reach = reach;
+      for (const t of this.fogTongue) {
+        const k = THREE.MathUtils.smoothstep(reach - t.at, -0.012, 0.05);
+        for (const m of t.meshes) {
+          m.visible = k > 0.02;
+          m.scale.set(t.r * (0.5 + 0.5 * k), t.top * 0.75 * k + 0.001, t.r * (0.5 + 0.5 * k));
+        }
+      }
+    }
+  }
+
+  /** Place the sun and moon for a moment in time. Re-bakes the reflection maps only when the light has changed enough to see. */
   setTime(date: Date, latDeg: number, lonDeg: number): void {
     const { azimuth, elevation } = sunAngles(date, latDeg, lonDeg);
     this.azimuth = azimuth;
     this.elevation = elevation;
-    // Keep a sliver of light after sunset so the scene never goes fully black in this milestone.
-    sunDirection(azimuth, Math.max(elevation, -0.03), this.sunDir);
-    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    this.latDeg = latDeg;
+    // The sky's own shader follows the sun a little way below the horizon, which gives the colours of dusk.
+    // The veil in `nightSky.ts` then takes the light out of it.
+    sunDirection(azimuth, Math.max(elevation, -0.14), this.trueSun);
+    this.sky.material.uniforms.sunPosition.value.copy(this.trueSun);
+    const night = 1 - THREE.MathUtils.smoothstep(elevation, -0.21, -0.015);
+    this.night = night;
+    this.nightSky.setNight(night, this.trueSun);
+    const moon = moonAngles(date, latDeg, lonDeg);
+    sunDirection(moon.azimuth, moon.elevation, this.moonDir);
+    // The sky turns once a sidereal day. Near enough: the hour angle of the stars from the clock and the longitude.
+    this.turn = ((date.getTime() / 86164090.5) % 1) * Math.PI * 2 + (lonDeg * Math.PI) / 180;
 
     // Warmer and dimmer as the sun gets low.
     const h = THREE.MathUtils.clamp(Math.sin(Math.max(elevation, 0)), 0, 1);
     const warm = 1 - THREE.MathUtils.smoothstep(h, 0.05, 0.55);
-    this.sunColor.setRGB(1, 1 - 0.32 * warm, 1 - 0.62 * warm);
+    const dull = 1 - 0.7 * this.weather.overcast;
+    if (elevation > -0.05) {
+      // The sun is the light, down to a few degrees below the horizon, where it has faded to nothing.
+      const left = THREE.MathUtils.smoothstep(elevation, -0.05, 0.03);
+      sunDirection(azimuth, Math.max(elevation, 0.035), this.sunDir);
+      this.sunColor.setRGB(1, 1 - 0.32 * warm, 1 - 0.62 * warm);
+      this.lightPower = left * dull;
+      this.sunLight.intensity = (3.4 * THREE.MathUtils.smoothstep(h, 0.0, 0.25) + 0.05) * left * dull;
+    } else {
+      // After dark the moon is the light, when it is up: weak, cold, and enough to see a sea by.
+      const up = THREE.MathUtils.smoothstep(moon.elevation, 0.0, 0.2) * (0.25 + 0.75 * moon.lit) * THREE.MathUtils.smoothstep(elevation, -0.05, -0.16);
+      if (moon.elevation > 0.02) sunDirection(moon.azimuth, Math.max(moon.elevation, 0.06), this.sunDir);
+      this.sunColor.setRGB(0.62, 0.74, 1);
+      this.lightPower = 0.035 * up * dull;
+      this.sunLight.intensity = 0.3 * up * dull;
+    }
     this.sunLight.color.copy(this.sunColor);
-    this.sunLight.intensity = 3.4 * THREE.MathUtils.smoothstep(h, 0.0, 0.25) + 0.05;
-    this.fill.intensity = 0.2 + 0.25 * h;
+    // Enough left at night to make out the boat by: the eye adapts, and there is always some light off the shore.
+    this.fill.intensity = (0.2 + 0.25 * h) * (1 - 0.68 * night) * (1 - 0.3 * this.weather.overcast);
 
     // Clouds and fog take their light from the same sun: white by day, warm toward sunset, dim after.
-    const day = 0.12 + 0.88 * THREE.MathUtils.smoothstep(Math.sin(elevation), -0.05, 0.22);
+    const day = (0.12 + 0.88 * THREE.MathUtils.smoothstep(Math.sin(elevation), -0.05, 0.22)) * (1 - 0.82 * night);
     this.cirrusMaterial.uniforms.uDay.value = day;
     // High cloud drifts a little over an afternoon.
     this.cirrusMaterial.uniforms.uDrift.value = ((date.getTime() / 1000) % 86400) * 0.00006;
@@ -300,7 +423,24 @@ export class SkySystem {
       fu.uHazeFar.value = fog.far;
     }
 
-    if (this.lastBaked.distanceToSquared(this.sunDir) > 2e-5 || !this.envTarget) this.bake();
+    // The light the boat is lit by comes from the baked sky, so bake again when the sky has changed: the sun has
+    // moved, night has come on, or fog or a squall has closed in.
+    const w = this.weather;
+    const b = this.baked;
+    if (this.lastBaked.distanceToSquared(this.trueSun) > 2e-5 || !this.envTarget || Math.abs(b.night - night) > 0.04 || Math.abs(b.fog - w.fog) > 0.08 || Math.abs(b.overcast - w.overcast) > 0.08 || Math.abs(b.cover - w.cover) > 0.06) {
+      b.night = night; b.fog = w.fog; b.overcast = w.overcast; b.cover = w.cover;
+      this.bake();
+    }
+  }
+
+  /** Stars, moon and the veil: once a frame, when the camera is known. */
+  drawNight(camera: THREE.Camera, pixelsHigh: number): void {
+    const moonUp = THREE.MathUtils.smoothstep(this.moonDir.y, -0.02, 0.06) * (0.12 + 0.88 * this.night);
+    const clear = (1 - this.weather.fog) * (1 - this.weather.overcast);
+    this.nightSky.set(this.night, this.trueSun, this.moonDir, moonUp, clear, this.latDeg, this.turn, camera, pixelsHigh);
+    // The squall's cloud takes what light the day has.
+    const day = 1 - 0.93 * this.night;
+    this.nightSky.veilUniforms.uCloud.value.setRGB(0.3, 0.33, 0.37).multiplyScalar(day);
   }
 
   /** Keep the shadow box centred on the boat. */
@@ -309,10 +449,11 @@ export class SkySystem {
     this.sunLight.position.copy(target).addScaledVector(this.sunDir, 60);
     // The cloud dome is all direction and no place, so it rides along with the boat.
     this.cirrus.position.set(target.x, 0, target.z);
+    this.nightSky.follow(target.x, target.z);
   }
 
   private bake(): void {
-    this.lastBaked.copy(this.sunDir);
+    this.lastBaked.copy(this.trueSun);
     this.cubeCamera.update(this.renderer, this.envScene);
     const next = this.pmrem.fromScene(this.envScene, 0, 1, 40000);
     this.scene.environment = next.texture;

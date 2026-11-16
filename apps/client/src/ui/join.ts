@@ -5,6 +5,7 @@ import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
 import { alone, onWeb } from '../net/platform';
 import type { CourseAbout } from '../world/loadCourse';
 import { inText, nextEvent, whenText } from '../race/events';
+import { graphics, type QualityChoice } from '../scene/quality';
 
 export interface StartSpot {
   id: string;
@@ -138,6 +139,7 @@ export class JoinFlow {
     else if (d.spot) this.choice.spot = d.spot;
     else if (d.time) this.choice.time = d.time;
     else if (d.weather) this.choice.weather = d.weather as Weather;
+    else if (d.gfx) graphics.choose(d.gfx as QualityChoice);
     else if (d.tutorial) this.choice.tutorial = d.tutorial === '1';
     else if (d.boat) {
       this.choice.boat = d.boat;
@@ -215,6 +217,8 @@ export class JoinFlow {
     const level = WEATHER.find((k) => k.id === (this.choice.weather ?? 'normal')) ?? WEATHER[1];
     const weather = WEATHER.map((k) =>
       `<button type="button" class="chip" data-weather="${k.id}" aria-pressed="${k.id === level.id}" title="${esc(k.say)}">${esc(k.name)}</button>`).join('');
+    const gfx = ([['auto', 'Auto', 'Everything, unless this device struggles: then the lighter picture'], ['high', 'High', 'Everything: wakes, spray, cloud shadows, rain'], ['low', 'Low', 'A lighter picture for a phone or an older laptop']] as const).map(([id, name, say]) =>
+      `<button type="button" class="chip" data-gfx="${id}" aria-pressed="${graphics.choice === id}" title="${esc(say)}">${name}</button>`).join('');
     // A race fixed for later today: tell everyone on the way in where to start from.
     const event = alone() ? null : nextEvent(this.choice.water);
     const from = event && this.water.spots.find((sp) => sp.id === event.spot);
@@ -228,6 +232,7 @@ export class JoinFlow {
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
       <div class="when weather" role="group" aria-label="How hard it blows"><span class="k">Wind</span>${weather}</div>
       <p class="soon">${esc(level.say)}.</p>
+      <div class="when weather" role="group" aria-label="Graphics"><span class="k">Graphics</span>${gfx}</div>
       <div class="cards">${cards}</div>
       <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii and the BVI.</p>`;
   }

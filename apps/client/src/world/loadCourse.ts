@@ -23,7 +23,7 @@ export interface CourseAbout {
   scenery?: {
     /** Which built-in ground cover colours the land: `sf-bay` or `evergreen`. */
     landCover?: string;
-    /** Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`. */
+    /** Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer` (the fog bank that comes in through the Gate), `morning-haze`. */
     pieces?: string[];
   };
 }
