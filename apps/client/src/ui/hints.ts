@@ -1,4 +1,6 @@
 import { KT, R2D, wrapPi, type Sim } from '@slack-tide/sim';
+import { isCapsized, isPressed, placard, reefDue } from '../aboard/pressedRules';
+import type { Sea } from '@slack-tide/world';
 
 export interface HintContext {
   sim: Sim;
@@ -8,6 +10,12 @@ export interface HintContext {
   busy(): boolean;
   /** True while she is in a race, where the engine may not be used. */
   racing?(): boolean;
+  /** The sea where she is, where the water has one. */
+  sea?(): Sea | null;
+  /** How many times she has slammed in the last minute. */
+  slams?(): number;
+  /** What this stretch of water is called when its tide is famous for the sea it raises: "the Golden Gate". Empty anywhere else. */
+  tideGate?(): string;
 }
 
 interface Rule {
@@ -16,6 +24,8 @@ interface Rule {
   after: number;
   when(c: HintContext): boolean;
   say(c: HintContext): string;
+  /** Said once in a sail and not again. */
+  once?: boolean;
 }
 
 const SAVED = 'regatta.hints';
@@ -51,14 +61,39 @@ export class Hints {
       when: (c) => c.sim.out.jib.backed > 0.5 && !c.sim.state.maneuver,
       say: () => 'The jib is aback: its old sheet is holding it on the wrong side. Let that sheet go (hold E), then trim the other winch (hold Q).',
     },
+    // A boat that does not heel: a catamaran. She is reefed by the numbers on her placard, because nothing else warns.
+    {
+      id: 'capsized', after: 6,
+      when: (c) => isCapsized(c.sim.boat, c.sim.state),
+      say: (c) => `She is capsized and will not come up by herself. Help is righting her. When she is up: ${placard(c.sim.boat)}, and ease the mainsheet (S) the moment she feels pressed.`,
+    },
+    {
+      id: 'pressed', after: 3,
+      when: (c) => isPressed(c.sim.boat, c.sim.out) && !isCapsized(c.sim.boat, c.sim.state),
+      say: (c) => `She is pressed: ${Math.round(c.sim.out.aws / KT)} kt apparent is more than ${c.sim.boat.sails.main.reefs[c.sim.state.reef]?.name.toLowerCase() ?? 'this sail'} will carry. A bow is digging in and she is slowing, and that is all the warning a catamaran gives. Ease the mainsheet now (hold S) and reef (J).`,
+    },
+    {
+      id: 'reefNumbers', after: 10,
+      when: (c) => reefDue(c.sim.boat, c.sim.state, c.sim.out) !== null,
+      say: (c) => {
+        const due = reefDue(c.sim.boat, c.sim.state, c.sim.out) ?? 1;
+        return `${Math.round(c.sim.out.aws / KT)} kt apparent. She will not heel to tell you she has too much sail up, so she is reefed by the numbers: ${placard(c.sim.boat)}. Take in ${due > 1 ? 'the second reef' : 'a reef'} now (J).`;
+      },
+    },
+    {
+      // Caught head to wind, a catamaran will not sail herself out the way a sloop does.
+      id: 'ironsCat', after: 6,
+      when: (c) => !!c.sim.boat.sails.jib.selfTacking && c.sim.out.inIrons && !c.sim.state.maneuver && !c.sim.state.engineOn,
+      say: (c) => `In irons. She is slow through the wind and stops if she is tacked without plenty of way on. Press T and the crew holds the jib aback to push her bows round${c.racing?.() ? '' : ', or start the engines (I): with the wheel over they turn her where she lies'}. Next time bear away for speed before you tack.`,
+    },
     {
       id: 'irons', after: 8,
-      when: (c) => c.sim.out.inIrons && !c.sim.state.maneuver && !c.sim.state.engineOn,
+      when: (c) => c.sim.out.inIrons && !c.sim.state.maneuver && !c.sim.state.engineOn && !c.sim.boat.sails.jib.selfTacking,
       say: () => 'In irons: she is pointing too close to the wind to sail. Put the wheel over and hold it until the sails fill, about 45° off the wind.',
     },
     {
       id: 'heel', after: 12,
-      when: (c) => Math.abs(c.sim.state.heel) * R2D > 26,
+      when: (c) => Math.abs(c.sim.state.heel) * R2D > 26 && !c.sim.boat.pressed,
       say: () => 'She is overpowered and heeling too far to be fast. Ease the mainsheet to stand her up (point at the boom and scroll down, or hold S).',
     },
     {
@@ -92,6 +127,32 @@ export class Hints {
         return o.inIrons || (o.tws < 3 * KT && Math.abs(s.speed) < 1 * KT);
       },
       say: (c) => `${c.sim.out.inIrons ? 'Still stuck head to wind' : 'There is not enough wind to sail'}. The engine will get her moving: press I to start it, then the full stop key to put her ahead.`,
+    },
+    {
+      // Slamming: said before the plain chop tip, because it is the more urgent of the two.
+      id: 'slamming', after: 2, once: true,
+      when: (c) => (c.slams?.() ?? 0) >= 3 && !c.sim.out.underPower,
+      say: (c) => `She is slamming: falling off the back of each wave and stopping. Bear away a few degrees to take them on her shoulder${c.sim.state.reef < c.sim.boat.sails.main.reefs.length - 1 ? ', and reef (J) so she goes through them slower' : ''}.`,
+    },
+    {
+      id: 'tideSea', after: 12, once: true,
+      when: (c) => {
+        const sea = c.sea?.();
+        return !!sea && sea.against > 0.5 && sea.streamFactor > 1.15 && sea.windHeight > 0.4;
+      },
+      say: (c) => {
+        const where = c.tideGate?.() ?? '';
+        const kt = ((c.sea?.()?.against ?? 0) / KT).toFixed(1);
+        return `Wind against tide${where ? ` in ${where}` : ''}: ${kt} kt of ${where ? 'ebb' : 'stream'} is running into the breeze and standing the sea up short and steep. It lies down again when the tide turns, and it is easier out of the strongest stream.`;
+      },
+    },
+    {
+      id: 'chop', after: 25, once: true,
+      when: (c) => {
+        const o = c.sim.out;
+        return !o.underPower && !c.sim.state.maneuver && o.seaLoss > 0.035 && Math.abs(o.twa) * R2D < 48 && Math.abs(o.twa) * R2D > 30;
+      },
+      say: () => 'This chop is stopping her: every wave takes a little speed. Crack off a few degrees and keep her moving. In a sea, speed first and pointing second.',
     },
     {
       id: 'tack', after: 15,
@@ -138,7 +199,7 @@ export class Hints {
       const held = r.when(this.ctx) ? (this.held.get(r.id) ?? 0) + dt : 0;
       this.held.set(r.id, held);
       if (held < r.after || this.clock < this.quietUntil) continue;
-      if (this.clock - (this.lastSaid.get(r.id) ?? -1e9) < 150) continue;
+      if (this.clock - (this.lastSaid.get(r.id) ?? -1e9) < (r.once ? Infinity : 150)) continue;
       this.lastSaid.set(r.id, this.clock);
       this.quietUntil = this.clock + 25;
       this.hideAt = this.clock + 11;

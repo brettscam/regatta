@@ -270,16 +270,18 @@ export class Crew {
   private poseHelm(pose: BoatPose, time: number): void {
     const f = this.helm;
     const geo = this.model.geo;
-    const sole = geo.cockpitSoleY;
+    // A raised helm station has its own sole, and may be off the centreline.
+    const sole = geo.helmSoleY ?? geo.cockpitSoleY;
+    const hx = geo.wheel.x;
     const lean = clamp(pose.heel * 0.6, -0.22, 0.22);
     f.up.set(-Math.sin(lean), Math.cos(lean), 0);
     f.right.set(Math.cos(lean), Math.sin(lean), 0);
     f.fwd.set(0, 0, -1);
     const z = geo.wheel.z + 0.46;
     const sway = Math.sin(time * 0.61) * 0.012;
-    f.footL.set(-0.17, sole, z + 0.03);
-    f.footR.set(0.17, sole, z - 0.02);
-    f.pelvis.set(0, sole, z + 0.01).addScaledVector(f.up, 0.85 * f.tall).addScaledVector(f.right, sway);
+    f.footL.set(hx - 0.17, sole, z + 0.03);
+    f.footR.set(hx + 0.17, sole, z - 0.02);
+    f.pelvis.set(hx, sole, z + 0.01).addScaledVector(f.up, 0.85 * f.tall).addScaledVector(f.right, sway);
     f.neck.copy(f.pelvis).addScaledVector(f.up, TORSO * f.tall + Math.sin(time * 1.7) * 0.005);
     f.neck.z -= 0.06;
     f.kneeHint.set(0, 0.2, -1);
@@ -334,7 +336,7 @@ export class Crew {
     const stride = 0.4 * (1 - 0.65 * mid);
     for (const [foot, s] of [[f.footL, -1], [f.footR, 1]] as const) {
       foot.set(f.pelvis.x, sole, f.pelvis.z).addScaledVector(f.fwd, stride).addScaledVector(f.right, s * 0.12);
-      foot.x = clamp(foot.x, -0.4, 0.4);
+      foot.x = clamp(foot.x, -(geo.wellHalf ?? 0.4), geo.wellHalf ?? 0.4);
     }
     f.kneeHint.copy(f.fwd).addScaledVector(Y, 0.9);
 
