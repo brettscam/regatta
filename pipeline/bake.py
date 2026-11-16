@@ -183,28 +183,24 @@ def main(name, work, tile_dir, out, hrrr_dir):
         Ground of height h at distance d counts as h / (rise * d + 25), so a hill shelters ten times its height or so."""
         most = np.zeros_like(x)
         for dist in np.arange(150.0, reach + 1, 150.0):
-            most = np.maximum(most, height_at(x + math.sin(bearing) * dist, y + math.cos(bearing) * dist) / (rise * dist + 25.0))
+            most = np.maximum(most, height_at(x + np.sin(bearing) * dist, y + np.cos(bearing) * dist) / (rise * dist + 25.0))
         return np.clip(most, 0, 1)
+
+    # Each wind cell is judged at five points, its middle and four round it, and only those that are afloat count.
+    if "lee" in wind_spec:
+        lee_x = wgx[..., None] + np.array([0, -0.25, 0.25, -0.25, 0.25]) * WIND_DX
+        lee_y = wgy[..., None] + np.array([0, -0.25, -0.25, 0.25, 0.25]) * WIND_DX
+        lee_afloat = height_at(lee_x, lee_y) < 1.0
+        lee_count = np.maximum(lee_afloat.sum(axis=-1), 1)
 
     def island_effects(u, v, gust, lee):
         """Wind shadow under high islands and a little more wind where it is squeezed past them, by rule.
-        The analysis grid is too coarse to hold either. Each wind cell is judged at five points and averaged."""
-        from_ = np.arctan2(-u, -v)
-        shade = np.zeros_like(u)
-        squeeze = np.zeros_like(u)
-        offsets = [(0, 0), (-0.25, -0.25), (0.25, -0.25), (-0.25, 0.25), (0.25, 0.25)]
-        for j in range(wny):
-            for i in range(wnx):
-                x = wxs[i] + np.array([o[0] for o in offsets]) * WIND_DX
-                y = wys[j] + np.array([o[1] for o in offsets]) * WIND_DX
-                afloat = height_at(x, y) < 1.0
-                if not afloat.any():
-                    continue
-                x, y = x[afloat], y[afloat]
-                a = float(from_[j, i])
-                shade[j, i] = blocking(x, y, a, lee["reach"], lee["rise"]).mean()
-                flanks = blocking(x, y, a + math.pi / 2, lee["reach"] / 2, lee["rise"]) + blocking(x, y, a - math.pi / 2, lee["reach"] / 2, lee["rise"])
-                squeeze[j, i] = (np.clip(flanks, 0, 2) / 2).mean()
+        The analysis grid is too coarse to hold either."""
+        from_ = np.arctan2(-u, -v)[..., None]
+        over_water = lambda a: (a * lee_afloat).sum(axis=-1) / lee_count
+        shade = over_water(blocking(lee_x, lee_y, from_, lee["reach"], lee["rise"]))
+        flanks = blocking(lee_x, lee_y, from_ + math.pi / 2, lee["reach"] / 2, lee["rise"]) + blocking(lee_x, lee_y, from_ - math.pi / 2, lee["reach"] / 2, lee["rise"])
+        squeeze = over_water(np.clip(flanks, 0, 2) / 2)
         mean = (1 - lee["calm"] * shade) * (1 + lee["squeeze"] * squeeze * (1 - shade))
         # Under a high island the mean wind drops away but the puffs still come down off the hill.
         puffs = (1 - lee["calm"] * 0.45 * shade) * (1 + lee["squeeze"] * squeeze * (1 - shade))
