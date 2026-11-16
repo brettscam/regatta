@@ -78,7 +78,9 @@ function gulfUse(x: number, y: number, z: number, slope: number, north: number):
   if (inBox(x, y, -22500, -15500, 7200, 10500) && z < 45) return 'town';
   if (inBox(x, y, -53800, -50500, 54500, 57500) && z < 60) return 'town';
   // Inverness Ridge, between Tomales Bay and the sea, and the ridges above Bolinas and Muir Woods: forest.
-  if (x > -47000 && x < -28000 && y > 12000 + (x + 28000) * -0.9 - 9000 && y < 12000 + (x + 28000) * -0.9 + 1500 && z > 60) return 'forest';
+  // The crest runs north-west from above Bolinas to Tomales Bay. `off` is metres north-east of it: fir from the bay shore to two miles seaward of the crest.
+  const off = ((x + 24500) * 1.545 + (y - 10500)) / 1.84;
+  if (x > -43000 && x < -23000 && off > -3500 && off < 2500 && z > 40) return 'forest';
   if (x > -24000 && y > 3000 && z > 150) return 'forest';
   if (y < -24000 && z > 180 && north > 0) return 'forest';
   // Everywhere else the coast is open: grass on the terraces and the Point Reyes headland, scrub in the gullies.
