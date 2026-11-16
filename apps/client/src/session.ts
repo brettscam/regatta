@@ -23,6 +23,7 @@ import { myAvatar } from './boat/avatar';
 import { Race, type RaceCourse } from './race/race';
 import { ShadedWind } from './race/shadow';
 import { damageNote } from './aboard/contactRules';
+import { capsizeAlarm } from './aboard/pressedRules';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
 
@@ -108,7 +109,7 @@ export class Session {
   private readonly identity: Identity;
   /** What the features aboard are handed. Its boat is kept current. */
   private aboard!: AboardContext;
-  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0 };
+  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0, capsizes: 0 };
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
     const world = stage.world;
@@ -125,13 +126,14 @@ export class Session {
     this.after = this.before;
     this.watch.crashGybes = this.sim.state.crashGybes;
     this.watch.knockdowns = this.sim.state.knockdowns;
+    this.watch.capsizes = this.sim.state.capsizes;
     this.watch.broaches = this.sim.state.broaches;
     this.watch.wraps = this.sim.state.spinWraps;
 
     this.boatView = new BoatView(opts.spec, opts.livery);
     stage.scene.add(this.boatView.root);
     this.drone = new DroneCamera(window.innerWidth / window.innerHeight);
-    this.drone.snap(VIEWS.drone, this.sim.state.heading);
+    this.drone.snap(this.boatView.views.drone, this.sim.state.heading);
 
     // The route, the plan worked out from the forecast, and what really happens.
     this.passage = new Passage(opts.spec.polar, {
@@ -380,12 +382,14 @@ export class Session {
     else if (!o.aground && o.underKeel !== null && o.underKeel < 2.5 && !watch.shallow) this.alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under the keel`);
     // The boom came across on its own.
     const windKt = Math.round(o.tws / KT);
-    if (sim.state.broaches > watch.broaches) this.alarm(`Broached under the spinnaker in ${windKt} kt. It has collapsed and she will come up. Get it down with N${windKt >= (this.spec.sails.spinnaker?.maxTwsKt ?? 21) ? ': this is too much wind for it' : ', or bear away before it fills again'}`);
+    if (sim.state.capsizes > watch.capsizes) this.alarm(capsizeAlarm(this.spec, sim.state, o));
+    else if (sim.state.broaches > watch.broaches) this.alarm(`Broached under the spinnaker in ${windKt} kt. It has collapsed and she will come up. Get it down with N${windKt >= (this.spec.sails.spinnaker?.maxTwsKt ?? 21) ? ': this is too much wind for it' : ', or bear away before it fills again'}`);
     else if (sim.state.knockdowns > watch.knockdowns && sim.state.crashGybes === watch.crashGybes) this.alarm(`Knocked down: ${windKt} kt on ${this.spec.sails.main.reefs[sim.state.reef]?.name.toLowerCase() ?? 'this much sail'} with the sheets in. She will come up. Let the main out with S, and reef with J before the next gust`);
     else if (sim.state.knockdowns > watch.knockdowns) this.alarm(`Knocked down. Crash gybe in ${windKt} kt with the main let out. She will come up: ease the sheets`);
     else if (sim.state.crashGybes > watch.crashGybes) this.alarm('Crash gybe. Haul the main in before the boom comes across, or press T and the crew tends it');
     if (sim.state.spinWraps > watch.wraps && sim.state.broaches === watch.broaches) this.alarm('The spinnaker has wrapped round the forestay. It is doing nothing: take it down with N, then set it again');
     watch.broaches = sim.state.broaches;
+    watch.capsizes = sim.state.capsizes;
     watch.wraps = sim.state.spinWraps;
     if (sim.state.knockdowns > watch.knockdowns) this.opts.logbook.count('knockdowns', sim.state.knockdowns - watch.knockdowns);
     watch.crashGybes = sim.state.crashGybes;
@@ -568,7 +572,7 @@ export class Session {
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
     this.sound.update(o.aws / KT, sim.state.speed / KT, loose, paused);
 
-    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
 
   /** A short account of the boat and the conditions, for attaching to feedback. */

@@ -1,18 +1,21 @@
 // Sails a race course on the route pilot and reports how it went. Usage: npx vite-node scripts/sailcourse.ts <race id> [hours into season] [boat id]
 // It is the check that a course can be sailed start to finish without the pilot putting her ashore.
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { Sim, KT, type BoatSpec } from '@slack-tide/sim';
 import { trackFix } from '@slack-tide/nav';
 import { ReplayWorld, type CourseData } from '@slack-tide/world';
 
-const dir = new URL('../courses/sf-bay/', import.meta.url);
+type RaceDef = { id: string; name: string; marks: Array<{ name: string; x: number; y: number }> };
+const [raceId = 'strait-cove', hours = '5.6', boatId = 'sloop38'] = process.argv.slice(2);
+// The race is looked for on every water under courses/, so one id is enough to say which water as well.
+const waters = readdirSync(new URL('../courses/', import.meta.url)).filter((w) => existsSync(new URL(`../courses/${w}/races.json`, import.meta.url)));
+const water = waters.find((w) => (JSON.parse(readFileSync(new URL(`../courses/${w}/races.json`, import.meta.url)).toString()) as RaceDef[]).some((r) => r.id === raceId));
+if (!water) throw new Error(`No race ${raceId}`);
+const dir = new URL(`../courses/${water}/`, import.meta.url);
 const read = (f: string) => readFileSync(new URL(f, dir));
 const course = JSON.parse(read('course.json').toString()) as CourseData;
 const cur = read('current.bin');
-const races = JSON.parse(read('races.json').toString()) as Array<{ id: string; name: string; marks: Array<{ name: string; x: number; y: number }> }>;
-const [raceId = 'strait-cove', hours = '5.6', boatId = 'sloop38'] = process.argv.slice(2);
-const race = races.find((r) => r.id === raceId);
-if (!race) throw new Error(`No race ${raceId}`);
+const race = (JSON.parse(read('races.json').toString()) as RaceDef[]).find((r) => r.id === raceId)!;
 const boat = JSON.parse(readFileSync(new URL(`../boats/${boatId}.json`, import.meta.url)).toString()) as BoatSpec;
 const world = new ReplayWorld({ course, current: new Int8Array(cur.buffer, cur.byteOffset, cur.byteLength), depth: new Uint8Array(read('depth.bin')) }, Number(hours) * 3600);
 

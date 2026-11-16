@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide/sim';
 import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './buildSloop';
+import { buildCatamaran } from './buildCat';
 
 export type { BoatDisplay, Livery } from './buildSloop';
 import { Jib, Mainsail, Spinnaker, spinnakerColour, type SailShape } from './sails';
 import { Crew } from './crew';
+import { VIEWS, type ViewPreset } from '../camera/drone';
 import type { Avatar } from './avatar';
 
 const R2D = 180 / Math.PI;
@@ -99,12 +101,16 @@ export class BoatView {
   readonly solids: THREE.Object3D[];
   /** Thin parts the camera hops across. */
   readonly thin: THREE.Object3D[];
+  /** The working views of this boat: the usual ones, with any her boat file gives in their place. */
+  readonly views: Record<string, ViewPreset>;
 
   private readonly bindings = new Map<string, ControlBinding>();
   private readonly glowMeshes = new Map<string, THREE.Mesh[]>();
   private glowNode: string | null = null;
   private glowLevel = 0;
   private belly = 1;
+  /** How far her bows are pressed down, radians. Only a boat with a `pressed` limit ever is. */
+  private bury = 0;
   private windexAngle = 0;
   private winchSpin = { winch_port: 0, winch_stbd: 0 };
   private lastSheet = { winch_port: 0, winch_stbd: 0 };
@@ -143,8 +149,10 @@ export class BoatView {
   private readonly q1 = new THREE.Quaternion();
 
   constructor(readonly spec: BoatSpec, readonly livery: Livery = {}) {
-    this.model = buildSloop(spec, livery);
+    // The boat file says which builder draws her. Both give the same model: the same named nodes and rig geometry.
+    this.model = (spec as BoatSpec & { model?: string }).model === 'catamaran' ? buildCatamaran(spec, livery) : buildSloop(spec, livery);
     this.root = this.model.root;
+    this.views = { ...VIEWS, ...(spec as BoatSpec & { views?: Record<string, ViewPreset> }).views };
     this.root.rotation.order = 'YXZ';
     this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38), livery.sail);
     this.jib = new Jib(this.model.geo);
@@ -303,10 +311,14 @@ export class BoatView {
   update(pose: BoatPose, state: SimState, out: SimOutputs, time: number, dt: number): void {
     const { nodes, geo } = this.model;
     this.root.position.set(pose.x, pose.heave, pose.z);
-    this.root.rotation.set(pose.pitch, -pose.heading, -pose.heel);
+    // Pressed past her limit, a boat that does not heel puts her lee bow down instead.
+    const press = THREE.MathUtils.clamp(((out.press || 0) - 1) * 0.3, 0, 0.085);
+    this.bury += (press - this.bury) * Math.min(1, dt * 1.2);
+    this.root.rotation.set(pose.pitch - this.bury, -pose.heading, -pose.heel);
 
     nodes.wheel.rotation.z = -pose.rudder * WHEEL_RATIO;
     nodes.rudder.rotation.y = pose.rudder;
+    if (nodes.rudder_port) nodes.rudder_port.rotation.y = pose.rudder;
     nodes.boom.rotation.y = pose.boom;
 
     // The sails belly away from the wind. Crossing the wind they pass through flat.
@@ -369,6 +381,9 @@ export class BoatView {
         ropes[0].set(clew, car);
         ropes[1].set(car, winch);
         ropes[2].mesh.visible = false;
+      } else if (geo.selfTackingJib) {
+        // One sheet on a track: there is no lazy sheet to draw.
+        for (const r of ropes) r.mesh.visible = false;
       } else {
         // The lazy sheet leads round the front of the mast to the other side.
         ropes[0].set(clew, around);

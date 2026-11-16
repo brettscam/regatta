@@ -17,6 +17,8 @@ export interface StageBoat {
   heading: number;
   speed: number;
   heel: number;
+  /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
+  hulls?: number;
 }
 
 /**

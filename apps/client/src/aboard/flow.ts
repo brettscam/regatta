@@ -109,7 +109,7 @@ export class FlowView implements Feature {
     const mv = (y - g.mainTackY) / ((g.mainHeadY - g.mainTackY) * reef);
     if (mv > 0 && mv < 0.97) {
       // The sail narrows toward the head and twists off a little.
-      const len = THREE.MathUtils.lerp(g.mainFoot, 0.3, mv) + 0.2 * g.mainFoot * Math.sin(Math.PI * mv) * 0.5;
+      const len = THREE.MathUtils.lerp(g.mainFoot, g.mainHeadWidth ?? 0.3, mv) + 0.2 * g.mainFoot * Math.sin(Math.PI * mv) * 0.5;
       const a = s.boomAngle * (1 + 0.22 * mv);
       out.push({ ax: 0, az: g.gooseneck.z, bx: Math.sin(a) * len, bz: g.gooseneck.z + Math.cos(a) * len, luff: o.main.flogging ? 1 : o.main.luff, stall: o.main.stall });
     }
