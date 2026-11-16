@@ -7,7 +7,7 @@ import blueJson from '../../../boats/blue50.json';
 import lineupJson from '../../../boats/lineup.json';
 import { capsizeAlarm, isCapsized, isPressed, placard, reefDue } from '../src/aboard/pressedRules';
 import { CONTACT, overlap, type Hull } from '../src/aboard/contactRules';
-import { PACERS, paceReef } from '../src/race/pace';
+import { paceReef } from '../src/race/pace';
 import { ShadedWind } from '../src/race/shadow';
 import { taken } from '../src/race/startline';
 
@@ -98,8 +98,8 @@ describe('the catamaran as a hull other boats can hit', () => {
 describe('a pace boat sailing the catamaran', () => {
   /** A pace boat's sim, built the way `PaceBoat` builds it, and sailed round marks by the same rule. */
   const sail = (twsKt: number, marks: Array<{ x: number; y: number }>, limitS: number) => {
-    const who = PACERS[1];
-    const crewed = { ...cat, polar: { ...cat.polar, speeds: cat.polar.speeds.map((row) => row.map((kt) => kt * who.pace)) } };
+    // Club boats sail the boat as she is: skill shows as mistakes, not a slower polar.
+    const crewed = cat;
     const sim = new Sim(crewed, new ShadedWind(steady(twsKt)), { x: 0, y: -200, headingDeg: 0, speedKt: 0 });
     sim.state.speed = 3.5 * KT;
     let legStart = { x: 0, y: -200 };
