@@ -389,6 +389,9 @@ export class Tips implements Feature {
       manoeuvre: s.maneuver !== null, knocked: o.knockedDown || s.knock > 0.05, hitAgo: this.clock - this.hitAt, panel,
       hold: s.hold, heldFor: this.heldFor, berth, ashore,
       tender: !!ctx.feature('kayak')?.focus?.(), night: this.night,
+      // The tender she carries, and what Shift+O would give instead (`aboard/kayak.ts`).
+      tenderName: (ctx.feature('kayak') as { tenderName?: () => string } | undefined)?.tenderName?.() ?? 'Kayak',
+      tenderOthers: (ctx.feature('kayak') as { tenderOthers?: () => string[] } | undefined)?.tenderOthers?.() ?? [],
       depth: o.underKeel === null ? 99 : o.underKeel + ctx.spec.dimensions.draft,
       marks: passage.marks.length - passage.nextIndex, mark,
     };

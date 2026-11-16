@@ -23,8 +23,10 @@ export class Dockside implements Feature {
     return null;
   }
 
-  key(code: string): boolean {
+  key(code: string, shift = false): boolean {
     const { ctx } = this;
+    // Shift+O is the tender's: it changes which one she carries.
+    if (shift && code === 'KeyO') return false;
     if (this.at) {
       if (code === 'KeyO') {
         ctx.say(`Back aboard from ${this.at.ashore!.name}. X casts off`, 6);

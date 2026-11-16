@@ -47,7 +47,8 @@ export const KEY_GROUPS: KeyGroup[] = [
   { id: 'anchor', title: 'At anchor and ashore', rows: [
     { keys: ['X'], name: 'Stop here', since: 'v9', what: 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.' },
     { keys: ['Z'], name: 'Sleep', since: 'v9', what: 'Skip to the morning. Only while stopped, and only when you are alone on the water.' },
-    { keys: ['O'], name: 'Go ashore', since: 'v10', what: 'Tied up at a dock, O steps straight ashore. Anywhere else you have stopped, it launches the kayak: paddle with W A S D, press O at a beach or a bar to land, and O beside your boat to climb back aboard.' },
+    { keys: ['O'], name: 'Go ashore', since: 'v10', what: 'Tied up at a dock, O steps straight ashore. Anchored or on a mooring, it launches the tender: the kayak, the dinghy or the wave runner. Drive her with W A S D (Shift with W is a sprint, or flat out), press O at a beach or a bar to land, and O beside your boat to climb back aboard.' },
+    { keys: ['Shift', '+', 'O'], name: 'Change tender', what: 'Aboard, with the tender stowed: the next one your boat carries. Every boat has the kayak; 30 ft and up the dinghy, an outboard skiff; 42 ft and up (the catamaran, the 45 and the 50) a wave runner as well. Also chosen on the way in, beside the boat\'s name.' },
     { keys: ['K'], name: 'Crab pot', since: 'v9', what: 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.' },
     { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it.' },
   ] },
@@ -122,7 +123,8 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['B'], 'all keys'],
   ],
   tender: [
-    [['W', 'S'], 'paddle ahead, back'],
+    [['W', 'S'], 'ahead, back'],
+    [['Shift'], 'flat out'],
     [['A', 'D'], 'turn'],
     [['O'], 'land, or climb back aboard'],
     [['B'], 'all keys'],

@@ -73,6 +73,8 @@ export class Stage {
   /** What every vessel leaves on the water, and the spray off their bows. */
   readonly wake: Wake;
   readonly spray = new Spray();
+  /** Small craft afloat this frame (the tenders, `aboard/kayak.ts`), drawn in the same wakes and spray as every vessel. Filled and emptied by their owners. */
+  readonly craft: WakeVessel[] = [];
   private readonly afloat: WakeVessel[] = [];
   private readonly white = new THREE.Color();
   private readonly tint = new THREE.Color();
@@ -282,7 +284,7 @@ export class Stage {
     const list = this.afloat;
     // A catamaran leaves a wake from each hull, each about its own centreline.
     const hulls = boat.hulls && boat.hulls > 0 ? 2 : 1;
-    const n = ships.length + hulls;
+    const n = ships.length + hulls + this.craft.length;
     while (list.length < n) list.push({ id: '', x: 0, z: 0, heading: 0, speed: 0, length: 11.6, beam: 3.8, lee: 0 });
     list.length = n;
     for (let h = 0; h < hulls; h++) {
@@ -298,12 +300,14 @@ export class Stage {
     }
     for (let i = 0; i < ships.length; i++) {
       const s = ships[i];
-      const v = list[i + hulls];
+      const v = list[i + hulls + this.craft.length];
       v.id = s.id;
       v.x = s.x; v.z = -s.y; v.heading = s.heading; v.speed = s.sog; v.length = s.length; v.beam = s.beam;
       // A sailing boat heels away from the wind, and her leeward bow wave is the bigger one.
       v.lee = s.kind === 'sail' ? -Math.sign(Math.sin(windFrom - s.heading)) * 0.7 * Math.min(1, s.sog / 2) : 0;
     }
+    // The tenders, as they are, straight after her own hull so a busy water never crowds them out of the wakes.
+    for (let i = 0; i < this.craft.length; i++) Object.assign(list[hulls + i], this.craft[i]);
     this.wake.update(this.renderer, seaTime, camera, list);
 
     const dt = seaTime - this.lastSea;
