@@ -5,6 +5,8 @@ import type { Place } from '../session';
 import { overlap, type Hull } from './contactRules';
 import type { AboardContext, Feature } from './feature';
 import { stamp } from './visited';
+import { KAYAK_WAKE, kayakCapsizes } from '../scene/wakeField';
+import type { WakeVessel } from '../scene/wake';
 import { BAIL_SECONDS, SHOAL_DEPTH, cruiseThrottle, minutesLeft, newMotor, stepMotor, type Motor, type MotorWater } from './motor';
 import { call, fendOff, groundHeight, heldBackBy, launchSpot, madeGood, newCraft, placeInReach, rangeAndBearing, stepCraft, touchingShore, BOARD_RANGE, type Craft, type HeightGrid, type Hulk, type Paddling } from './paddle';
 import { TenderFleet, newRide, sit } from './tenderFleet';
@@ -24,6 +26,11 @@ const TENDER_VIEW: Record<string, ViewPreset> = {
 const PAINTER = 3.5;
 /** How near another boat's tender is heard. */
 const EARSHOT = 260;
+/** Seconds a capsize costs: over she goes, and the paddler gets back in. The first part of it is the roll itself. */
+const SWIM = 7;
+const ROLL = 1.6;
+/** Within this of a venue's guest float, metres, a tender can be made fast to it and the crew steps up. */
+const GUEST_DOCK = 18;
 
 type Mode = 'stowed' | 'afloat' | 'ashore';
 const three = (deg: number): string => `${String(deg).padStart(3, '0')}°`;
@@ -79,6 +86,13 @@ export class Kayak implements Feature {
   /** What has been said about the powered tender on this trip, so each thing is said once. */
   private readonly said = { plane: false, shoal: false, shipping: false, quarter: false, dry: false, swamped: false, jumps: 0, spills: 0, swamps: 0, grounds: 0, thrown: false };
   private readonly harbour = new HarbourWatch();
+  /** The passing of a ship whose wake has been warned of, and the one that last put her over or filled her. */
+  private wakeWarned = '';
+  private wakeDunked = '';
+  /** Seconds left of a capsize. No paddling meanwhile. */
+  private swim = 0;
+  /** This tender as the drawn wakes and spray see her (`stage.craft`). */
+  private readonly drawn: WakeVessel = { id: 'own-tender', x: 0, z: 0, heading: 0, speed: 0, length: 3, beam: 1, lee: 0 };
   private zones: Zone[] = [];
   /** Seconds until another bump may be called. */
   private bumped = 0;
@@ -119,7 +133,8 @@ export class Kayak implements Feature {
       // The chart's depth with the tide on it. Where the drawn shore reaches out past the chart's, call it a foot of water.
       depth: (x, y) => Math.max(0.3, world.depth(x, y, ctx.sim.state.t)),
       shoal: (x, y) => this.thin(x, y, SHOAL_DEPTH),
-      wake: (x, y) => this.wakeAt(x, y),
+      // A ship's wake (the same one every player meets, `scene/wakeField.ts`), or the arms of a yacht's.
+      wake: (x, y) => Math.max(Math.min(1, (ctx.stage.wakes.strongest(x, y)?.hit.height ?? 0) / 0.8), this.wakeAt(x, y)),
     };
     this.others = new TenderFleet(ctx, this.ground);
     this.build();
@@ -227,7 +242,10 @@ export class Kayak implements Feature {
 
     if (this.mode === 'stowed') {
       if (ctx.sim.state.hold === 'none') {
-        ctx.say(`The ${name} stays ${this.spec.stow === 'astern' ? 'on her painter' : 'lashed down'} under way. Anchor or pick up a mooring first, then O launches her. Shift+O changes tender`, 6);
+        // The owner's rule: the tender goes once she is anchored or moored, and the yacht waits where she is.
+        ctx.say(this.spec.drive === 'paddle'
+          ? 'The kayak stays lashed down under way. Anchor or pick up a mooring first (X), then O launches her. Shift+O changes tender'
+          : `The ${this.dinghy()} is launched once she is anchored or moored. Stop with X first, then O`, 6);
         return true;
       }
       this.launch();
@@ -244,6 +262,12 @@ export class Kayak implements Feature {
       ctx.say('You are in the water. She is coming round for you');
       return true;
     }
+    // A venue's guest float: made fast alongside it and up the ladder, whatever the beach is like.
+    const guest = this.guestDock();
+    if (guest && Math.abs(c.speed) <= 1.6 && Math.hypot(c.x - ctx.sim.state.x, c.y - ctx.sim.state.y) > BOARD_RANGE) {
+      this.goAshore(guest, true);
+      return true;
+    }
     const what = call(c, ctx.sim.state, ctx.places, this.water.land);
     if (what.do === 'board') this.comeAboard(this.spec.tankL ? `Back aboard. The ${name} is ${this.stowedWord()} and her tank is filled from the can` : `Back aboard. The ${name} is ${this.stowedWord()}`);
     else if (what.do === 'land') this.goAshore(what.place);
@@ -251,6 +275,32 @@ export class Kayak implements Feature {
     else if (what.far) ctx.say(`Nothing to land on here. The boat is ${tens(what.range)} m off, bearing ${three(what.bearing)}`, 6);
     else ctx.say(`Nothing to land on here. ${this.spec.drive === 'paddle' ? 'Paddle' : 'Run'} in to a shore or a dock, or back alongside the boat`, 6);
     return true;
+  }
+
+  /** The place whose guest float she is lying at, if any. */
+  private guestDock(): Place | null {
+    const c = this.kayak;
+    for (const spot of this.ctx.stage.shore ?? []) {
+      const d = spot.layout?.dock;
+      if (!d || Math.hypot(d.x - c.x, d.y - c.y) > GUEST_DOCK) continue;
+      const place = this.ctx.places.find((p) => p.id === spot.id && p.ashore);
+      if (place) return place;
+    }
+    return null;
+  }
+
+  /** The tender as the skipper would call her: the skiff is the dinghy. */
+  private dinghy(): string {
+    return this.spec.id === 'skiff' ? 'dinghy' : this.spec.name.toLowerCase();
+  }
+
+  /** For the tips (`tipTable.ts`): the tender she carries, and the others Shift+O would give. */
+  tenderName(): string {
+    return this.spec.name;
+  }
+
+  tenderOthers(): string[] {
+    return tendersFor(this.yachtFeet()).filter((t) => t.id !== this.spec.id).map((t) => (t.id === 'skiff' ? 'Dinghy' : t.name));
   }
 
   private stowedWord(): string {
@@ -283,6 +333,7 @@ export class Kayak implements Feature {
     Object.assign(this.kayak, this.fresh(spot.x, spot.y, spot.heading));
     this.unberth();
     this.mode = 'afloat';
+    this.swim = 0;
     this.at = null;
     this.told = null;
     this.toldBoat = true;
@@ -304,7 +355,7 @@ export class Kayak implements Feature {
     else ctx.say('Skiff away. W opens the throttle, Shift with W is flat out, S goes astern, A and D steer. O lands her or brings you back aboard', 9);
   }
 
-  private goAshore(place: Place | null): void {
+  private goAshore(place: Place | null, float = false): void {
     const { ctx } = this;
     this.mode = 'ashore';
     this.at = place;
@@ -313,8 +364,12 @@ export class Kayak implements Feature {
     const m = this.kayak;
     if (isMotor(m)) m.throttle = m.slip = m.plane = 0;
     this.model.setManned(false);
-    this.haulUp();
-    if (place?.ashore) {
+    if (!float) this.haulUp();
+    else this.afloatAt = null;
+    if (place?.ashore && float) {
+      if (stamp(place.id)) ctx.logbook.count('ashore');
+      ctx.say(`Made fast to the guest dock at ${place.ashore.name} and up the ladder. ${place.ashore.say}`, 9);
+    } else if (place?.ashore) {
       // The first time ever at this place, on this device: a stamp on the bar-hop card and one more in the logbook.
       if (stamp(place.id)) ctx.logbook.count('ashore');
       ctx.say(`Ashore at ${place.ashore.name}. ${place.ashore.say}`, 9);
@@ -408,6 +463,7 @@ export class Kayak implements Feature {
         this.setTender(fit);
         return;
       }
+      this.draw(null);
       this.stow(held, live, dt, seaTime);
       this.wake?.update(null, live, seaTime);
       this.noise.update('none', -1, 0);
@@ -416,7 +472,9 @@ export class Kayak implements Feature {
 
     let input: Paddling = { ahead: 0, steer: 0 };
     if (this.mode === 'afloat' && !frozen) {
-      input = this.input = this.drive ?? this.keys();
+      this.swim = Math.max(0, this.swim - dt);
+      this.wakes();
+      input = this.input = this.swim > 0 ? { ahead: 0, steer: 0 } : this.drive ?? this.keys();
       if (isMotor(kayak)) stepMotor(kayak, spec, input, dt, this.water, this.yacht());
       else stepCraft(kayak, input, dt, this.water, this.yacht());
       this.contact(dt);
@@ -432,7 +490,10 @@ export class Kayak implements Feature {
       this.motoring(kayak, input, live, seaTime);
       return;
     }
-    sit(ctx, this.ground, this.model, this.ride, kayak.x, kayak.y, kayak.heading, dt, seaTime);
+    this.draw(null);
+    // Capsizing, she goes right round.
+    const over = this.mode === 'afloat' && this.swim > SWIM - ROLL ? ((SWIM - this.swim) / ROLL) * Math.PI * 2 : 0;
+    sit(ctx, this.ground, this.model, this.ride, kayak.x, kayak.y, kayak.heading, dt, seaTime, 0, over);
     // A sprint is a faster stroke, not a longer one.
     this.model.animate(frozen ? 0 : dt * (input.sprint && input.ahead > 0 && !kayak.blown ? 1.45 : 1), input.ahead, input.steer, this.clock);
   }
@@ -451,6 +512,7 @@ export class Kayak implements Feature {
     }
     const top = spec.topKt * KT;
     const working = afloat && m.fuel > 0 && m.swamped <= 0;
+    this.draw(afloat && m.hop <= 0.02 ? m : null);
     this.wake?.update(afloat ? { x: m.x, y: m.y, heading: m.heading, speed: m.speed, plane: m.plane, throttle: working ? Math.abs(m.throttle) : 0, hop: m.hop, length: this.model.length, halfBeam: this.model.halfBeam, jet: spec.drive === 'jet' } : null, dt, seaTime);
     // Revs follow the throttle, held back a little until she is moving. In the air a jet screams with nothing to push on.
     const airborne = m.hop > 0.02;
@@ -511,6 +573,61 @@ export class Kayak implements Feature {
     // The harbour's five knots, close to anything that minds a wash.
     const line = this.harbour.watch(dt, speedingPast(m.x, m.y, m.speed, this.zones));
     if (line) ctx.heard('Harbourmaster', line);
+  }
+
+  /** Put her in the sea's drawn wakes and spray (`stage.craft`, read by `scene/wake.ts` and `scene/spray.ts`), or take her out. */
+  private draw(m: Motor | null): void {
+    const list = this.ctx.stage.craft;
+    const at = list.indexOf(this.drawn);
+    if (!m) {
+      if (at >= 0) list.splice(at, 1);
+      return;
+    }
+    const v = this.drawn;
+    v.x = m.x;
+    v.z = -m.y;
+    v.heading = m.heading;
+    v.speed = Math.max(0, m.speed);
+    v.length = this.model.length;
+    v.beam = this.model.halfBeam * 2;
+    // Banked into a turn, the outside of it throws the bigger wave.
+    v.lee = Math.max(-1, Math.min(1, -m.lean / 0.3));
+    if (at < 0) list.push(v);
+  }
+
+  /**
+   * A ship's wake and the tender. A warning while it is still on its way. A kayak taken beam-on by a big one goes over:
+   * a roll, a few seconds in the water, the paddler winded. A dinghy flat out across it ships a lot of water.
+   * The wave runner jumps it (`motor.ts`). The wake itself is the same one every player has (`scene/wakeField.ts`).
+   */
+  private wakes(): void {
+    const { ctx, kayak } = this;
+    const sw = ctx.seaway;
+    if (!sw.wakeId || kayak.beached) return;
+    const w = sw.wake;
+    if (w.arriveIn > 0 && w.arriveIn < KAYAK_WAKE.warnAhead && w.peak >= KAYAK_WAKE.warn && this.wakeWarned !== sw.wakeId) {
+      this.wakeWarned = sw.wakeId;
+      ctx.alarm(`Ship's wake coming, ${this.spec.drive === 'jet' ? 'ease off or jump it' : 'turn into it'}: ${sw.wakeFrom}, ${w.peak.toFixed(1)} m, here in ${Math.max(5, Math.round(w.arriveIn / 5) * 5)} s`);
+    }
+    if (this.swim > 0 || this.wakeDunked === sw.wakeId || !kayakCapsizes(w.height, kayak.heading, w.dirX, w.dirY)) return;
+    if (isMotor(kayak)) {
+      // Only the dinghy minds it, and only at speed.
+      if (!this.spec.swamps || kayak.speed < 4) return;
+      this.wakeDunked = sw.wakeId;
+      kayak.shipped = Math.min(0.95, kayak.shipped + 0.45);
+      kayak.speed *= 0.5;
+      ctx.alarm(`${sw.wakeFrom}'s wake broke over her beam. She has shipped a lot of water: ease off and take the next one on the bow`);
+      return;
+    }
+    this.wakeDunked = sw.wakeId;
+    this.swim = SWIM;
+    kayak.speed = 0;
+    kayak.turn = 0;
+    kayak.puff = 0;
+    kayak.blown = true;
+    // Blown is said here, in the same breath.
+    this.toldBlown = true;
+    ctx.alarm(`Capsized. ${sw.wakeFrom}'s wake caught her beam-on, ${w.height.toFixed(1)} m of it. You are back in her, soaked and winded. Next time turn her bow into it`);
   }
 
   /** The nearest of the other boats' powered tenders can be heard. */
@@ -610,8 +727,9 @@ export class Kayak implements Feature {
   private pointOut(): void {
     const { ctx, kayak } = this;
     this.effort();
-    const place = placeInReach(kayak, ctx.places, kayak.beached || touchingShore(kayak.x, kayak.y, this.water.land));
-    if (place?.ashore && place.id !== this.told) ctx.say(`${capital(place.ashore.name)} is close by. Ease up and press O to go ashore`, 6);
+    const guest = this.guestDock();
+    const place = guest ?? placeInReach(kayak, ctx.places, kayak.beached || touchingShore(kayak.x, kayak.y, this.water.land));
+    if (place?.ashore && place.id !== this.told) ctx.say(guest ? `The guest dock at ${place.ashore.name}. Ease up and press O to make fast and go ashore` : `${capital(place.ashore.name)} is close by. Ease up and press O to go ashore`, 6);
     this.told = place?.id ?? null;
 
     const off = Math.hypot(kayak.x - ctx.sim.state.x, kayak.y - ctx.sim.state.y);
@@ -781,6 +899,7 @@ export class Kayak implements Feature {
   }
 
   dispose(): void {
+    this.draw(null);
     this.helm(true);
     this.model.dispose();
     this.wake?.dispose();

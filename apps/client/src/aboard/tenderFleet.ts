@@ -4,6 +4,7 @@ import { groundHeight, type HeightGrid } from './paddle';
 import { buildTender, type TenderModel } from './tenderModel';
 import { TenderTrack } from './tenderTrack';
 import { TenderWake } from './tenderWake';
+import type { WakeVessel } from '../scene/wake';
 import { tenderById, type TenderSpec } from './tenders';
 
 const KT = 0.514444;
@@ -75,6 +76,8 @@ interface Entry {
   avatar: string;
   lean: number;
   seen: SeenTender;
+  /** Her in the sea's drawn wakes (`stage.craft`), while she is under way under power. */
+  drawn: WakeVessel;
 }
 
 /**
@@ -114,6 +117,7 @@ export class TenderFleet {
         e = {
           key, spec, model, avatar, wake: spec.drive === 'paddle' ? null : new TenderWake(ctx.stage.scene, (x, z, t, n) => ctx.stage.seaLevel(x, z, t, n)),
           track: new TenderTrack(), ride: newRide(), at: -1, lean: 0,
+          drawn: { id: `tender-${boat.peer}`, x: 0, z: 0, heading: 0, speed: 0, length: model.length, beam: model.halfBeam * 2, lee: 0 },
           seen: { peer: boat.peer, owner: boat.boatName || boat.name || 'another boat', spec, x: 0, y: 0, heading: 0, speed: 0, ashore: false },
         };
         entries.set(boat.peer, e);
@@ -138,6 +142,13 @@ export class TenderFleet {
       const work = t.speed > 0.3 ? Math.min(1, t.speed / (spec.cruiseKt * KT)) : t.speed < -0.2 ? -1 : 0;
       e.model.animate(dt, spec.drive === 'paddle' ? Math.sign(work) : work, Math.abs(turning) > 0.08 ? Math.sign(turning) : 0, this.clock);
       e.wake?.update(t.ashore ? null : { x: t.x, y: t.y, heading: t.heading, speed: t.speed, plane, throttle: Math.min(1, t.speed / top), hop: 0, length: e.model.length, halfBeam: e.model.halfBeam, jet: spec.drive === 'jet' }, dt, seaTime);
+      const d = e.drawn;
+      const craft = ctx.stage.craft;
+      const at = craft.indexOf(d);
+      if (spec.drive !== 'paddle' && !t.ashore && t.speed > 0.5) {
+        d.x = t.x; d.z = -t.y; d.heading = t.heading; d.speed = t.speed; d.lee = Math.max(-1, Math.min(1, -e.lean / 0.3));
+        if (at < 0) craft.push(d);
+      } else if (at >= 0) craft.splice(at, 1);
       const s = e.seen;
       s.x = t.x; s.y = t.y; s.heading = t.heading; s.speed = t.speed; s.ashore = t.ashore;
       s.owner = boat.boatName || boat.name || 'another boat';
@@ -155,6 +166,8 @@ export class TenderFleet {
   }
 
   private drop(e: Entry): void {
+    const at = this.ctx.stage.craft.indexOf(e.drawn);
+    if (at >= 0) this.ctx.stage.craft.splice(at, 1);
     e.model.dispose();
     e.wake?.dispose();
   }

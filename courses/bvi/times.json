@@ -1,0 +1,6 @@
+[
+  { "id": "morning", "name": "Mid-morning", "hours": 1.5, "say": "The trades already up at 14 knots from east-north-east, the sun still low over Virgin Gorda. The time to start a long beat", "default": true },
+  { "id": "afternoon", "name": "Early afternoon", "hours": 5, "say": "Fifteen knots with gusts to 20, and the shoals at their brightest under a high sun" },
+  { "id": "evening", "name": "Late afternoon", "hours": 8, "say": "The breeze holding as the light goes gold. Be on a mooring by six: night falls fast here" },
+  { "id": "christmas", "name": "Christmas winds", "hours": 4.5, "boost": 1.45, "say": "The reinforced trades of midwinter: 20 knots and more in the channel, with harder gusts off the hills. Reef before you leave" }
+]

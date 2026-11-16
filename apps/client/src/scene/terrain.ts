@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { CourseData } from '@slack-tide/world';
+import type { CourseData, GridSpec } from '@slack-tide/world';
 import { onCityNight } from './massing';
 
 /** Repeatable noise in 0..1 from a grid position. */
@@ -22,6 +22,14 @@ export function smoothNoise(x: number, y: number): number {
   const c = hash(i, j + 1);
   const d = hash(i + 1, j + 1);
   return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+}
+
+/**
+ * Whether a stretch of tropical shore is sand or rock. The elevation data cannot tell, so it goes by broad patches:
+ * about half of any coast is beach. The ground cover and the palms both ask this, so palms stand behind sand.
+ */
+export function sandyShore(x: number, y: number): boolean {
+  return smoothNoise(x / 520 + 31, y / 520 - 17) > 0.48;
 }
 
 export type LandUse = 'city' | 'town' | 'forest' | 'open';
@@ -63,14 +71,57 @@ function evergreenUse(x: number, y: number, z: number, slope: number, north: num
   return 'forest';
 }
 
+// ---- the ocean coast outside the Golden Gate ---------------------------------------------------------
+/**
+ * Ground cover for the coast from Half Moon Bay to Bodega (`gulf`). It shares the Bay's origin, so inside the Gate the
+ * Bay's own rule is used. Outside it: grass and coastal scrub kept green by the fog, fir and bishop pine on the high
+ * ridges (Tamalpais, Inverness Ridge, Montara Mountain), and a few small towns. Boxes from general knowledge.
+ */
+function gulfUse(x: number, y: number, z: number, slope: number, north: number): LandUse {
+  if (x > -9500 && y > -9000 && y < 14000) return landUse(x, y, z);
+  // Daly City and Pacifica, Montara to Half Moon Bay, Stinson Beach and Bolinas, Bodega Bay.
+  if (x > -7000 && y <= -9000 && y > -17500 && z < 200) return 'town';
+  if (inBox(x, y, -6500, -2000, -25500, -17500) && z < 110) return 'town';
+  if (inBox(x, y, -7500, 6000, -41000, -32500) && z < 60) return 'town';
+  if (inBox(x, y, -22500, -15500, 7200, 10500) && z < 45) return 'town';
+  if (inBox(x, y, -53800, -50500, 54500, 57500) && z < 60) return 'town';
+  // Inverness Ridge, between Tomales Bay and the sea, and the ridges above Bolinas and Muir Woods: forest.
+  // The crest runs north-west from above Bolinas to Tomales Bay. `off` is metres north-east of it: fir from the bay shore to two miles seaward of the crest.
+  const off = ((x + 24500) * 1.545 + (y - 10500)) / 1.84;
+  if (x > -43000 && x < -23000 && off > -3500 && off < 2500 && z > 40) return 'forest';
+  if (x > -24000 && y > 3000 && z > 150) return 'forest';
+  if (y < -24000 && z > 180 && north > 0) return 'forest';
+  // Everywhere else the coast is open: grass on the terraces and the Point Reyes headland, scrub in the gullies.
+  return z > 90 && north > 0.12 && slope > 0.15 ? 'forest' : 'open';
+}
+// ---- end of the ocean coast ------------------------------------------------------------------------
+
+/** One grid of a course's land heights: the main grid, or one of its finer insets. */
+export interface LandPart {
+  grid: GridSpec;
+  /** Boxes this part leaves undrawn because a finer inset draws them. */
+  skip?: GridSpec[];
+  name?: string;
+}
+
 /**
  * The land around the course, from real elevation data.
  * Sim coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
- * @param cover which built-in ground cover to colour it with: `sf-bay` (the default) or `evergreen`
+ * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen`, `gulf` or `tropic`
+ * @param part draw one grid of a course whose land has insets, with `heights` that grid's own cells. Left out, the whole of a plain course
  */
-export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Mesh {
+export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay', part?: LandPart): THREE.Mesh {
   const bay = cover !== 'evergreen';
-  const g = course.terrain;
+  // Trade-wind islands: green bush to the ridges, drier and thornier low down and on the sunny side, bare rock where
+  // it is steep, and white coral sand wherever the shore is flat.
+  const tropic = cover === 'tropic';
+  const bush = new THREE.Color(0.1, 0.25, 0.08);
+  const canopy = new THREE.Color(0.17, 0.34, 0.11);
+  const thorn = new THREE.Color(0.36, 0.39, 0.19);
+  const coral = new THREE.Color(0.9, 0.86, 0.72);
+  const boulder = new THREE.Color(0.46, 0.43, 0.39);
+  const gulf = cover === 'gulf';
+  const g = part ? { ...course.terrain, ...part.grid } : course.terrain;
   const { nx, ny, dx } = g;
   const pos = new Float32Array(nx * ny * 3);
   const col = new Float32Array(nx * ny * 3);
@@ -103,9 +154,10 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       pos[k * 3 + 2] = -y;
       if (z <= 0.4) {
         // Seabed colour only shows where a triangle crosses the waterline.
-        col[k * 3] = sand.r * 0.8;
-        col[k * 3 + 1] = sand.g * 0.8;
-        col[k * 3 + 2] = sand.b * 0.8;
+        const bed = tropic ? coral : sand;
+        col[k * 3] = bed.r * (tropic ? 1 : 0.8);
+        col[k * 3 + 1] = bed.g * (tropic ? 1 : 0.8);
+        col[k * 3 + 2] = bed.b * (tropic ? 1 : 0.8);
         continue;
       }
 
@@ -115,12 +167,29 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       const slope = Math.hypot(e, n);
       const broad = smoothNoise(x / 900, y / 900);
       const patch = smoothNoise(x / 420, y / 420) * 0.6 + smoothNoise(x / 130, y / 130) * 0.4;
+      if (tropic) {
+        // Wetter with height, drier on low ground and on slopes that face the sun to the south.
+        const dry = THREE.MathUtils.clamp((1 - z / 230) * (0.25 + broad * 0.9) + THREE.MathUtils.clamp(-n * 1.5, 0, 0.35), 0, 0.9);
+        c.copy(bush).lerp(canopy, patch).lerp(thorn, dry * (0.55 + 0.45 * patch));
+        c.lerp(boulder, THREE.MathUtils.smoothstep(slope, 0.55, 1.05) * 0.7);
+        let beach = 0;
+        for (let r = 1; r <= 1 && beach === 0; r++) {
+          if (wet(i - r, j) || wet(i + r, j) || wet(i, j - r) || wet(i, j + r) || wet(i - r, j - r) || wet(i + r, j + r) || wet(i - r, j + r) || wet(i + r, j - r)) beach = r === 1 ? 1 : 0.45;
+        }
+        // Sand on a flat shore, grey rock under a steep one.
+        if (beach > 0 && z < 22) c.lerp(slope > 0.22 || !sandyShore(x, y) ? boulder : coral, beach * (1 - THREE.MathUtils.smoothstep(z, 3, 22)) * (sandyShore(x, y) ? 1 : 0.7));
+        const lit = (0.9 + 0.18 * hash(i, j)) * (1 - 0.16 * THREE.MathUtils.clamp((-e - n) * 1.6, 0, 1));
+        col[k * 3] = c.r * lit;
+        col[k * 3 + 1] = c.g * lit;
+        col[k * 3 + 2] = c.b * lit;
+        continue;
+      }
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
       const sheltered = THREE.MathUtils.clamp(0.5 - (e + n) * 2.2, 0, 1);
       // Near the open ocean the fog keeps the hills green-grey. Inland they dry to gold by July.
       const oceanward = bay ? 1 - THREE.MathUtils.smoothstep(x, -9500, -3200) : 0.5;
 
-      const use = bay ? landUse(x, y, z) : evergreenUse(x, y, z, slope, n);
+      const use = gulf ? gulfUse(x, y, z, slope, n) : bay ? landUse(x, y, z) : evergreenUse(x, y, z, slope, n);
       if (use === 'forest') {
         c.copy(forest).lerp(scrub, patch * 0.55).lerp(gold, Math.max(0, patch - 0.72) * 1.2);
       } else {
@@ -139,7 +208,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
           c.offsetHSL(0, 0, (hash(bi + 17, bj - 5) - 0.5) * 0.07);
         } else if (use === 'town') {
           c.lerp(scrub, 0.35).lerp(town, 0.22 + 0.2 * hash(Math.floor(x / 110), Math.floor(y / 110)));
-        } else if (bay && z < 12 && slope < 0.05 && y < -2250) {
+        } else if (bay && z < 12 && slope < 0.05 && y < -2250 && (!gulf || y > -9000)) {
           c.lerp(lawn, 0.5);
         }
       }
@@ -174,6 +243,8 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       const e = d + 1;
       // Skip quads that are all water.
       if (h[a] <= 0.4 && h[b] <= 0.4 && h[d] <= 0.4 && h[e] <= 0.4) continue;
+      // And the ones a finer inset draws.
+      if (part?.skip?.some((s) => g.x0 + i * dx >= s.x0 - 1 && g.x0 + (i + 1) * dx <= s.x0 + (s.nx - 1) * s.dx + 1 && g.y0 + j * dx >= s.y0 - 1 && g.y0 + (j + 1) * dx <= s.y0 + (s.ny - 1) * s.dx + 1)) continue;
       idx[p++] = a; idx[p++] = b; idx[p++] = d;
       idx[p++] = b; idx[p++] = e; idx[p++] = d;
     }
@@ -184,9 +255,101 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   geom.setIndex(new THREE.BufferAttribute(idx.subarray(0, p), 1));
   geom.computeVertexNormals();
   const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ vertexColors: true }));
-  mesh.name = 'terrain';
+  mesh.name = part?.name ?? 'terrain';
   mesh.frustumCulled = false;
   return mesh;
+}
+
+/** Where each grid of a course's land begins in its height data: the main grid, then its insets in order. */
+export function landParts(course: CourseData): Array<{ grid: GridSpec; start: number }> {
+  const out = [{ grid: course.terrain as GridSpec, start: 0 }];
+  let o = course.terrain.nx * course.terrain.ny;
+  for (const g of course.terrain.insets ?? []) {
+    out.push({ grid: g, start: o });
+    o += g.nx * g.ny;
+  }
+  return out;
+}
+
+/** Height of the land at a course position, metres, read from the finest grid that covers it. 0 over water. */
+export function landHeight(course: CourseData, heights: Uint8Array): (x: number, y: number) => number {
+  const parts = landParts(course);
+  const max = course.terrain.max;
+  return (x, y) => {
+    let k = 0;
+    for (let n = parts.length - 1; n > 0; n--) {
+      const g = parts[n].grid;
+      if (x >= g.x0 && y >= g.y0 && x <= g.x0 + (g.nx - 1) * g.dx && y <= g.y0 + (g.ny - 1) * g.dx) { k = n; break; }
+    }
+    const { grid: g, start } = parts[k];
+    const fx = Math.min(g.nx - 1.001, Math.max(0, (x - g.x0) / g.dx));
+    const fy = Math.min(g.ny - 1.001, Math.max(0, (y - g.y0) / g.dx));
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const u = fx - i;
+    const v = fy - j;
+    const at = (ii: number, jj: number) => (heights[start + jj * g.nx + ii] / 255) ** 2 * max;
+    return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  };
+}
+
+/**
+ * All of a course's land. A plain course is one mesh, as `buildTerrain` makes it. A course with insets is the main grid
+ * with holes where the insets go, and a finer mesh in each hole. The main mesh keeps the name `terrain` and all its
+ * points, so anything that reads the land back off it (the kayak's shoreline) still can.
+ */
+export function buildLand(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Object3D {
+  const insets = course.terrain.insets ?? [];
+  if (!insets.length) return buildTerrain(course, heights, cover);
+  const parts = landParts(course);
+  const main = course.terrain;
+  const group = new THREE.Group();
+  group.name = 'land';
+  const base = buildTerrain(course, heights.subarray(0, main.nx * main.ny), cover, { grid: main, skip: insets });
+  group.add(base);
+  const basePos = base.geometry.getAttribute('position');
+  /** Height of the main mesh as drawn, at a place on one of its grid lines. */
+  const drawn = (x: number, y: number): number => {
+    const fx = Math.min(main.nx - 1.001, Math.max(0, (x - main.x0) / main.dx));
+    const fy = Math.min(main.ny - 1.001, Math.max(0, (y - main.y0) / main.dx));
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const u = fx - i;
+    const v = fy - j;
+    const at = (ii: number, jj: number) => basePos.getY(jj * main.nx + ii);
+    return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  };
+  parts.slice(1).forEach(({ grid: g, start }, n) => {
+    const mesh = buildTerrain(course, heights.subarray(start, start + g.nx * g.ny), cover, { grid: g, name: `terrain-inset-${n}` });
+    // Along its edge an inset takes the height the main mesh is drawn at, so the two meet without a crack.
+    const pos = mesh.geometry.getAttribute('position');
+    for (let j = 0; j < g.ny; j++) {
+      for (let i = 0; i < g.nx; i++) {
+        if (i > 0 && j > 0 && i < g.nx - 1 && j < g.ny - 1) continue;
+        pos.setY(j * g.nx + i, drawn(g.x0 + i * g.dx, g.y0 + j * g.dx));
+      }
+    }
+    // A quad left out as all water may now have a raised edge. Close the gap by drawing the whole of the outer ring.
+    const idx: number[] = Array.from(mesh.geometry.getIndex()!.array);
+    const have = new Set<number>();
+    for (let k = 0; k < idx.length; k += 6) have.add(idx[k]);
+    for (let j = 0; j < g.ny - 1; j++) {
+      for (let i = 0; i < g.nx - 1; i++) {
+        if (i > 0 && j > 0 && i < g.nx - 2 && j < g.ny - 2) continue;
+        const a = j * g.nx + i;
+        if (have.has(a)) continue;
+        const b = a + 1;
+        const d = a + g.nx;
+        const e = d + 1;
+        if (pos.getY(a) < 0 && pos.getY(b) < 0 && pos.getY(d) < 0 && pos.getY(e) < 0) continue;
+        idx.push(a, b, d, b, e, d);
+      }
+    }
+    mesh.geometry.setIndex(idx);
+    mesh.geometry.computeVertexNormals();
+    group.add(mesh);
+  });
+  return group;
 }
 
 /** The Golden Gate Bridge, to scale from its published dimensions. Tower positions come from the course file. */

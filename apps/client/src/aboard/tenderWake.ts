@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
-// What a powered tender does to the water: white patches left astern that spread into a V, spray thrown off her
-// chines once she is on the plane, and the wave runner's rooster tail. Drawing only: nothing here decides anything.
-// One of these per tender on the water, the player's and each of the other boats'.
+// What a powered tender throws into the air: spray off her chines once she is on the plane, the wave runner's rooster
+// tail, and a splash where she lands or hits something. Her wake on the water is drawn with every other vessel's
+// (`stage.craft`, `scene/wake.ts`). Drawing only: nothing here decides anything.
+// One of these per powered tender on the water, the player's and each of the other boats'.
 
-const PATCHES = 40;
 const DROPS = 140;
 const G = 9.81;
 
@@ -27,21 +27,15 @@ export interface WakeMaker {
   jet: boolean;
 }
 
-interface Patch { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; x: number; z: number; vx: number; vz: number; age: number; life: number; size: number }
 interface Drop { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; size: number }
 
 export class TenderWake {
   private readonly group = new THREE.Group();
-  private readonly patches: Patch[] = [];
   private readonly drops: Drop[] = [];
   private readonly spray: THREE.InstancedMesh;
-  private readonly disc: THREE.BufferGeometry;
-  private nextPatch = 0;
   private nextDrop = 0;
-  /** Metres run since the last patch, and drops owed. */
-  private run = 0;
+  /** Drops owed. */
   private owed = 0;
-  private side = 1;
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly p = new THREE.Vector3();
@@ -49,16 +43,6 @@ export class TenderWake {
 
   constructor(private readonly scene: THREE.Scene, private readonly seaLevel: (x: number, z: number, seaTime: number, count?: number) => number) {
     this.group.name = 'tender-wake';
-    this.disc = new THREE.CircleGeometry(0.5, 12);
-    this.disc.rotateX(-Math.PI / 2);
-    for (let i = 0; i < PATCHES; i++) {
-      const mat = new THREE.MeshBasicMaterial({ color: 0xf2f7f8, transparent: true, opacity: 0, depthWrite: false });
-      const mesh = new THREE.Mesh(this.disc, mat);
-      mesh.visible = false;
-      mesh.renderOrder = 2;
-      this.group.add(mesh);
-      this.patches.push({ mesh, mat, x: 0, z: 0, vx: 0, vz: 0, age: 0, life: 0, size: 1 });
-    }
     this.spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.5, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.82, depthWrite: false }), DROPS);
     this.spray.name = 'tender-spray';
     this.spray.frustumCulled = false;
@@ -72,9 +56,9 @@ export class TenderWake {
     scene.add(this.group);
   }
 
-  /** How many patches of white water and how many drops are showing. For tests and the console. */
-  showing(): { patches: number; drops: number } {
-    return { patches: this.patches.filter((p) => p.mesh.visible).length, drops: this.drops.filter((d) => d.age < d.life).length };
+  /** How many drops are in the air. For the console. */
+  showing(): { drops: number } {
+    return { drops: this.drops.filter((d) => d.age < d.life).length };
   }
 
   private drop(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, size: number): void {
@@ -99,22 +83,6 @@ export class TenderWake {
    */
   update(maker: WakeMaker | null, dt: number, seaTime: number): void {
     if (maker && dt > 0) this.make(maker, dt, seaTime);
-
-    for (const p of this.patches) {
-      if (!p.mesh.visible) continue;
-      p.age += dt;
-      const k = p.age / p.life;
-      if (k >= 1) {
-        p.mesh.visible = false;
-        continue;
-      }
-      p.x += p.vx * dt;
-      p.z += p.vz * dt;
-      const size = p.size * (1 + 2.4 * k);
-      p.mesh.scale.set(size, 1, size);
-      p.mesh.position.set(p.x, this.seaLevel(p.x, p.z, seaTime, 4) + 0.05, p.z);
-      p.mat.opacity = 0.55 * (1 - k) * Math.min(1, p.age * 8);
-    }
 
     let live = false;
     for (let i = 0; i < DROPS; i++) {
@@ -148,27 +116,6 @@ export class TenderWake {
     const wet = c.hop <= 0.02;
     const sea = this.seaLevel(c.x, z, seaTime, 4);
 
-    // White water astern: a patch each side of the transom every metre or so, drifting apart into the V.
-    this.run += v * dt;
-    const every = 0.7 + 0.5 * c.plane;
-    if (v > 1.2 && wet && this.run >= every) {
-      this.run = 0;
-      this.side = -this.side;
-      const p = this.patches[this.nextPatch];
-      this.nextPatch = (this.nextPatch + 1) % PATCHES;
-      const back = c.length * 0.5;
-      const out = this.side * c.halfBeam * (0.5 + 0.4 * c.plane);
-      p.x = c.x - fx * back + rx * out;
-      p.z = z - fz * back + rz * out;
-      const spread = this.side * (0.25 + 0.9 * c.plane);
-      p.vx = rx * spread;
-      p.vz = rz * spread;
-      p.age = 0;
-      p.life = 1.3 + 1.5 * c.plane + Math.min(1.2, v * 0.05);
-      p.size = c.halfBeam * (0.7 + 0.9 * c.plane) + Math.random() * 0.2;
-      p.mesh.visible = true;
-    }
-
     // Spray off the chines on the plane, and the jet's rooster tail.
     if (!wet) return;
     this.owed = Math.min(30, this.owed + dt * (c.plane * (14 + v * 3) + (c.jet && c.throttle > 0.25 && v > 4 ? 70 * c.throttle : 0)));
@@ -194,8 +141,6 @@ export class TenderWake {
 
   dispose(): void {
     this.scene.remove(this.group);
-    this.disc.dispose();
-    for (const p of this.patches) p.mat.dispose();
     this.spray.geometry.dispose();
     (this.spray.material as THREE.Material).dispose();
     this.spray.dispose();

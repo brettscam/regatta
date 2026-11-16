@@ -4,6 +4,7 @@
   "where": "California",
   "say": "A sea breeze that builds all afternoon, and a tide through the Golden Gate",
   "order": 1,
+  "sea": { "openFetchKm": 20 },
   "scenery": {
     "landCover": "sf-bay",
     "pieces": ["golden-gate-bridge", "san-francisco", "marine-layer"]

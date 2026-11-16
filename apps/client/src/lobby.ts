@@ -107,6 +107,6 @@ export class Lobby {
     if (w > 760) this.camera.setViewOffset(w, h, -Math.min(230, w * 0.2), 0, w, h);
     else this.camera.setViewOffset(w, h, 0, h * 0.22, w, h);
 
-    this.stage.frame(dt, 1, this.elapsed, seaTime, this.camera, { x, z, heading: s.heading, speed: s.speed, heel: s.heel }, this.stage.traffic.vessels, sim.out.tws / KT);
+    this.stage.frame(dt, 1, this.elapsed, seaTime, this.camera, { x, z, heading: s.heading, speed: s.speed, heel: s.heel, hulls: view.rig.hullOffset }, this.stage.traffic.vessels, sim.out.tws / KT);
   }
 }

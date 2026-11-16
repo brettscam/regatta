@@ -5,6 +5,7 @@ import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 import { myAvatarCode, readAvatar } from '../boat/avatar';
+import { mySailStyleCode, readSailStyle } from '../boat/sailStyle';
 import { readDamage } from '../aboard/contactRules';
 import { readTender, type TenderReport } from '../aboard/tenders'; // tender
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
@@ -70,6 +71,9 @@ export interface RemoteBoat {
   damage: number;
   /** The name on her transom. */
   boatName: string;
+  /** Her topsides colour as she sent it ('' if she sent none or nonsense), and her skipper's avatar code, to be read with `readAvatar`. */
+  readonly colour: string;
+  readonly avatar: string;
   /** What she says she is doing: at anchor, ashore at Sam's, fishing. Another page's word. */
   status: string;
   /** A race she has called, if any, exactly as she sent it. Check it before use. */
@@ -83,12 +87,10 @@ export interface RemoteBoat {
   raceLeg: number;
   raceToGo: number;
   raceFinish: number;
-  // ---- tender: her tender when it is away from her (`oc`, checked by `readTender`), when that was heard (ms),
-  // and her colour and her skipper's look to draw it in. `aboard/tenderFleet.ts` draws it.
+  // ---- tender: her tender when it is away from her (`oc`, checked by `readTender`), and when that was heard (ms).
+  // `aboard/tenderFleet.ts` draws it in her colour with her skipper in it.
   tender: TenderReport | null;
   tenderAt: number;
-  colour: string;
-  avatar: string;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -117,8 +119,12 @@ class Remote implements RemoteBoat {
   // ---- tender
   tender: TenderReport | null = null;
   tenderAt = 0;
+  /** Her sails as she sent them, a code to be read with `readSailStyle`. */
+  private sl = '';
   readonly colour: string;
-  get avatar(): string { return this.av; }
+  get avatar(): string {
+    return this.av;
+  }
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
@@ -145,6 +151,7 @@ class Remote implements RemoteBoat {
 
   constructor(readonly peer: string, spec: BoatSpec, who: Identity, env: Environment, scene: THREE.Scene) {
     this.identity = `${who.boat}|${who.colour}|${who.name}`;
+    this.colour = HEX.test(who.colour) ? who.colour : '';
     this.length = spec.dimensions.loa;
     this.beam = spec.dimensions.beam;
     this.mast = spec.dimensions.mastHeight;
@@ -152,7 +159,6 @@ class Remote implements RemoteBoat {
     // She arrives in her own colours with her own name on the transom.
     this.view = new BoatView(spec, { topsides: HEX.test(who.colour) ? who.colour : undefined, name: who.name || undefined });
     this.boatName = who.name;
-    this.colour = HEX.test(who.colour) ? who.colour : ''; // tender
     scene.add(this.view.root);
     this.label.className = 'boat-label';
     document.body.appendChild(this.label);
@@ -171,6 +177,7 @@ class Remote implements RemoteBoat {
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
     this.fresh = v.nw === 1;
     if (typeof v.av === 'string' && v.av !== this.av) this.view.setAvatar(readAvatar((this.av = v.av.slice(0, 120))));
+    if (typeof v.sl === 'string' && v.sl !== this.sl) this.view.setSailStyle(readSailStyle((this.sl = v.sl.slice(0, 60))));
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.damage = readDamage(v.dm);
@@ -402,6 +409,7 @@ export class Fleet {
       wire.nm = this.me.name;
       if (this.me.skipper) wire.sk = this.me.skipper;
       (wire as unknown as Record<string, unknown>).av = myAvatarCode();
+      (wire as unknown as Record<string, unknown>).sl = mySailStyleCode();
       if (this.hailed) {
         wire.msg = this.hailed.text;
         wire.mt = this.hailed.at;

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "roadtown",
+    "name": "Road Town",
+    "where": "Off Road Harbour, in the middle of the Sir Francis Drake Channel",
+    "teaches": "Flat water and a steady trade wind. Reach across to Dead Chest, run down to Nanny Cay and beat home.",
+    "x": -5600, "y": -1500,
+    "route": [
+      { "name": "Dead Chest", "x": -1500, "y": -5200 },
+      { "name": "Nanny Cay", "x": -8300, "y": -3900 },
+      { "name": "Road Harbour", "x": -5400, "y": -1800 }
+    ]
+  },
+  {
+    "id": "bight",
+    "name": "The Bight",
+    "where": "Off Norman Island, at the mouth of the Bight",
+    "teaches": "The beat every charter boat makes: out past the Indians and up the channel to Cooper Island, tack on tack.",
+    "x": -8700, "y": -11000,
+    "route": [
+      { "name": "The Indians", "x": -9000, "y": -9700 },
+      { "name": "Peter Island", "x": -7200, "y": -7000 },
+      { "name": "Cooper Island", "x": 3000, "y": -2700 }
+    ]
+  },
+  {
+    "id": "northsound",
+    "name": "North Sound",
+    "where": "Inside Virgin Gorda's North Sound, off Bitter End",
+    "teaches": "Pilotage. Out by the channel past Colquhoun Reef, then a run down the back of Virgin Gorda with the trades behind.",
+    "x": 19000, "y": 8900,
+    "route": [
+      { "name": "North Sound", "x": 18300, "y": 9300 },
+      { "name": "Colquhoun Reef", "x": 18150, "y": 10900 },
+      { "name": "Mosquito Rock", "x": 15600, "y": 11700 },
+      { "name": "Seal Dogs", "x": 13200, "y": 10500 },
+      { "name": "Mountain Point", "x": 12300, "y": 7400 }
+    ]
+  },
+  {
+    "id": "greatharbour",
+    "name": "Great Harbour",
+    "where": "Off Jost Van Dyke, outside Great Harbour",
+    "teaches": "Island hopping on the north side: across to Sandy Cay and on to Cane Garden Bay, through the wind shadow and the puffs under Tortola.",
+    "x": -21100, "y": 1700,
+    "route": [
+      { "name": "Sandy Cay", "x": -17300, "y": 1100 },
+      { "name": "Cane Garden Bay", "x": -12300, "y": 800 }
+    ]
+  }
+]

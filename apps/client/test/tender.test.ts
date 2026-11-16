@@ -50,14 +50,14 @@ describe('the table of tenders', () => {
     expect(runner.haulUp).toBeLessThanOrEqual(skiff.haulUp);
   });
 
-  it('gives every yacht the kayak and the skiff, and the wave runner only to the 45 and anything bigger', () => {
+  it('gives every yacht the kayak and the skiff, and the wave runner only to the big ones: the cat, the 45 and the 50', () => {
     expect(boats && readdirSync(boats).length).toBeGreaterThan(1);
     const ids = (id: string) => tendersFor(feet(id)).map((t) => t.id);
     expect(ids('sloop30')).toEqual(['kayak', 'skiff']);
     expect(ids('sloop38')).toEqual(['kayak', 'skiff']);
     expect(ids('perf45')).toEqual(['kayak', 'skiff', 'runner']);
-    // Still in the yard: the catamaran is too small for one, the 50 footer will have it without a line of code.
-    expect(ids('cat42')).toEqual(['kayak', 'skiff']);
+    // The rule is the table's minimum length, so a bigger boat added later carries one without a line of code.
+    expect(ids('cat42')).toEqual(['kayak', 'skiff', 'runner']);
     expect(ids('blue50')).toEqual(['kayak', 'skiff', 'runner']);
     expect(carries(29, skiff)).toBe(false);
   });
@@ -65,6 +65,7 @@ describe('the table of tenders', () => {
   it('falls back to the next best when the yacht does not carry what was chosen', () => {
     expect(tenderFor('runner', 45).id).toBe('runner');
     expect(tenderFor('runner', 38).id).toBe('skiff');
+    expect(tenderFor('runner', 42).id).toBe('runner');
     expect(tenderFor('runner', 25).id).toBe('kayak');
     expect(tenderFor('nonsense', 45).id).toBe('kayak');
     expect(tenderFor(undefined, 30).id).toBe('kayak');

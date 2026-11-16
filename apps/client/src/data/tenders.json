@@ -51,7 +51,7 @@
     "name": "Wave runner",
     "say": "A sit-astride jet craft, 38 knots flat out. Ease off before you throw her round",
     "drive": "jet",
-    "minLengthFt": 45,
+    "minLengthFt": 42,
     "topKt": 38,
     "cruiseKt": 32,
     "planeKt": 12,

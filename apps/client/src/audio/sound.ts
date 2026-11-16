@@ -9,6 +9,8 @@ export class Sound {
   private water!: GainNode;
   private flog!: GainNode;
   private master!: GainNode;
+  /** Wind, water, cloth and engine go through here on the way to the master, so they can be turned down under the radio. */
+  private ambient!: GainNode;
   private clickBank = 0;
 
   /** Call from a pointer or key event. Safe to call again. */
@@ -24,6 +26,8 @@ export class Sound {
     this.master = ctx.createGain();
     this.master.gain.value = 0.5;
     this.master.connect(ctx.destination);
+    this.ambient = ctx.createGain();
+    this.ambient.connect(this.master);
 
     const noise = this.noiseBuffer(ctx, 4);
     const loop = () => {
@@ -41,7 +45,7 @@ export class Sound {
     this.windTone.Q.value = 0.7;
     this.wind = ctx.createGain();
     this.wind.gain.value = 0;
-    loop().connect(this.windTone).connect(this.wind).connect(this.master);
+    loop().connect(this.windTone).connect(this.wind).connect(this.ambient);
 
     // Water: low rushing noise that grows with boat speed.
     const waterLow = ctx.createBiquadFilter();
@@ -52,7 +56,7 @@ export class Sound {
     waterHigh.frequency.value = 160;
     this.water = ctx.createGain();
     this.water.gain.value = 0;
-    loop().connect(waterLow).connect(waterHigh).connect(this.water).connect(this.master);
+    loop().connect(waterLow).connect(waterHigh).connect(this.water).connect(this.ambient);
 
     // Flogging cloth: sharper noise chopped at a few beats a second.
     const flogTone = ctx.createBiquadFilter();
@@ -70,12 +74,63 @@ export class Sound {
     lfo.start();
     this.flog = ctx.createGain();
     this.flog.gain.value = 0;
-    loop().connect(flogTone).connect(chop).connect(this.flog).connect(this.master);
+    loop().connect(flogTone).connect(chop).connect(this.flog).connect(this.ambient);
   }
 
   /** Where another maker of sound joins the game's: the context and the master volume. Null until sound has started. */
   output(): { ctx: AudioContext; node: AudioNode } | null {
     return this.ctx && this.ctx.state === 'running' ? { ctx: this.ctx, node: this.master } : null;
+  }
+
+  /**
+   * Turn the wind, the water and the engine down while somebody is on the radio, the way a helmsman leans in to the
+   * set, and bring them back after. `amount` is what is left of them: 1 is all, 0.4 is well down.
+   */
+  duck(amount: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    this.ambient.gain.setTargetAtTime(Math.max(0, Math.min(1, amount)), ctx.currentTime, amount < 1 ? 0.08 : 0.35);
+  }
+
+  /**
+   * How loud the game is set, for sound that cannot be put through the master volume (the browser's own speech):
+   * 1 as the game is made, 0 when it is silent or has not started.
+   */
+  level(): number {
+    return this.ctx && this.ctx.state === 'running' ? Math.min(1, this.master.gain.value / 0.5) : 0;
+  }
+
+  /**
+   * A vessel's whistle: short blasts, a second apart. Five is the signal for "I do not understand your intentions:
+   * keep clear".
+   * @param near 1 alongside, falling to 0 out of earshot
+   * @param deep true for a ship, whose whistle is lower than a ferry's
+   */
+  horn(blasts: number, near: number, deep = false): void {
+    const ctx = this.ctx;
+    if (!ctx || !(near > 0)) return;
+    const base = deep ? 98 : 174;
+    for (let i = 0; i < blasts; i++) {
+      const t = ctx.currentTime + 0.05 + i * 0.62;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.5 * Math.min(1, near), t + 0.05);
+      g.gain.setValueAtTime(0.5 * Math.min(1, near), t + 0.3);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = base * 6;
+      // Two reeds a little apart, as a whistle has.
+      for (const f of [base, base * 1.26]) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = f;
+        osc.connect(tone);
+        osc.start(t);
+        osc.stop(t + 0.45);
+      }
+      tone.connect(g).connect(this.master);
+    }
   }
 
   private noiseBuffer(ctx: AudioContext, seconds: number): AudioBuffer {
@@ -146,7 +201,7 @@ export class Sound {
       chug.connect(chugDepth).connect(beat.gain);
       low.connect(tone);
       high.connect(highGain).connect(tone);
-      tone.connect(beat).connect(gain).connect(this.master);
+      tone.connect(beat).connect(gain).connect(this.ambient);
       // Exhaust: low noise, wet and uneven.
       const src = ctx.createBufferSource();
       src.buffer = this.noiseBuffer(ctx, 2);

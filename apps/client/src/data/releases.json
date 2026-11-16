@@ -1,6 +1,126 @@
 {
   "notes": [
     {
+      "id": "v36",
+      "date": "2026-11-16",
+      "title": "Setting up a race is easier",
+      "items": [
+        "The race panel (R) scrolls again: on smaller screens its lower half was cut off, so the courses below the first few and the button to start could not be reached.",
+        "Setting up a race is three steps: the course (each shows its length and number of marks), when, and the boats. One button at the bottom is always in view and says exactly what it will do.",
+        "For a race later, pick a time in one tap: in 30 minutes, in an hour, tonight at 7:30, or tomorrow evening. Or choose Today or Tomorrow and type a time. Times are shown on your own clock."
+      ]
+    },
+    {
+      "id": "v35",
+      "date": "2026-11-16",
+      "title": "The water, the sails and the light",
+      "items": [
+        "The water now tells you what the wind is doing: gusts show as dark patches where the wind really is stronger, whitecaps build from about ten knots, and every boat, ferry and ship leaves a wake that curls behind her. Spray flies when she slams into a sea.",
+        "The sails take their shape from how you trim them, and shiver and flog when you pinch or let them go. Choose your own sailcloth and spinnaker design on the new Sails page of the Profile tab (B); everyone on the water sees them.",
+        "The day runs on through a golden evening into a starlit night with the moon in its real phase, and every boat shows her red, green and white lights, so you can tell which way she is heading.",
+        "Summer fog pours through the Golden Gate in the afternoon, and on the Extreme level rain squalls come down the wind at you. A Graphics setting on the way in (Auto, High, Low) helps slower machines."
+      ]
+    },
+    {
+      "id": "v34",
+      "date": "2026-11-16",
+      "title": "A new water: the British Virgin Islands",
+      "items": [
+        "A new water: the British Virgin Islands, from Jost Van Dyke to Virgin Gorda's North Sound, sailed in the real trade winds and tides of 9 February 2025.",
+        "Clear water shows turquoise over the shoals, palms line the beaches, and boats lie on the moorings at the Bight, Cooper Island and North Sound.",
+        "Twenty famous stops to go ashore at, from the Willy T and the Baths to Foxy's, the Soggy Dollar and Bitter End.",
+        "Race the channel sprint, round Norman and Peter, or go bar to bar from Soper's Hole to Bitter End. Pick the Christmas winds start for a proper blow."
+      ]
+    },
+    {
+      "id": "v33",
+      "date": "2026-11-16",
+      "title": "A new water: the Gulf of the Farallones",
+      "items": [
+        "A new water: the open Pacific outside the Golden Gate, from the bridge out to the Farallon Islands, north to Point Reyes and Bodega Bay and south to Pillar Point.",
+        "Twenty tankers, container ships, car carriers and cruise ships run the real shipping lanes in and out of the Gate every day, with the pilot boat at the sea buoy and fishing boats offshore.",
+        "The Potato Patch, the bar and the island refuge are marked on the chart, the crew warns you as you sail into them, and the lighthouses flash at night.",
+        "Race to the Lightship, round the Farallones, or up the coast to Drakes Bay and Bodega, on a real July day with a north-wester and a metre of Pacific swell. This water replays 26 July 2024, a breezier day than the Bay's."
+      ]
+    },
+    {
+      "id": "v32",
+      "date": "2026-11-16",
+      "title": "Company on the water",
+      "items": [
+        "More boats now live on both waters: cruising yachts, daysailers, fishing boats, kayakers and boats at anchor, and every player sees them in the same places.",
+        "Hail one with Enter when she is close and she answers with where she is bound, then a tip about the wind, the tide, a place to anchor or the fishing. Sail alongside one and she may race you to the next point. Every boat you meet is counted in your logbook.",
+        "The Bay has tankers to the refineries, a second container ship, a car carrier, a cruise ship at Pier 27, tugs with barges and the pilot boat. The San Juans have their car ferry. Ships hold their course and sound five short blasts.",
+        "The radio gives each caller a voice of their own, ducks the wind and water while someone speaks, and reads the weather every other hour."
+      ]
+    },
+    {
+      "id": "v31",
+      "date": "2026-11-16",
+      "title": "Bars and yacht clubs on the shore",
+      "items": [
+        "Every bar and yacht club now has a home on the shore you can steer for: a clubhouse under its burgee, a deck of umbrellas, a guest dock, and lights that come on at dusk.",
+        "Sam's in Tiburon has its big deck of white umbrellas. The Corinthian, St. Francis, Richmond and Orcas Island yacht clubs are on the water too, with more places in the San Juans.",
+        "As you close with a place its name and distance appear, with a tick once you have been ashore. The chart marks clubs with a flag and bars with a glass.",
+        "The boats in the marinas are proper yachts now, and the trees along the waterfront are the right size."
+      ]
+    },
+    {
+      "id": "v30",
+      "date": "2026-11-16",
+      "title": "Two levels of autopilot",
+      "items": [
+        "P now has two levels. Press once and the pilot steers while you trim the sails. Press again and the crew trims too, so she sails herself. A third press hands everything back.",
+        "Steering alone is unlimited, in a race or out, but your speed still depends on your own trimming.",
+        "In a race the full pilot is limited to 3 minutes from the gun. The race line shows what is left, and when it runs out the pilot keeps steering and the sheets come back to you.",
+        "Before the gun both levels are unlimited, so getting to the start stays easy. The spinnaker is yours to trim unless the full pilot is on."
+      ]
+    },
+    {
+      "id": "v29",
+      "date": "2026-11-16",
+      "title": "A real sea",
+      "items": [
+        "The Bay now has a real sea. The chop builds with the wind and the open water to windward, stands up short and steep where the ebb runs against the breeze in the Golden Gate, and lies down in the lee of the land.",
+        "Your boat lives in it: she loses speed punching into a chop (the 30 far more than the 45), slams when she falls off a steep one, surfs a little running in a big sea, and is harder to steer and easier to gybe by accident downwind.",
+        "Ships and ferries leave a wake that reaches you a minute or so after they pass, rolling the boat and shaking the wind out of the sails in light air. In the kayak, turn your bow into a big ship's wake or it will put you over.",
+        "The instruments describe the sea beside the wind, and there are new tips for chop, slamming and wind against tide."
+      ]
+    },
+    {
+      "id": "v28",
+      "date": "2026-11-16",
+      "title": "Tips, and a radio you can see",
+      "items": [
+        "Small cards now pop up at the right moment to show a key you may not know: hold V to talk when another boat appears, J to reef when it blows, X near an anchorage, O to go ashore. Each goes away once you use the key, and Don't show tips turns them off.",
+        "The radio has a light at the bottom left. It shows RX when anyone is on the air and TX when you are. Click it to learn how the radio works.",
+        "The Keys tab on the board is grouped, searchable, and marks keys that are new since you last sailed.",
+        "The strip of keys at the start of a sail now changes with what you are doing: sailing, racing, at anchor or in the kayak."
+      ]
+    },
+    {
+      "id": "v27",
+      "date": "2026-11-16",
+      "title": "A catamaran and a bluewater 50",
+      "items": [
+        "Two new boats: a 42 ft cruising catamaran and a 50 ft bluewater cruiser.",
+        "The catamaran sails flat and fast on a reach, beating the 45 from about 16 knots, but will not point and is slow through a tack. She gives no heel to warn you: reef by the numbers on her placard, 18 knots apparent and again at 25, or risk a capsize she will not come back from.",
+        "Her two engines spin her on the spot, and she floats where the keelboats run aground.",
+        "The bluewater 50 is heavy and steady: slow to get going, hard to stop, and at her best when the wind gets up."
+      ]
+    },
+    {
+      "id": "v26",
+      "date": "2026-11-16",
+      "title": "The beer can league",
+      "items": [
+        "The pace boats are now the yacht club: sixteen skippers, from two ringers who never miss a shift to the couple out for the sunset.",
+        "Call a race with up to nine of them and pick the fleet: Beer can, Mixed or Hot. They sail the same boat as you. The weaker ones lose the way real crews do: late starts, sheets left cleated, wide roundings, a reef too late in a blow.",
+        "The race panel shows the whole fleet as cards: each boat in her colour with her skipper, and a real player's own figure. Places and gaps show while racing.",
+        "At the finish there is a results table that fills in as the back-markers come home. The skippers call across the water in character."
+      ]
+    },
+    {
       "id": "v25",
       "date": "2026-11-15",
       "title": "Choose your weather",

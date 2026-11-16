@@ -213,6 +213,13 @@
       "blurb": "The first target. Many people on the same Bay at once, racing or just out for a sail.",
       "items": [
         {
+          "id": "voice-helm",
+          "status": "next",
+          "area": "experience",
+          "title": "Voice commands at the helm",
+          "text": "Call the boat like a skipper: \"tack\", \"gybe\", \"ease the main four percent\", \"trim the jib\", \"steer two seven zero\", \"bear away ten\", \"reef\", \"pilot on\". Hold a key to speak, hear the crew answer \"tacking\", and see what was understood. Works in Chrome, Edge and Safari."
+        },
+        {
           "id": "accounts",
           "status": "next",
           "title": "Accounts and profiles",
@@ -365,14 +372,14 @@
         },
         {
           "id": "cat",
-          "status": "later",
+          "status": "shipped",
           "title": "The 42 ft catamaran",
           "text": "No heel to warn you: reef by the numbers. Two engines for docking.",
           "area": "experience"
         },
         {
           "id": "bvi",
-          "status": "later",
+          "status": "shipped",
           "title": "British Virgin Islands",
           "text": "Trade winds, short hops and a mooring ball every night: Tortola, Virgin Gorda, Jost Van Dyke and Anegada.",
           "area": "world"
@@ -402,7 +409,7 @@
       "items": [
         {
           "id": "xp",
-          "status": "next",
+          "status": "shipped",
           "title": "Points that show",
           "text": "Your rank beside your name on the water, a season table, and a sound when you make a new rank.",
           "area": "progress"
@@ -516,10 +523,10 @@
         },
         {
           "id": "moreboats",
-          "status": "later",
+          "status": "next",
           "area": "experience",
           "title": "More boats",
-          "text": "The 42 ft catamaran, the 50 ft blue-water cruiser, and something small and quick."
+          "text": "Something small and quick: a dinghy or a sportboat to throw around."
         },
         {
           "id": "chill",

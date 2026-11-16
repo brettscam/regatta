@@ -1,0 +1,369 @@
+{
+  "id": "blue50",
+  "name": "50 ft bluewater cruiser",
+  "lengthFt": 50,
+  "tagline": "Heavy and steady. Slow to gather way, carries it a long time, and stands up to a blow",
+  "role": "Bluewater cruiser",
+  "difficulty": "Forgiving, but she will not be hurried",
+  "defaultName": "Petrel",
+  "homePort": "Port Townsend",
+  "topsides": "#1d4a36",
+  "notes": "Generic 50 ft heavy-displacement bluewater cruiser with a long keel. All figures approximate and open to tuning. The polar is the 38's scaled for her waterline in a breeze and marked down in light air and close to the wind: she is sticky in a calm, points modestly, and comes into her own from 16 kt up. Sloop-rigged in the sim: one headsail, no staysail.",
+  "dimensions": {
+    "loa": 15.2,
+    "lwl": 12.6,
+    "beam": 4.5,
+    "draft": 2.1,
+    "freeboard": 1.45,
+    "displacementKg": 19000,
+    "mastHeight": 20.0,
+    "boomLength": 6.0,
+    "boomHeight": 1.6,
+    "mastFromBow": 6.1,
+    "jibFoot": 6.3,
+    "forestayHeight": 18.6
+  },
+  "hull": {
+    "comment": "For drawing. sternTaper narrows her toward the transom (a sloop's is 0.221); bulwarkM is the height of solid bulwarks above the deck edge.",
+    "sternTaper": 0.42,
+    "bulwarkM": 0.16
+  },
+  "polar": {
+    "units": "knots by true wind angle (deg) and true wind speed (kt), full sail, flat water",
+    "twa": [
+      0,
+      25,
+      32,
+      40,
+      52,
+      60,
+      75,
+      90,
+      110,
+      120,
+      135,
+      150,
+      165,
+      180
+    ],
+    "tws": [
+      0,
+      6,
+      10,
+      14,
+      20,
+      25,
+      30
+    ],
+    "speeds": [
+      [
+        0,
+        0,
+        0.0,
+        0.0,
+        0.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0.0,
+        0.0,
+        1.33,
+        2.71,
+        3.7,
+        4.08,
+        4.33,
+        4.33,
+        4.17,
+        3.92,
+        3.35,
+        2.78,
+        2.37,
+        2.12
+      ],
+      [
+        0.0,
+        0.0,
+        2.29,
+        4.57,
+        5.66,
+        6.02,
+        6.3,
+        6.38,
+        6.38,
+        6.2,
+        5.65,
+        4.92,
+        4.38,
+        4.01
+      ],
+      [
+        0.0,
+        0.0,
+        2.83,
+        5.55,
+        6.66,
+        7.05,
+        7.34,
+        7.54,
+        7.74,
+        7.63,
+        7.15,
+        6.56,
+        5.97,
+        5.68
+      ],
+      [
+        0.0,
+        0.0,
+        3.15,
+        6.17,
+        7.34,
+        7.77,
+        8.19,
+        8.49,
+        8.91,
+        9.01,
+        8.7,
+        8.19,
+        7.66,
+        7.36
+      ],
+      [
+        0.0,
+        0.0,
+        3.28,
+        6.38,
+        7.59,
+        8.13,
+        8.55,
+        8.97,
+        9.49,
+        9.81,
+        9.7,
+        9.28,
+        8.65,
+        8.34
+      ],
+      [
+        0.0,
+        0.0,
+        3.31,
+        6.44,
+        7.66,
+        8.2,
+        8.68,
+        9.13,
+        9.74,
+        10.14,
+        10.14,
+        9.8,
+        9.18,
+        8.85
+      ]
+    ]
+  },
+  "sails": {
+    "main": {
+      "areaM2": 64,
+      "reefs": [
+        {
+          "name": "Full main",
+          "drive": 1.0,
+          "heel": 1.0,
+          "luff": 1.0
+        },
+        {
+          "name": "Reef 1",
+          "drive": 0.78,
+          "heel": 0.47,
+          "luff": 0.8
+        },
+        {
+          "name": "Reef 2",
+          "drive": 0.6,
+          "heel": 0.22,
+          "luff": 0.62
+        }
+      ],
+      "sheetMinDeg": 3,
+      "sheetMaxDeg": 85
+    },
+    "jib": {
+      "areaM2": 52,
+      "sheetHardDeg": 8,
+      "sheetMaxSlackDeg": 80
+    },
+    "spinnaker": {
+      "comment": "Asymmetric spinnaker. gain is the share of speed added to the white-sail polar when it is set and trimmed, by true wind angle; fade is how much of that is left as the wind rises. All approximate and open to tuning.",
+      "areaM2": 135,
+      "minTwaDeg": 85,
+      "maxTwsKt": 22,
+      "sheetMinDeg": 22,
+      "sheetMaxDeg": 88,
+      "gain": {
+        "twa": [
+          80,
+          90,
+          105,
+          120,
+          135,
+          150,
+          165,
+          180
+        ],
+        "pct": [
+          0.0,
+          0.04,
+          0.101,
+          0.155,
+          0.18,
+          0.158,
+          0.09,
+          0.036
+        ]
+      },
+      "fade": {
+        "tws": [
+          0,
+          8,
+          14,
+          20,
+          26
+        ],
+        "k": [
+          1,
+          1,
+          0.85,
+          0.6,
+          0.4
+        ]
+      },
+      "heelPerKnot": 1.6,
+      "heelOffset": 9
+    }
+  },
+  "heel": {
+    "comment": "Phase 1 empirical heel law: degrees = max(0, perKnot * AWS - offset) * pointOfSail * sailFactors. Replaced by the righting curve in phase 2.",
+    "perKnot": 1.14,
+    "offset": 8.0,
+    "mainShare": 0.55,
+    "jibShare": 0.45,
+    "penaltyStartDeg": 20,
+    "penaltyPerDeg": 0.03,
+    "penaltyFloor": 0.55,
+    "rudderFadeStartDeg": 28,
+    "rudderFadeRangeDeg": 10,
+    "maxDeg": 44,
+    "overpowerDeg": 30
+  },
+  "rightingCurve": {
+    "comment": "GZ in metres by heel angle. Unused by the phase 1 model, kept here for the phase 2 force model.",
+    "deg": [
+      0,
+      10,
+      20,
+      30,
+      40,
+      50,
+      60,
+      90,
+      120
+    ],
+    "gz": [
+      0,
+      0.32,
+      0.58,
+      0.76,
+      0.86,
+      0.9,
+      0.88,
+      0.55,
+      0
+    ]
+  },
+  "helm": {
+    "maxRudderDeg": 35,
+    "turnGain": 0.096,
+    "rudderDrag": 0.03
+  },
+  "handling": {
+    "comment": "Nineteen tonnes on a long keel: slow to gather way and slow to lose it. The pilot sails her no closer than closeHauledDeg. Her long keel holds her head when she has no way on.",
+    "gatherS": 20,
+    "carryS": 28,
+    "leewayBaseDeg": 3.3,
+    "closeHauledDeg": 46,
+    "blowOff": 0.7
+  },
+  "engine": {
+    "powerKw": 55,
+    "cruiseKt": 7.6,
+    "burnLph": 4.6,
+    "tankL": 420,
+    "batteryAh": 520,
+    "alternatorA": 90,
+    "windage": 0.022
+  },
+  "controls": [
+    {
+      "node": "wheel",
+      "control": "rudder",
+      "label": "Wheel",
+      "view": "helm",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyA",
+          "ArrowLeft"
+        ],
+        "inc": [
+          "KeyD",
+          "ArrowRight"
+        ]
+      }
+    },
+    {
+      "node": "boom",
+      "control": "mainsheet",
+      "label": "Mainsheet",
+      "view": "mast",
+      "stepDeg": 2,
+      "keys": {
+        "dec": [
+          "KeyW"
+        ],
+        "inc": [
+          "KeyS"
+        ]
+      }
+    },
+    {
+      "node": "winch_port",
+      "control": "jibsheet_port",
+      "label": "Port jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "winch_stbd",
+      "control": "jibsheet_stbd",
+      "label": "Starboard jib sheet",
+      "view": "helm",
+      "stepDeg": 2
+    },
+    {
+      "node": "autopilot",
+      "control": "pilot",
+      "label": "Autopilot",
+      "view": "helm",
+      "stepDeg": 1
+    }
+  ]
+}

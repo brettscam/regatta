@@ -6,6 +6,7 @@ import { alone, onWeb } from '../net/platform';
 import type { CourseAbout } from '../world/loadCourse';
 import { inText, nextEvent, whenText } from '../race/events';
 import { TENDERS, carries, saveTender, savedTender, tenderFor } from '../aboard/tenders'; // tender
+import { graphics, type QualityChoice } from '../scene/quality';
 
 export interface StartSpot {
   id: string;
@@ -139,6 +140,7 @@ export class JoinFlow {
     else if (d.spot) this.choice.spot = d.spot;
     else if (d.time) this.choice.time = d.time;
     else if (d.weather) this.choice.weather = d.weather as Weather;
+    else if (d.gfx) graphics.choose(d.gfx as QualityChoice);
     else if (d.tutorial) this.choice.tutorial = d.tutorial === '1';
     else if (d.boat) {
       this.choice.boat = d.boat;
@@ -199,6 +201,9 @@ export class JoinFlow {
       const on = c.id === (this.loading ?? this.choice.water);
       return `<button type="button" class="chip" data-water="${c.id}" aria-pressed="${on}" title="${esc(c.say)}"><b>${esc(c.name)}</b>${esc(this.loading === c.id ? 'Fetching the chart' : c.where)}</button>`;
     }).join('')}</div>`;
+    // A water whose record is partly worked out by rule says so here, before anyone casts off.
+    const told = this.opts.waters.find((c) => c.id === this.choice.water)?.data;
+    const sources = told && !this.loading ? `<p class="sources">${esc(told)}</p>` : '';
     const cards = this.water.spots.map((s) => {
       const wind = w.wind(s.x, s.y, 0);
       const c = w.current(s.x, s.y, 0);
@@ -217,6 +222,8 @@ export class JoinFlow {
     const level = WEATHER.find((k) => k.id === (this.choice.weather ?? 'normal')) ?? WEATHER[1];
     const weather = WEATHER.map((k) =>
       `<button type="button" class="chip" data-weather="${k.id}" aria-pressed="${k.id === level.id}" title="${esc(k.say)}">${esc(k.name)}</button>`).join('');
+    const gfx = ([['auto', 'Auto', 'Everything, unless this device struggles: then the lighter picture'], ['high', 'High', 'Everything: wakes, spray, cloud shadows, rain'], ['low', 'Low', 'A lighter picture for a phone or an older laptop']] as const).map(([id, name, say]) =>
+      `<button type="button" class="chip" data-gfx="${id}" aria-pressed="${graphics.choice === id}" title="${esc(say)}">${name}</button>`).join('');
     // A race fixed for later today: tell everyone on the way in where to start from.
     const event = alone() ? null : nextEvent(this.choice.water);
     const from = event && this.water.spots.find((sp) => sp.id === event.spot);
@@ -226,10 +233,12 @@ export class JoinFlow {
       : '';
     return `${race}<h2>Where do you want to sail?</h2>
       ${waters}
+      ${sources}
       <div class="when" role="group" aria-label="Time to cast off">${when}</div>
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
       <div class="when weather" role="group" aria-label="How hard it blows"><span class="k">Wind</span>${weather}</div>
       <p class="soon">${esc(level.say)}.</p>
+      <div class="when weather" role="group" aria-label="Graphics"><span class="k">Graphics</span>${gfx}</div>
       <div class="cards">${cards}</div>
       <p class="soon">More waters are planned: the Farallones, San Francisco to San Diego, the Baja Ha-Ha, Hawaii and the BVI.</p>`;
   }
@@ -252,7 +261,7 @@ export class JoinFlow {
       const reach = polarSpeed(spec.polar, 100, 14);
       return `<button type="button" class="card" data-boat="${e.id}" aria-pressed="${e.id === this.choice.boat}">
         <b>${esc(spec.name)}</b><span class="say">${esc(spec.tagline ?? spec.role ?? '')}</span>
-        <span class="now">${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${reach.toFixed(1)} kt reaching in 14 kt</span></button>`;
+        <span class="now">${spec.difficulty ? `${esc(spec.difficulty)} · ` : ''}${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${reach.toFixed(1)} kt reaching in 14 kt</span></button>`;
     }).join('');
     const coming = yard.length ? `<p class="soon">Still in the yard: ${yard.map((e) => esc(e.name ?? e.id)).join(' and ')}.</p>` : '';
     const swatches = TOPSIDES.map((c) =>

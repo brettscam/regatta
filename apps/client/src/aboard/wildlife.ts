@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { AboardContext, Feature } from './feature';
 import {
-  FAUNA, FIELD_GUIDE, FLOAT_BEAM, FLOAT_DECK, FLOAT_LENGTH, NOTICE, WHALE_ROOM,
-  Sightings, haulFloats, lookAbout, whaleAt, whereAway, type Animal, type Kind, type Sea,
+  FAUNA, FLOAT_BEAM, FLOAT_DECK, FLOAT_LENGTH, NOTICE, WHALE_ROOM,
+  Sightings, fieldGuide, haulFloats, lookAbout, whaleAt, whereAway, type Animal, type Kind, type Sea,
 } from './fauna';
 import { sight } from './sightings';
 
@@ -368,7 +368,7 @@ export class Wildlife implements Feature {
       this.quiet = BETWEEN_REMARKS;
       // The first time ever for this kind, on this device, goes in the logbook.
       if (sight(nearest) === 1) ctx.logbook.count('seen');
-      ctx.say(`${where}: ${FIELD_GUIDE[nearest].first}`, 12);
+      ctx.say(`${where}: ${fieldGuide(this.courseId, nearest).first}`, 12);
     }
     this.room(now);
   }

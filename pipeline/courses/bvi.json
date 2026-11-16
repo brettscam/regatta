@@ -1,0 +1,86 @@
+{
+  "id": "bvi",
+  "name": "British Virgin Islands",
+  "origin": { "lat": 18.42, "lon": -64.55 },
+  "timeZone": "America/Tortola",
+
+  "model": {
+    "name": "stofs-2d-global",
+    "title": "NOAA STOFS-2D-Global (Surge and Tide Operational Forecast System, ADCIRC)",
+    "archive": "nowcast",
+    "reader": "stofs",
+    "bucket": "https://s3.amazonaws.com/noaa-gestofs-pds",
+    "fieldsKey": "stofs_2d_glo.{cycle:%Y%m%d}/stofs_2d_glo.t{cycle:%H}z.fields.{what}.nc",
+    "box": { "lon0": -64.90, "lon1": -64.18, "lat0": 18.20, "lat1": 18.62 },
+    "dryDepth": 0.3
+  },
+  "season": {
+    "start": "2025-02-09T12:00",
+    "hours": 36,
+    "forecastHours": 48,
+    "hrrrForecastCycle": "2025-02-09T06:00"
+  },
+  "wind": {
+    "reader": "rtma",
+    "truth": "NOAA RTMA (Real-Time Mesoscale Analysis), Puerto Rico and Virgin Islands grid, 1.25 km, one analysis an hour",
+    "forecast": "NOAA NAM 3 km Puerto Rico nest",
+    "seaOnly": 40,
+    "lee": { "reach": 5000, "rise": 0.1, "calm": 0.6, "squeeze": 0.12 },
+    "modelled": "wind shadow under the high islands and a little extra where the wind is squeezed past them are added by rule from the terrain"
+  },
+  "hrrrBox": { "lon0": -64.92, "lon1": -64.16, "lat0": 18.18, "lat1": 18.64 },
+  "tileBox": { "lon0": -64.86, "lon1": -64.22, "lat0": 18.24, "lat1": 18.60 },
+
+  "chart": [-26400.0, -15600.0, 30000.0, 14100.0],
+  "terrain": [-30400.0, -19600.0, 34000.0, 18100.0],
+  "dx": { "current": 300.0, "depth": 100.0, "terrain": 100.0, "wind": 2000.0, "coast": 30.0 },
+  "coast": { "tolerance": 18.0, "minArea": 6000 },
+  "currentReach": 1,
+  "landFrom": "model",
+  "terrainMax": 820.0,
+
+  "tideStation": ["Road Town", 18.4170, -64.6120],
+  "streamAt": ["Cut", "Thatch Island Cut", 18.3870, -64.7200, 0],
+  "shoals": [
+    { "name": "Colquhoun Reef", "line": [[18.51308, -64.38886], [18.51263, -64.38222]], "width": 500, "depth": 1.0 }
+  ],
+  "marks": [
+    ["roadtown", "Road Town", 18.4275, -64.62, "town"],
+    ["westend", "West End", 18.388, -64.704, "town"],
+    ["spanishtown", "Spanish Town", 18.449, -64.433, "town"],
+    ["greatharbour", "Great Harbour", 18.444, -64.751, "town"],
+    ["canegarden", "Cane Garden Bay", 18.4275, -64.657, "town"],
+    ["nannycay", "Nanny Cay", 18.399, -64.6365, "town"],
+    ["trellis", "Trellis Bay", 18.4465, -64.533, "town"],
+    ["leverick", "Leverick Bay", 18.4975, -64.3885, "town"],
+    ["bitterend", "Bitter End", 18.4985, -64.357, "town"],
+    ["tortola", "Tortola", 18.43, -64.63, "island"],
+    ["virgingorda", "Virgin Gorda", 18.48, -64.405, "island"],
+    ["jost", "Jost Van Dyke", 18.45, -64.75, "island"],
+    ["norman", "Norman Island", 18.317, -64.61, "island"],
+    ["peter", "Peter Island", 18.352, -64.58, "island"],
+    ["salt", "Salt Island", 18.37, -64.527, "island"],
+    ["cooper", "Cooper Island", 18.383, -64.508, "island"],
+    ["ginger", "Ginger Island", 18.389, -64.479, "island"],
+    ["beef", "Beef Island", 18.442, -64.528, "island"],
+    ["guana", "Guana Island", 18.478, -64.573, "island"],
+    ["camanoe", "Great Camanoe", 18.476, -64.535, "island"],
+    ["scrub", "Scrub Island", 18.47, -64.515, "island"],
+    ["dogs", "The Dogs", 18.482, -64.461, "island"],
+    ["mosquito", "Mosquito Island", 18.512, -64.393, "island"],
+    ["pricklypear", "Prickly Pear", 18.509, -64.37, "island"],
+    ["necker", "Necker Island", 18.527, -64.359, "island"],
+    ["littlejost", "Little Jost Van Dyke", 18.452, -64.72, "island"],
+    ["sandycay", "Sandy Cay", 18.437, -64.71, "island"],
+    ["greatthatch", "Great Thatch", 18.384, -64.74, "island"],
+    ["stjohn", "St John", 18.34, -64.75, "island"],
+    ["indians", "The Indians", 18.332, -64.629, "island"],
+    ["fallen", "Fallen Jerusalem", 18.417, -64.453, "island"],
+    ["deadchest", "Dead Chest", 18.365, -64.563, "island"],
+    ["baths", "The Baths", 18.429, -64.444, "point"],
+    ["steele", "Steele Point", 18.388, -64.713, "point"],
+    ["treasure", "Treasure Point", 18.313, -64.623, "point"],
+    ["monkey", "Monkey Point", 18.464, -64.574, "point"],
+    ["colquhoun", "Colquhoun Reef", 18.51398, -64.37843, "buoy"]
+  ]
+}
