@@ -37,8 +37,11 @@ export interface Place {
   say: string;
   /** How a boat stops here: on a mooring buoy, alongside a dock, or on her own anchor. */
   kind?: 'mooring' | 'dock' | 'anchorage';
-  /** Where the crew goes once ashore. */
-  ashore?: { name: string; say: string };
+  /**
+   * Where the crew goes once ashore. `kind` is what stands there (club, bar, marina, hotel, store, park) and how the chart marks it.
+   * The rest shapes the venue drawn on the shore, all optional: see `VenuePlace` in `scene/venue.ts`.
+   */
+  ashore?: { name: string; say: string; kind?: string; site?: [number, number]; sign?: string; deck?: [number, number]; tables?: number; umbrellas?: string };
 }
 
 export interface SessionOptions {

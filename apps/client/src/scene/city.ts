@@ -15,6 +15,8 @@ export interface Ground {
   /** True where the depth chart lets a boat float. Nothing is built there, so nothing drawn can be sailed through. */
   sailable(x: number, y: number): boolean;
   rnd(): number;
+  /** Plots the city's ordinary blocks leave empty, as [x, y, radius]: something else stands there. */
+  clear?: Array<[number, number, number]>;
 }
 
 type P3 = [number, number, number];
@@ -102,7 +104,7 @@ export function buildCity(g: Ground): City {
     }
     return null;
   };
-  const keepOut: Array<[number, number, number]> = [];
+  const keepOut: Array<[number, number, number]> = [...(g.clear ?? [])];
   const site = (name: keyof typeof SITES, clear = 42, foot = 20) => {
     const p = P(name);
     keepOut.push([p.x, p.y, clear]);
