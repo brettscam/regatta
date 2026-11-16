@@ -3,6 +3,8 @@ import { metresToNm } from '@slack-tide/nav';
 import type { CourseData, ReplayWorld } from '@slack-tide/world';
 import type { Passage } from './passage';
 import type { TrafficVessel } from '../scene/traffic';
+import { shoreKind } from '../scene/shoreSite';
+import { visited } from '../aboard/visited';
 
 const D2R = Math.PI / 180;
 const NM = 1852;
@@ -38,7 +40,7 @@ export interface ChartHost {
   /** Sim time now, seconds since the session started. */
   now(): number;
   /** Places worth sailing to. */
-  places?: Array<{ id: string; name: string; x: number; y: number; say: string }>;
+  places?: Array<{ id: string; name: string; x: number; y: number; say: string; kind?: string; ashore?: { kind?: string } }>;
   boat(): ChartBoat;
   /** Other vessels on the water, shown like AIS targets. */
   traffic?: () => TrafficVessel[];
@@ -120,6 +122,9 @@ export class Chart {
     this.bind();
   }
 
+  /** Places the crew has been ashore at, as of the last time the chart was opened. */
+  private been = new Set<string>();
+
   get isOpen(): boolean {
     return this.open;
   }
@@ -128,6 +133,8 @@ export class Chart {
     this.open = force ?? !this.open;
     this.overlay.hidden = !this.open;
     if (this.open) {
+      // Which places the crew has been ashore at, as of now: read once here, not every time the chart is drawn.
+      this.been = visited();
       // Open on the whole route and the boat.
       this.frameRoute();
       this.viewTime = null;
@@ -734,25 +741,55 @@ export class Chart {
       }
     }
 
-    // Places to sail to: a green ring and a name. Click one to head there.
+    // Places to sail to. Click one to head there. A yacht club is a burgee on its staff, a bar a glass, and the rest
+    // a ring: green and filled once the crew has been ashore there, hollow until then.
     for (const place of this.host.places ?? []) {
       const [sx, sy] = this.screen(w, h, v, place.x, place.y);
       if (sx < -40 || sy < -20 || sx > w + 40 || sy > h + 20) continue;
+      const been = this.been.has(place.id);
+      const kind = place.ashore ? shoreKind(place) : '';
       ctx.strokeStyle = '#0f6b5a';
-      ctx.fillStyle = '#ffffff';
       ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      // The spot itself, so a click has something to aim at.
+      ctx.fillStyle = been ? '#0f6b5a' : '#ffffff';
       ctx.beginPath();
-      ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+      ctx.arc(sx, sy, kind === 'club' || kind === 'bar' ? 3.2 : 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      if (kind === 'club') {
+        // A staff and a burgee flying from it.
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy - 19);
+        ctx.stroke();
+        ctx.fillStyle = been ? '#0f6b5a' : '#c2452f';
+        ctx.beginPath();
+        ctx.moveTo(sx + 1, sy - 19); ctx.lineTo(sx + 14, sy - 15); ctx.lineTo(sx + 1, sy - 11);
+        ctx.closePath();
+        ctx.fill();
+      } else if (kind === 'bar') {
+        // A glass on its stem.
+        ctx.fillStyle = been ? '#0f6b5a' : '#e0a030';
+        ctx.beginPath();
+        ctx.moveTo(sx - 7, sy - 19); ctx.lineTo(sx + 7, sy - 19); ctx.lineTo(sx, sy - 11);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 11); ctx.lineTo(sx, sy - 5);
+        ctx.moveTo(sx - 4, sy - 5); ctx.lineTo(sx + 4, sy - 5);
+        ctx.stroke();
+      } else if (!been) {
+        ctx.fillStyle = '#0f6b5a';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.fillStyle = '#0f6b5a';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
-      ctx.fill();
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(place.name, sx + 10, sy);
+      ctx.fillText(place.name, sx + (kind === 'club' ? 16 : 10), sy);
     }
 
     this.drawRoute(ctx, w, h, v, true);
@@ -1025,7 +1062,7 @@ export class Chart {
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
       ${traffic}
-      <p class="hint">Click water to add a waypoint, or a green ring to head for that place. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
+      <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
       <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA ${/NOAA (\w+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }

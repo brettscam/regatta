@@ -10,6 +10,7 @@ import { FlowView } from './flow';
 import { Mooring } from './mooring';
 import { Guide } from './guide';
 import { Kayak } from './kayak';
+import { Landmarks } from './landmarks';
 import { SeamanshipPoints } from './seamanship';
 import { CrabPots } from './pots';
 import { Radio } from './radio';
@@ -41,6 +42,8 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new Wildlife(ctx),
     // The boats that live here take no keys. Their status (a race to the next point) comes after everything the player does herself.
     new Residents(ctx),
+    // The names over the places ashore: they take no keys either.
+    new Landmarks(ctx),
     // Wind shadow and collisions watch the other boats and take no keys. A holed boat's status is given by the session before any other.
     new BadAir(ctx),
     new Contact(ctx),

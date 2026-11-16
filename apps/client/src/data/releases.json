@@ -1,6 +1,28 @@
 {
   "notes": [
     {
+      "id": "v31",
+      "date": "2026-11-16",
+      "title": "Bars and yacht clubs on the shore",
+      "items": [
+        "Every bar and yacht club now has a home on the shore you can steer for: a clubhouse under its burgee, a deck of umbrellas, a guest dock, and lights that come on at dusk.",
+        "Sam's in Tiburon has its big deck of white umbrellas. The Corinthian, St. Francis, Richmond and Orcas Island yacht clubs are on the water too, with more places in the San Juans.",
+        "As you close with a place its name and distance appear, with a tick once you have been ashore. The chart marks clubs with a flag and bars with a glass.",
+        "The boats in the marinas are proper yachts now, and the trees along the waterfront are the right size."
+      ]
+    },
+    {
+      "id": "v30",
+      "date": "2026-11-16",
+      "title": "Two levels of autopilot",
+      "items": [
+        "P now has two levels. Press once and the pilot steers while you trim the sails. Press again and the crew trims too, so she sails herself. A third press hands everything back.",
+        "Steering alone is unlimited, in a race or out, but your speed still depends on your own trimming.",
+        "In a race the full pilot is limited to 3 minutes from the gun. The race line shows what is left, and when it runs out the pilot keeps steering and the sheets come back to you.",
+        "Before the gun both levels are unlimited, so getting to the start stays easy. The spinnaker is yours to trim unless the full pilot is on."
+      ]
+    },
+    {
       "id": "v29",
       "date": "2026-11-16",
       "title": "A real sea",

@@ -733,3 +733,7 @@ body:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 78px); }
 .board .keytools .tipswitch { font-size: 13px; color: var(--dim); }
 .board .keygroup[hidden], .board .keylist li[hidden], .board .keypage .note[hidden] { display: none; }
 .board .keylist .what b .fresh { margin-left: 8px; padding: 1px 6px; border-radius: 6px; background: var(--amber); color: #1a1205; font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: 1px; }
+
+/* ---- places ashore: a name over each venue as she closes with it. A ring for one still to visit, a tick for one stamped. */
+.place-label { background: rgba(9, 18, 24, 0.62); font-weight: 500; color: rgba(238, 243, 244, 0.86); }
+.place-label.new { border-color: var(--amber); color: var(--ink); font-weight: 600; }

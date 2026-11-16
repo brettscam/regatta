@@ -143,6 +143,8 @@ export class Race {
   /** Races other boats have called that this one could join. */
   readonly offers = new Map<string, RaceCall>();
   started = false;
+  /** A note the session adds to the racing line, such as what is left of the full pilot. */
+  note = '';
   leg = 0;
   toGo = 0;
   finish: number | null = null;
@@ -535,7 +537,7 @@ export class Race {
     const pos = racing > 1 ? ` · ${ORDINAL[place - 1] ?? place} of ${racing}` : '';
     if (this.finish !== null) return `Finished in ${clockText(this.finish)}${pos}`;
     const what = this.leg === 0 ? 'start ring at' : this.leg === call.marks.length - 1 ? 'finish at' : 'next';
-    return `Racing ${clockText(this.elapsed)}${pos} · ${what} ${this.nextMark?.name ?? ''} ${shortRange(Math.max(0, this.toGo - RING))}`;
+    return `Racing ${clockText(this.elapsed)}${pos} · ${what} ${this.nextMark?.name ?? ''} ${shortRange(Math.max(0, this.toGo - RING))}${this.note ? ` · ${this.note}` : ''}`;
   }
 
   /** The pace boats, for the chart and the collision watch. */
