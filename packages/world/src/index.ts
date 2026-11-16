@@ -1,6 +1,7 @@
 import type { Environment, EnvSample } from '@slack-tide/sim';
 
 export * from './replay';
+export * from './sea';
 
 const D2R = Math.PI / 180;
 const KT = 0.514444;

@@ -22,6 +22,7 @@ import { alone } from './net/platform';
 import { myAvatar } from './boat/avatar';
 import { Race, type RaceCourse } from './race/race';
 import { ShadedWind } from './race/shadow';
+import { Seaway } from './aboard/seaway';
 import { damageNote } from './aboard/contactRules';
 import { capsizeAlarm } from './aboard/pressedRules';
 import { FleetPanel } from './ui/fleetpanel';
@@ -76,6 +77,8 @@ export class Session {
   readonly sim: Sim;
   /** The wind the sim is fed: the world's, less whatever another boat to windward is taking. `aboard/badair.ts` sets it. */
   readonly air: ShadedWind;
+  /** The sea as she meets it: the sea state at the boat, ships' wakes, and the slam and surf events. See `aboard/seaway.ts`. */
+  readonly seaway: Seaway;
   boatView: BoatView;
   readonly drone: DroneCamera;
   readonly hud = new Hud();
@@ -101,7 +104,7 @@ export class Session {
   private before: Snapshot;
   private after: Snapshot;
   private acc = 0;
-  private readonly motion = { heave: 0, pitch: 0, roll: 0 };
+  private readonly motion = { heave: 0, pitch: 0, roll: 0, lastPitch: 0, wait: 0, shudder: 0, shudderAge: 9, surf: 0 };
   private readonly boatPos = new THREE.Vector3();
   /** The boat she is sailing now: her own (`opts.spec`), or the class of the race she is in. */
   private spec: YardBoat;
@@ -124,6 +127,7 @@ export class Session {
     if (opts.resume) this.sim.restore(opts.resume);
     this.before = grab(this.sim.state);
     this.after = this.before;
+    this.seaway = new Seaway(this.sim, stage, (text, seconds = 5) => this.hud.raiseAlarm(text, seconds));
     this.watch.crashGybes = this.sim.state.crashGybes;
     this.watch.knockdowns = this.sim.state.knockdowns;
     this.watch.capsizes = this.sim.state.capsizes;
@@ -201,6 +205,13 @@ export class Session {
       // In another boat's wind shadow the sails misbehave through no fault of the trim: nothing to coach.
       busy: () => (this.coach?.active ?? false) || this.chart.isOpen || opts.boardOpen() || this.paused || this.air.factor < 0.93,
       racing: () => this.race.call !== null && this.race.finish === null,
+      sea: () => this.seaway.sea,
+      slams: () => this.seaway.slamsLately,
+      tideGate: () => {
+        // The one stretch of the Bay whose ebb is famous for it.
+        const gate = stage.course.id === 'sf-bay' ? stage.course.marks.find((m) => m.id === 'gate') : undefined;
+        return gate && Math.hypot(gate.x - this.sim.state.x, gate.y - this.sim.state.y) < 3000 ? 'the Golden Gate' : '';
+      },
     });
 
     const togglePause = (): void => {
@@ -243,7 +254,7 @@ export class Session {
     });
 
     this.aboard = {
-      sim: this.sim, world, air: this.air, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
+      sim: this.sim, world, air: this.air, seaway: this.seaway, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
       spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       heard: (from, text) => this.heard(from, text),
@@ -460,6 +471,7 @@ export class Session {
         if (i === steps - 1) this.before = this.after;
         sim.step();
         this.race.step();
+        this.seaway.step();
         for (const f of this.features) f.step?.();
         // Keep the track and mark arrivals honest at high time rates.
         if (i % 30 === 0) passage.update(sim.state, sim.state.t);
@@ -502,15 +514,43 @@ export class Session {
     const hPort = sea(x + fz * 1.4, z - fx * 1.4);
     const hMid = sea(x, z);
     const ease = paused ? 0 : Math.min(1, dtReal * 5);
+    // A ship's wake is in `sea` already. She rolls to it harder than to the wind's sea: it comes at her as a few
+    // steep waves all from one side.
+    const wakes = stage.wakes;
+    const wakeRoll = Math.atan2(wakes.height(x + fz * 1.4, -(z - fx * 1.4)) - wakes.height(x - fz * 1.4, -(z + fx * 1.4)), 2.8) * 0.6;
     motion.heave += ((hBow + hStern + 2 * hMid) / 4 - motion.heave) * ease;
     motion.pitch += (Math.atan2(hBow - hStern, half * 2) * 0.8 - motion.pitch) * ease;
-    motion.roll += (Math.atan2(hPort - hStbd, 2.8) * 0.5 - motion.roll) * ease;
+    motion.roll += (Math.atan2(hPort - hStbd, 2.8) * 0.5 + wakeRoll - motion.roll) * ease;
+
+    // A slam is shown as her bow comes down off the wave she can be seen on: the sim says she slammed, the picture
+    // says when. Then a shudder through the hull for half a second, and the thump.
+    const seaway = this.seaway;
+    if (!paused) {
+      if (seaway.pendingSlam > 0) {
+        motion.wait += dtReal;
+        if (motion.pitch < motion.lastPitch - 1e-5 && motion.pitch < 0.01 || motion.wait > 1.5) {
+          motion.shudder = seaway.pendingSlam;
+          motion.shudderAge = 0;
+          motion.wait = 0;
+          seaway.pendingSlam = 0;
+          this.sound.thud(0.35 + 0.5 * motion.shudder);
+          drone.shake(0.25 + 0.35 * motion.shudder);
+          seaway.emit('slam', motion.shudder);
+        }
+      }
+      motion.lastPitch = motion.pitch;
+      motion.shudderAge += dtReal;
+      // Surfing, she carries her bow down and the water hisses past.
+      motion.surf += (seaway.surf - motion.surf) * Math.min(1, dtReal * 3);
+    }
+    const ring = motion.shudderAge < 0.7 ? motion.shudder * Math.exp(-motion.shudderAge / 0.16) : 0;
+    const shake = ring * Math.cos(motion.shudderAge * 44);
 
     const pose: BoatPose = {
       x, z, heading,
-      heel: mix(before.heel, after.heel, alpha) + motion.roll,
-      pitch: motion.pitch,
-      heave: motion.heave - 0.03,
+      heel: mix(before.heel, after.heel, alpha) + motion.roll + shake * 0.006,
+      pitch: motion.pitch - ring * 0.035 - shake * 0.008 - motion.surf * 0.045,
+      heave: motion.heave - 0.03 - ring * 0.07,
       rudder: mix(before.rudder, after.rudder, alpha),
       boom: mix(before.boomAngle, after.boomAngle, alpha),
       jib: mix(before.jibAngle, after.jibAngle, alpha),
@@ -541,6 +581,7 @@ export class Session {
     // The replay runs out of weather eventually. The day comes round again rather than freezing in the dark.
     if (world.wrapSeason(sim.state.t)) this.alarm('End of the recorded weather. The same day starts over.');
 
+    seaway.update(dtReal, away ? away.x : sim.state.x, away ? away.y : sim.state.y);
     for (const f of this.features) f.update?.(dtReal, seaTime);
     if (away) this.boatPos.set(away.x, away.height, -away.y);
     else this.boatPos.set(x, pose.heave, z);
@@ -559,7 +600,9 @@ export class Session {
     const doing = this.status();
     // In bad air the line says so for as long as it lasts, beside any gust on the way.
     const lostKt = Math.round((sim.out.tws / this.air.factor - sim.out.tws) / KT);
-    const airLine = [this.air.factor < 0.93 && lostKt >= 1 ? `bad air, ${lostKt} kt down` : '', gust.line].filter(Boolean).join(' · ');
+    // The sea in words goes with the wind's: what the water is doing, then what the air is.
+    const wakeLine = seaway.wake.height > 0.15 && !away ? (seaway.slatting ? 'sails slatting in a wake' : "ship's wake") : '';
+    const airLine = [seaway.words, wakeLine, this.air.factor < 0.93 && lostKt >= 1 ? `bad air, ${lostKt} kt down` : '', gust.line].filter(Boolean).join(' · ');
     if (doing) hud.setSail(doing, '', airLine);
     else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, airLine);
     hud.setPilot(pilot.line());
@@ -570,7 +613,7 @@ export class Session {
     this.coach?.update(dtReal);
     const o = sim.out;
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
-    this.sound.update(o.aws / KT, sim.state.speed / KT, loose, paused);
+    this.sound.update(o.aws / KT, sim.state.speed / KT + motion.surf * 3, loose, paused);
 
     stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
@@ -588,7 +631,7 @@ export class Session {
       headingDeg: Math.round(s.heading * R2D), speedKt: r1(o.sog / KT), heelDeg: Math.round(s.heel * R2D),
       windKt: r1(o.tws / KT), windFromDeg: Math.round(o.twd * R2D), windAngleDeg: Math.round(o.twa * R2D),
       helm: s.helmMode, crewTrim: s.crewTrim, reef: s.reef,
-      aground: o.aground, knockdowns: s.knockdowns, hullDamage: Math.round(s.damage * 100), windShadow: Math.round((1 - this.air.factor) * 100), boatsInCompany: this.fleet.boats.length,
+      aground: o.aground, sea: this.seaway.words, slams: s.slams, knockdowns: s.knockdowns, hullDamage: Math.round(s.damage * 100), windShadow: Math.round((1 - this.air.factor) * 100), boatsInCompany: this.fleet.boats.length,
       screen: `${window.innerWidth}x${window.innerHeight}@${window.devicePixelRatio}`,
     };
   }
@@ -601,8 +644,9 @@ export class Session {
       get boatView() { return session.boatView; },
       get spec() { return session.spec; },
       scene: this.stage.scene, traffic: this.stage.traffic, renderer: this.stage.renderer, world: this.stage.world,
-      sim: this.sim, air: this.air, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
+      sim: this.sim, air: this.air, seaway: this.seaway, passage: this.passage, chart: this.chart, pilot: this.pilot, fleet: this.fleet, drone: this.drone,
       coach: this.coach, hints: this.hints, gusts: this.gusts, race: this.race, fleetPanel: this.fleetPanel, features: this.features, views: VIEWS, setPaused: (p: boolean) => { this.paused = p; },
+      stage: this.stage, setRate: (index: number) => { this.rateIndex = index; this.hud.setRate(index); },
     };
   }
 }

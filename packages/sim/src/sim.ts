@@ -1,6 +1,6 @@
 import { D2R, R2D, KT, clamp, lerp, wrapPi, wrapTau, smoothstep, approach, interp1 } from './math';
 import { polarSpeed } from './polar';
-import type { BoatSpec, ControlName, EngineSpec, Environment, HelmMode, SailReport, SimOutputs, SimState } from './types';
+import type { BoatSpec, ControlName, EngineSpec, Environment, HelmMode, SailReport, SeaSample, SimOutputs, SimState } from './types';
 
 /** Fixed step. The sim never takes any other step size. */
 export const SIM_DT = 1 / 60;
@@ -22,6 +22,71 @@ const KNOCKDOWN_LOAD = 52;
 const SPIN_OVER_PER_KT = 2.2;
 /** The most the crew will let the main out beyond its best setting to spill a gust. Past this it is time to reef. */
 const GUST_EASE_MAX = 11 * D2R;
+
+/**
+ * The boat in a seaway. Every number the sea changes is here. None of it runs unless the environment gives a sea.
+ * `hl` below is the sea's height over the boat's waterline length: the same sea is a bigger sea to a smaller boat.
+ */
+export const SEAWAY = {
+  /** Seas lower than this, metres, do nothing. */
+  minHeight: 0.05,
+  /** Speed lost beating or motoring into it: `resist * hl^1.25 * (steepness / 0.05)^0.7`, full within 35 degrees of the bow, nothing abaft 72: cracking off a little takes the waves on her shoulder. */
+  resist: 2.0,
+  /** The most the sea alone takes, as a share of her speed. */
+  resistCap: 0.35,
+  /** Steepness below which she never slams, and the range above it over which the chance of slamming on a wave comes on. */
+  slamSteep: 0.03,
+  slamRange: 0.04,
+  /** `hl` below which the waves are too small to drop her, about 0.2 m for the 30 and 0.3 m for the 45. Full chance comes 0.05 above it. */
+  slamFromHl: 0.025,
+  /** The most likely she is to slam on any one wave. */
+  slamChance: 0.35,
+  /** Speed a slam takes: `slamBase + slamPerHl * hl`, as a share, capped. */
+  slamBase: 0.02,
+  slamPerHl: 0.25,
+  slamCap: 0.05,
+  /** Surfing: the most a running boat gains, as a share of her speed, for a boat of displacement/length ratio 190. Lighter gains more. */
+  surf: 0.05,
+  /** Height, metres, at which she starts to surf, and the further height over which the full gain comes on. */
+  surfFrom: 0.3,
+  surfRange: 0.9,
+  /** Yaw a quartering sea puts on her at its worst, radians a second for each unit of `hl`. */
+  yaw: 30 * D2R,
+  /** A sea dead astern yaws her this share of what a quartering one does. */
+  yawAstern: 0.4,
+  /** Extra leeway with the sea forward of the quarter: `1 + leeway * hl`. */
+  leeway: 1.5,
+  /**
+   * Rolling downwind. In flat water the boom stays put until she is 10 degrees by the lee. Running in a sea the roll
+   * throws it across sooner: that margin shrinks by `rollLee * hl` degrees, by 8 at the most.
+   */
+  rollLee: 60,
+  rollLeeCap: 8,
+} as const;
+
+/** Displacement/length ratio: long tons over (waterline feet / 100) cubed. About 140 is a light fast boat, 220 a moderate cruiser. */
+export function displacementLength(boat: BoatSpec): number {
+  const d = boat.dimensions;
+  return (d.displacementKg / 1016) / Math.pow((d.lwl * 3.28084) / 100, 3);
+}
+
+/** A number from 0 to 1 that depends only on `n`: which waves she slams on is settled by the count of waves met, not by chance. */
+function waveHash(n: number): number {
+  const v = Math.sin(n * 12.9898 + 4.1414) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/** What the sea is doing to her this step. */
+interface Seaway {
+  /** Share of speed lost to the head sea. */
+  loss: number;
+  /** Share of speed gained surfing, this instant. */
+  gain: number;
+  /** Yaw the sea is putting on her, rad/s. */
+  yaw: number;
+  /** Multiplier on leeway. */
+  leeway: number;
+}
 
 /**
  * The engine's throttle positions, from full astern to full ahead. `speed` is the share of her cruising speed under
@@ -166,6 +231,9 @@ export function initialState(init: InitialConditions = {}): SimState {
     engineStops: 0,
     batteryTrips: 0,
     damage: 0,
+    seaPhase: 0,
+    seaCount: 0,
+    slams: 0,
     maneuver: null,
   };
 }
@@ -190,6 +258,8 @@ export class Sim {
   readonly dt = SIM_DT;
   state: SimState;
   out: SimOutputs;
+  /** How much sooner the boom comes across by the lee for her rolling in a following sea, radians. Set afresh every step; 0 in flat water. */
+  private rollLee = 0;
 
   constructor(
     public boat: BoatSpec,
@@ -667,6 +737,8 @@ export class Sim {
     this.computeWind();
     if (b.engine) this.stepEngine(b.engine);
     if (s.hold !== 'none') return this.stepHeld();
+    // The sea, where the world gives one. Without it `seaway` is null and nothing below differs from flat water.
+    const seaway = this.seaway(this.env.sea?.(s.x, s.y, s.t));
     const windSide = o.awa >= 0 ? 1 : -1;
     const awaAbs = Math.abs(o.awa);
     const awsKt = o.aws / KT;
@@ -797,6 +869,8 @@ export class Sim {
       // The propeller gets her moving, and stops her, quicker than the sails do.
       if (spill >= 0.5) tau = Math.abs(v) > Math.abs(s.speed) && v * s.speed >= 0 ? 9 : 14;
     }
+    // Punching into a sea costs her speed, under sail or power. Running before a big one, she surfs.
+    if (seaway && o.targetSpeed > 0) o.targetSpeed *= (1 - seaway.loss) * (1 + seaway.gain);
     // A damaged hull drags, under sail or power. Holed, she stops in a few lengths.
     if (s.damage > 0) {
       o.targetSpeed *= damageSpeed(s.damage);
@@ -860,6 +934,8 @@ export class Sim {
     if (o.overpower > 0 && !pr) yawTarget += windSide * 7 * D2R * clamp((o.overpower - 2) / 8, 0, 1) * smoothstep(25 * D2R, 45 * D2R, awaAbs);
     // In astern the propeller walks the stern to port, so her bow swings to starboard, most before she has sternway.
     if (geared && s.throttle < 0 && !twin) yawTarget += PROP_WALK * (-s.throttle / 2) * (1 - 0.5 * clamp(-s.speed / 1.2, 0, 1));
+    // A sea on the quarter slews her about as each wave passes under.
+    if (seaway) yawTarget += seaway.yaw;
     s.yawRate += (yawTarget - s.yawRate) * (1 - Math.exp(-dt / 0.7));
     s.heading = wrapTau(s.heading + s.yawRate * dt);
 
@@ -867,7 +943,9 @@ export class Sim {
     const slowGain = clamp((2.8 / Math.max(s.speed, 0.8)) ** 2, 1, 6);
     // Leeway comes from the side force of sails that are drawing. Flogging sails push nothing sideways.
     const sideForce = clamp(sailLoad, 0, 1.2);
-    const leeway = Math.min((hd?.leewayMaxDeg ?? 25) * D2R, pointOfSail * sideForce * ((hd?.leewayBaseDeg ?? 3) + (hd?.leewayPerHeelDeg ?? 0.12) * heelDeg) * D2R * slowGain);
+    let leeway = Math.min((hd?.leewayMaxDeg ?? 25) * D2R, pointOfSail * sideForce * ((hd?.leewayBaseDeg ?? 3) + (hd?.leewayPerHeelDeg ?? 0.12) * heelDeg) * D2R * slowGain);
+    // Each wave knocks her bodily to leeward.
+    if (seaway) leeway = Math.min((hd?.leewayMaxDeg ?? 25) * D2R, leeway * seaway.leeway);
     const lateralTarget = -windSide * s.speed * Math.tan(leeway);
     s.lateral += (lateralTarget - s.lateral) * (1 - Math.exp(-dt / 1.0));
 
@@ -922,6 +1000,73 @@ export class Sim {
 
     s.tick += 1;
     s.t = s.tick * dt;
+  }
+
+  // ---- in a seaway ------------------------------------------------------------------------------
+
+  /**
+   * What the sea does to her this step: see `SEAWAY` for the numbers. Moves her along the wave under her, and now and
+   * then drops her off one: a slam, which checks her speed there and then.
+   * @returns null in flat water, with every sea output at rest
+   */
+  private seaway(sea: SeaSample | null | undefined): Seaway | null {
+    const o = this.out;
+    if (!sea || !(sea.height > SEAWAY.minHeight) || !(sea.length > 0.5)) {
+      o.seaLoss = 0;
+      o.surf = 0;
+      this.rollLee = 0;
+      return null;
+    }
+    const s = this.state;
+    const lwl = this.boat.dimensions.lwl;
+    const hl = sea.height / lwl;
+    const steepK = clamp(sea.steepness / 0.05, 0.4, 1.8);
+    // Where the waves come from, off the bow: 0 a head sea, positive on the starboard side, pi dead astern.
+    const rel = wrapPi(sea.dir - s.heading);
+    const relAbs = Math.abs(rel);
+    const head = 1 - smoothstep(35 * D2R, 72 * D2R, relAbs);
+    const follow = smoothstep(120 * D2R, 160 * D2R, relAbs);
+
+    // She meets the waves faster going into them and slower running with them.
+    const k = (Math.PI * 2) / sea.length;
+    const sigma = Math.sqrt(9.81 * k);
+    const met = sigma + k * s.speed * Math.cos(rel);
+    const before = Math.floor(s.seaPhase / (Math.PI * 2));
+    s.seaPhase += met * this.dt;
+    const crest = Math.floor(s.seaPhase / (Math.PI * 2)) !== before;
+    // Keep the number small. Nothing reads more of it than where she is on the wave.
+    if (Math.abs(s.seaPhase) > 1e4) s.seaPhase -= Math.round(s.seaPhase / (Math.PI * 2)) * Math.PI * 2;
+
+    const loss = Math.min(SEAWAY.resistCap, SEAWAY.resist * head * Math.pow(hl, 1.25) * Math.pow(steepK, 0.7));
+    o.seaLoss = loss;
+
+    // A wave top: going to windward fast in a steep sea she may fall off the back of it.
+    if (crest) {
+      s.seaCount++;
+      const hull = 2.43 * Math.sqrt(lwl) * KT;
+      const pace = clamp(s.speed / (0.85 * hull), 0, 1);
+      const chance = SEAWAY.slamChance * clamp((sea.steepness - SEAWAY.slamSteep) / SEAWAY.slamRange, 0, 1) * head * clamp((hl - SEAWAY.slamFromHl) / 0.05, 0, 1) * pace * pace;
+      if (met > 0 && chance > 0 && waveHash(s.seaCount) < chance) {
+        s.slams++;
+        s.speed *= 1 - Math.min(SEAWAY.slamCap, SEAWAY.slamBase + SEAWAY.slamPerHl * hl);
+      }
+    }
+
+    // Running in a sea big enough to pick her up, she surges down each face. A light boat gets more of it.
+    const light = clamp(280 / displacementLength(this.boat) - 0.6, 0.5, 1.6);
+    const waveSpeed = sigma / k;
+    const carry = follow * clamp((sea.height - SEAWAY.surfFrom) / SEAWAY.surfRange, 0, 1) * clamp(s.speed / (0.45 * waveSpeed), 0, 1);
+    const face = Math.sin(s.seaPhase);
+    o.surf = carry * clamp(0.5 + 0.7 * face, 0, 1);
+    const gain = SEAWAY.surf * light * carry * (1 + 0.6 * face);
+
+    // On the quarter each wave lifts the stern and slews her; dead astern she rolls and wanders; on the bow it only nudges her.
+    const quarter = relAbs > Math.PI / 2 ? -Math.sin(2 * rel) : 0.25 * Math.sin(2 * rel);
+    const yaw = SEAWAY.yaw * hl * Math.min(1.5, steepK) * (quarter + SEAWAY.yawAstern * follow) * face * clamp(s.speed / 2, 0.3, 1);
+
+    this.rollLee = follow * Math.min(SEAWAY.rollLeeCap, SEAWAY.rollLee * hl * Math.min(1.5, steepK)) * D2R;
+    const forward = 1 - smoothstep(100 * D2R, 150 * D2R, relAbs);
+    return { loss, gain, yaw, leeway: 1 + SEAWAY.leeway * hl * Math.min(1.5, steepK) * forward };
   }
 
   // ---- at anchor or on a mooring --------------------------------------------------------------
@@ -1068,8 +1213,8 @@ export class Sim {
     const q = 0.5 * AIR_DENSITY * o.aws * o.aws;
 
     // Main. The boom swings to leeward until the sheet stops it.
-    // It stays put through small wind-angle wobbles dead ahead and dead astern.
-    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R && s.mainSide !== -windSide) {
+    // It stays put through small wind-angle wobbles dead ahead and dead astern, less so astern when she is rolling in a sea.
+    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R + this.rollLee && s.mainSide !== -windSide) {
       if (slew && awaAbs > 100 * D2R) {
         this.gybed();
         this.spinGybed();
@@ -1353,6 +1498,7 @@ export class Sim {
       targetSpeed: 0, polarSpeed: 0, heelLoad: 0, heelPenalty: 1, weatherHelm: 0, rudderGrip: 1,
       inIrons: false, roundingUp: false, pilotBeating: false, knockedDown: false, underKeel: null, aground: false,
       engineRpm: 0, fuel: this.fuel, battery: this.battery, underPower: this.underPower,
+      seaLoss: 0, surf: 0,
     };
   }
 }

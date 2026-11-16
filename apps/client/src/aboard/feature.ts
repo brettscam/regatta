@@ -10,6 +10,7 @@ import type { Place } from '../session';
 import type { Stage } from '../stage';
 import type { Race } from '../race/race';
 import type { ShadedWind } from '../race/shadow';
+import type { Seaway } from './seaway';
 import type { Hud } from '../ui/hud';
 import type { Passage } from '../ui/passage';
 
@@ -19,6 +20,11 @@ export interface AboardContext {
   world: ReplayWorld;
   /** The wind her sim is fed: the world's, scaled by `air.factor` when another boat is taking it. See `race/shadow.ts`. */
   air: ShadedWind;
+  /**
+   * The sea as she meets it: `seaway.sea` the sea state at the boat, `seaway.wake` a ship's wake at whoever is being
+   * followed, and `seaway.on((event, strength) => ...)` to be told when she slams, surfs or meets a wake. See `seaway.ts`.
+   */
+  seaway: Seaway;
   /** The shared scene: `stage.scene` to add meshes to, `stage.seaLevel(x, z, seaTime)` for the height of the water. */
   stage: Stage;
   hud: Hud;
