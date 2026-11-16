@@ -156,7 +156,11 @@ export function buildPalms(course: CourseData, heights: Uint8Array): THREE.Group
  * They are scenery: nothing stops a boat sailing through the field, so they are kept few, and clear of the buoy
  * the player picks up.
  */
-export function buildMooringFields(course: CourseData, heights: Uint8Array, depths: Uint8Array, places: Array<{ x: number; y: number; kind?: string }>): THREE.Group {
+export function buildMooringFields(
+  course: CourseData, heights: Uint8Array, depths: Uint8Array, places: Array<{ x: number; y: number; kind?: string }>,
+  /** Circles to keep clear, [x, y, radius]: the ways in to the guest docks and the buoy the player picks up. */
+  clear: ReadonlyArray<[number, number, number]> = [],
+): THREE.Group {
   const depthAt = depthSampler(course, depths);
   const heightAt = heightSampler(course, heights);
   // The way the wind of the first hour blows from, over the whole chart: a moored boat points into it.
@@ -169,11 +173,12 @@ export function buildMooringFields(course: CourseData, heights: Uint8Array, dept
     const want = 9 + Math.floor(hash(p, 3) * 6);
     let placed = 0;
     for (let n = 0; n < want * 8 && placed < want; n++) {
-      const r = 55 + hash(p * 101 + n, 1) * 230;
+      const r = 150 + hash(p * 101 + n, 1) * 260;
       const a = hash(p * 101 + n, 2) * 6.283;
       const x = place.x + Math.cos(a) * r;
       const y = place.y + Math.sin(a) * r;
       if (depthAt(x, y) < 2.5 || depthAt(x, y) > 22 || heightAt(x, y) > 0.3) continue;
+      if (clear.some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) < r)) continue;
       // Room to swing: no two closer than 45 m.
       if (boats.some((b) => Math.hypot(b.x - x, b.y - y) < 45)) continue;
       boats.push({ x, y, len: 11 + hash(p * 101 + n, 4) * 5, turn: head + (hash(p * 101 + n, 5) - 0.5) * 0.35, dark: hash(p * 101 + n, 6) > 0.85, cat: hash(p * 101 + n, 8) > 0.6 });

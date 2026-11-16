@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { D2R, R2D, type ControlBinding, type ControlName, type Sim } from '@slack-tide/sim';
 import type { BoatView } from '../boat/boatView';
-import { VIEWS, type DroneCamera } from '../camera/drone';
+import type { DroneCamera } from '../camera/drone';
 import type { Hud } from '../ui/hud';
 import type { Sound } from '../audio/sound';
 
@@ -296,7 +296,7 @@ export class Controls {
 
   private onDoubleClick = (e: MouseEvent): void => {
     const hit = this.pick(e.clientX, e.clientY);
-    if (hit && VIEWS[hit.view]) this.drone.flyTo(VIEWS[hit.view]);
+    if (hit && this.boat.views[hit.view]) this.drone.flyTo(this.boat.views[hit.view]);
   };
 
   // ---- keys -----------------------------------------------------------------------------------
@@ -320,10 +320,10 @@ export class Controls {
         break;
       case 'KeyN': this.spinnaker(); break;
       case 'KeyJ': this.reef(e.shiftKey ? -1 : 1); break;
-      case 'Digit1': this.drone.flyTo(VIEWS.helm); break;
-      case 'Digit2': this.drone.flyTo(VIEWS.mast); break;
-      case 'Digit3': this.drone.flyTo(VIEWS.foredeck); break;
-      case 'Digit4': this.drone.flyTo(VIEWS.drone); break;
+      case 'Digit1': this.drone.flyTo(this.boat.views.helm); break;
+      case 'Digit2': this.drone.flyTo(this.boat.views.mast); break;
+      case 'Digit3': this.drone.flyTo(this.boat.views.foredeck); break;
+      case 'Digit4': this.drone.flyTo(this.boat.views.drone); break;
       case 'KeyH': this.host.toggleInstruments(); break;
       case 'KeyC': this.host.toggleHints(); break;
       case 'Enter': this.host.openHail(); e.preventDefault(); break;

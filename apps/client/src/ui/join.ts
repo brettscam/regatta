@@ -254,7 +254,7 @@ export class JoinFlow {
       const reach = polarSpeed(spec.polar, 100, 14);
       return `<button type="button" class="card" data-boat="${e.id}" aria-pressed="${e.id === this.choice.boat}">
         <b>${esc(spec.name)}</b><span class="say">${esc(spec.tagline ?? spec.role ?? '')}</span>
-        <span class="now">${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${reach.toFixed(1)} kt reaching in 14 kt</span></button>`;
+        <span class="now">${spec.difficulty ? `${esc(spec.difficulty)} · ` : ''}${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${reach.toFixed(1)} kt reaching in 14 kt</span></button>`;
     }).join('');
     const coming = yard.length ? `<p class="soon">Still in the yard: ${yard.map((e) => esc(e.name ?? e.id)).join(' and ')}.</p>` : '';
     const swatches = TOPSIDES.map((c) =>

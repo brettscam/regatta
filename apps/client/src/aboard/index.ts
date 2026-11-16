@@ -1,4 +1,5 @@
 import { BadAir } from './badair';
+import { ClubBanter } from './banter';
 import { CheatStrip } from './cheat';
 import { Contact } from './contact';
 import { Dockside } from './dock';
@@ -9,9 +10,11 @@ import { FlowView } from './flow';
 import { Mooring } from './mooring';
 import { Guide } from './guide';
 import { Kayak } from './kayak';
+import { Landmarks } from './landmarks';
 import { SeamanshipPoints } from './seamanship';
 import { CrabPots } from './pots';
 import { Radio } from './radio';
+import { Tips } from './tips';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
 
@@ -36,9 +39,15 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new CheatStrip(ctx),
     new Radio(ctx),
     new Wildlife(ctx),
+    // The names over the places ashore: they take no keys either.
+    new Landmarks(ctx),
     // Wind shadow and collisions watch the other boats and take no keys. A holed boat's status is given by the session before any other.
     new BadAir(ctx),
     new Contact(ctx),
     new SeamanshipPoints(ctx),
+    // The club skippers' remarks during a race. It only listens.
+    new ClubBanter(ctx),
+    // The pop-up tips and the radio's light. Last: they watch everything, take no keys and give no status.
+    new Tips(ctx),
   ];
 }

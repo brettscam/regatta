@@ -1,4 +1,5 @@
-import type { Environment, EnvSample } from '@slack-tide/sim';
+import type { Environment, EnvSample, SeaSample } from '@slack-tide/sim';
+import type { SeaSpec, SeaState } from './sea';
 
 /** A flat grid in metres east (x) and north (y) of the course origin. Row 0 is the southern edge. */
 export interface GridSpec {
@@ -51,6 +52,8 @@ export interface CourseData {
   bounds: { x0: number; y0: number; x1: number; y1: number };
   /** Land outlines as flat x, y lists in metres. */
   coast: number[][];
+  /** What the water says about its sea: an ocean swell coming in, open water beyond the chart. Left out, there is no swell. See `sea.ts`. */
+  sea?: SeaSpec;
 }
 
 export interface ReplayData {
@@ -107,6 +110,11 @@ export class ReplayWorld implements Environment {
    * for a day when the afternoon breeze really pipes up. Wind and gusts scale together; direction does not change.
    */
   windBoost = 1;
+  /**
+   * The sea running on this water, once somebody has given it one (`new SeaState(world)`). Null, the water is flat to
+   * every sim sailed on it, as it was before there was a sea.
+   */
+  seas: SeaState | null = null;
   private readonly cur: Int8Array;
   private readonly dep: Uint8Array;
   private readonly out: EnvSample = { windDir: 0, windSpeed: 0, currentX: 0, currentY: 0, depth: 0 };
@@ -281,6 +289,11 @@ export class ReplayWorld implements Environment {
   depth(x: number, y: number, t: number): number {
     const charted = this.chartDepth(x, y);
     return charted <= 0 ? 0 : Math.max(0, charted + this.tide(t));
+  }
+
+  /** The sea as a sim takes it. Nothing unless `seas` has been set. */
+  sea(x: number, y: number, t: number): SeaSample | null {
+    return this.seas ? this.seas.sample(x, y, t) : null;
   }
 
   sample(x: number, y: number, t: number): EnvSample {

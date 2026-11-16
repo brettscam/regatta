@@ -185,6 +185,7 @@ const fragmentShader = /* glsl */ `
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
   uniform float uBoatSpeed;
   uniform float uBoatHeel;
+  uniform float uHulls;    // half the distance between her two hulls, 0 for one hull
   uniform vec4 uTrail[NT]; // x, z, age 0..1, strength
   uniform vec4 uShipA[NS]; // x, z, sin(heading), cos(heading)
   uniform vec4 uShipB[NS]; // speed m/s, length, beam, 1 when the slot is in use
@@ -323,14 +324,16 @@ const fragmentShader = /* glsl */ `
       float noise = foamTex * 0.55 + foamFine * 0.45;
       // Heel pushes the leeward side down, so the foam is wider there.
       float lee = local.x * sign(uBoatHeel) * min(abs(uBoatHeel) * 0.5, 0.2);
-      vec2 hq = vec2(local.x / (1.72 + lee), (local.y + 0.1) / 5.9);
+      // A boat with two hulls has two of everything, each about its own centreline.
+      float lx = uHulls > 0.0 ? abs(local.x) - uHulls : local.x;
+      vec2 hq = vec2(lx / ((uHulls > 0.0 ? 1.0 : 1.72) + lee), (local.y + 0.1) / 5.9);
       float he = dot(hq, hq);
       // A thin collar of foam at the waterline, heavier toward the stern where the flow breaks away.
       float aft = smoothstep(-5.0, 5.5, local.y);
       float alongside = smoothstep(1.5, 1.08, he) * smoothstep(0.38, 0.72, noise + way * 0.12 + aft * 0.12) * way * (0.35 + 0.65 * aft);
       // Bow wave: two short arms sweeping back from the stem.
       float bowZ = local.y + 5.2;
-      float arm = abs(abs(local.x) - (0.25 + bowZ * 0.42));
+      float arm = abs(abs(lx) - (0.25 + bowZ * 0.42));
       float bowWave = smoothstep(0.9, 0.0, arm) * smoothstep(-0.6, 0.4, bowZ) * smoothstep(7.5, 1.5, bowZ) * way * way;
       // Wake: a ribbon through where the stern has been.
       float wake = 0.0;
@@ -341,6 +344,12 @@ const fragmentShader = /* glsl */ `
         float age = a.z;
         float width = 0.8 + age * 5.5;
         float d = segDist(vBase, a.xy, b.xy);
+        if (uHulls > 0.0) {
+          // Two ribbons, one astern of each hull, set off either side of where her middle has been.
+          vec2 along = b.xy - a.xy;
+          vec2 off = vec2(-along.y, along.x) / max(length(along), 0.001) * uHulls;
+          d = min(segDist(vBase - off, a.xy, b.xy), segDist(vBase + off, a.xy, b.xy));
+        }
         float m = smoothstep(width, width * 0.2, d) * (1.0 - age) * (1.0 - age) * a.w * 0.85;
         wake = max(wake, m);
       }
@@ -436,6 +445,7 @@ export class Ocean {
       uBoat: { value: new THREE.Vector4() },
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
+      uHulls: { value: 0 },
       uTrail: { value: this.trail },
       uShipA: { value: vec4s(SHIP_SLOTS) },
       uShipB: { value: vec4s(SHIP_SLOTS) },
@@ -512,13 +522,14 @@ export class Ocean {
    * @param camera the mesh is re-centred under it
    * @param boat world x, world z, heading (radians, compass), speed (m/s), heel (radians)
    */
-  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number }): void {
+  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number; hulls?: number }): void {
     const u = this.uniforms;
     u.uTime.value = time;
     (u.uCenter.value as THREE.Vector3).set(camera.position.x, 0, camera.position.z);
     (u.uBoat.value as THREE.Vector4).set(boat.x, boat.z, Math.sin(boat.heading), Math.cos(boat.heading));
     u.uBoatSpeed.value = boat.speed;
     u.uBoatHeel.value = boat.heel;
+    u.uHulls.value = boat.hulls ?? 0;
 
     // Drop a wake point at the stern every couple of metres. Newest first.
     const sx = boat.x - Math.sin(boat.heading) * 5.0;
