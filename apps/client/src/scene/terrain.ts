@@ -138,7 +138,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
         c.copy(bush).lerp(canopy, patch).lerp(thorn, dry * (0.55 + 0.45 * patch));
         c.lerp(boulder, THREE.MathUtils.smoothstep(slope, 0.55, 1.05) * 0.7);
         let beach = 0;
-        for (let r = 1; r <= 2 && beach === 0; r++) {
+        for (let r = 1; r <= 1 && beach === 0; r++) {
           if (wet(i - r, j) || wet(i + r, j) || wet(i, j - r) || wet(i, j + r) || wet(i - r, j - r) || wet(i + r, j + r) || wet(i - r, j + r) || wet(i + r, j - r)) beach = r === 1 ? 1 : 0.45;
         }
         // Sand on a flat shore, grey rock under a steep one.

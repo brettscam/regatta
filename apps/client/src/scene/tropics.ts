@@ -255,14 +255,14 @@ export function buildVirginIslands(course: CourseData, heights: Uint8Array): THR
       }
     }
     shore.sort((a, b) => Math.hypot(a[0] - centre.x, a[1] - centre.y) - Math.hypot(b[0] - centre.x, b[1] - centre.y));
-    const near = shore.slice(0, 120);
-    const count = near.length ? 150 : 0;
+    const near = shore.slice(0, 45);
+    const count = near.length ? 120 : 0;
     const rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.95 }), count);
     for (let k = 0; k < count; k++) {
       const [sx, sy] = near[Math.floor(hash(k, 21) * near.length)];
-      const x = sx + (hash(k, 23) - 0.5) * 90;
-      const y = sy + (hash(k, 25) - 0.5) * 90;
-      const r = 2.5 + hash(k, 27) ** 2 * 5;
+      const x = sx + (hash(k, 23) - 0.5) * 50;
+      const y = sy + (hash(k, 25) - 0.5) * 50;
+      const r = 1.5 + hash(k, 27) ** 2.5 * 9;
       q.setFromEuler(new THREE.Euler(hash(k, 29) * 3, hash(k, 31) * 6, hash(k, 33) * 3));
       rocks.setMatrixAt(k, m.compose(new THREE.Vector3(x, Math.max(0, heightAt(x, y)) + r * 0.35, -y), q, new THREE.Vector3(r * (1 + hash(k, 35) * 0.5), r * (0.75 + hash(k, 37) * 0.3), r)));
       const tone = 0.5 + hash(k, 39) * 0.16;

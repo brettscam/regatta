@@ -307,7 +307,9 @@ export class SkySystem {
   follow(target: THREE.Vector3): void {
     this.sunLight.target.position.copy(target);
     this.sunLight.position.copy(target).addScaledVector(this.sunDir, 60);
-    // The cloud dome is all direction and no place, so it rides along with the boat.
+    // The sky and the cloud dome are all direction and no place, so they ride along with the boat. Left at the
+    // course origin, the 18 km sky is behind a camera that has sailed 18 km out, and the sky there draws black.
+    this.sky.position.set(target.x, 0, target.z);
     this.cirrus.position.set(target.x, 0, target.z);
   }
 
