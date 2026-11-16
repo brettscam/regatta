@@ -124,7 +124,7 @@ export class Hints {
       id: 'chop', after: 25, once: true,
       when: (c) => {
         const o = c.sim.out;
-        return !o.underPower && !c.sim.state.maneuver && o.seaLoss > 0.045 && Math.abs(o.twa) * R2D < 48 && Math.abs(o.twa) * R2D > 30;
+        return !o.underPower && !c.sim.state.maneuver && o.seaLoss > 0.035 && Math.abs(o.twa) * R2D < 48 && Math.abs(o.twa) * R2D > 30;
       },
       say: () => 'This chop is stopping her: every wave takes a little speed. Crack off a few degrees and keep her moving. In a sea, speed first and pointing second.',
     },

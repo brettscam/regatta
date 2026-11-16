@@ -528,6 +528,7 @@ export class Session {
           motion.wait = 0;
           seaway.pendingSlam = 0;
           this.sound.thud(0.35 + 0.5 * motion.shudder);
+          drone.shake(0.25 + 0.35 * motion.shudder);
           seaway.emit('slam', motion.shudder);
         }
       }
