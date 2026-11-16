@@ -1,5 +1,6 @@
 // Sails a race course on the route pilot and reports how it went. Usage: npx vite-node scripts/sailcourse.ts <race id> [hours into season] [boat id] [wind boost]
 // The sea is running, as it is in the game. SEA=0 in the environment sails it on flat water.
+// A long ocean race is given up to 40 hours.
 // It is the check that a course can be sailed start to finish without the pilot putting her ashore.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { Sim, KT, type BoatSpec } from '@slack-tide/sim';
@@ -19,8 +20,11 @@ const cur = read('current.bin');
 const race = (JSON.parse(read('races.json').toString()) as RaceDef[]).find((r) => r.id === raceId)!;
 const boat = JSON.parse(readFileSync(new URL(`../boats/${boatId}.json`, import.meta.url)).toString()) as BoatSpec;
 const world = new ReplayWorld({ course, current: new Int8Array(cur.buffer, cur.byteOffset, cur.byteLength), depth: new Uint8Array(read('depth.bin')) }, Number(hours) * 3600);
-
 world.windBoost = Number(boost);
+// The longest she is given, hours: four on the Bay, as before, and up to forty for an ocean race.
+const length = race.marks.slice(1).reduce((sum, m, i) => sum + Math.hypot(m.x - race.marks[i].x, m.y - race.marks[i].y), 0);
+const LIMIT_HOURS = Math.max(4, Math.min(40, (length / 1852) * 0.75));
+
 if (process.env.SEA !== '0') world.seas = new SeaState(world, (JSON.parse(read('about.json').toString()) as { sea?: SeaSpec }).sea ?? course.sea);
 let worstSea = 0;
 
@@ -36,7 +40,9 @@ sim.trimForWind();
 let aground = 0;
 let lastReport = 0;
 const ARRIVAL = 130;
-for (let i = 0; i < 60 * 3600 * 4 && leg < marks.length; i++) {
+for (let i = 0; i < 60 * 3600 * LIMIT_HOURS && leg < marks.length; i++) {
+  // The recorded weather is 36 hours long: at its end the day comes round again, as it does in the game.
+  world.wrapSeason(sim.state.t);
   sim.step();
   const s = sim.state;
   if (i % 600 === 0 && world.seas) worstSea = Math.max(worstSea, world.seas.at(s.x, s.y, s.t).height);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CourseData } from '@slack-tide/world';
 import { buildCity } from './city';
 import { landUse, smoothNoise } from './terrain';
+import { mooredFleet } from './yacht';
 
 /** Small seeded generator, so the city is built the same on every machine. */
 function mulberry32(seed: number): () => number {
@@ -60,8 +61,10 @@ function boxes(blocks: Block[], name: string, material?: THREE.Material): THREE.
  * The city, Alcatraz and the Bay Bridge are built in `city.ts` from real latitudes and longitudes. The rest is placed
  * from general knowledge and checked against the terrain, so nothing is built on water.
  * Course coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
+ * @param keepClear water to leave open, as [x, y, radius]: the approach to each place's guest dock, where no moored boat should lie
+ * @param plots ground to leave empty, as [x, y, radius]: where each place's own venue stands
  */
-export function buildScenery(course: CourseData, terrainHeights: Uint8Array, depths: Uint8Array): THREE.Group {
+export function buildScenery(course: CourseData, terrainHeights: Uint8Array, depths: Uint8Array, keepClear: Array<[number, number, number]> = [], plots: Array<[number, number, number]> = []): THREE.Group {
   const g = course.terrain;
   const group = new THREE.Group();
   group.name = 'scenery';
@@ -142,7 +145,7 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
   };
 
   // ---- San Francisco, Alcatraz, the Bay Bridge and the smaller shores: one mesh, built in city.ts ----
-  const city = buildCity({ at, heightAt, dry, footing, shoreFrom, summitNear, sailable, rnd });
+  const city = buildCity({ at, heightAt, dry, footing, shoreFrom, summitNear, sailable, rnd, clear: plots });
   for (const o of city.objects) group.add(o);
   group.userData.placed = city.placed;
   group.userData.cityTriangles = city.triangles;
@@ -195,6 +198,7 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
         let near = false;
         for (let a = 0; a < 6 && !near; a++) near = !dry(px + Math.cos(a) * reach, py + Math.sin(a) * reach);
         if (!near || rnd() < 0.25 + (z / zMax) * 0.45) continue;
+        if (plots.some(([cx, cy, cr]) => Math.hypot(px - cx, py - cy) < cr)) continue;
         houses.push({ x: px, y: py, base: footing(px, py, 8) - 1, w: 11 + rnd() * 9, d: 9 + rnd() * 6, h: 6 + rnd() * 5, turn: rnd() * Math.PI, color: paintwork[Math.floor(rnd() * paintwork.length)].clone() });
       }
     }
@@ -210,10 +214,9 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
   }
   group.add(boxes(houses, 'houses'));
 
-  // ---- marinas: masts in the water off Sausalito, Tiburon and the Marina district -------------------
+  // ---- marinas: yachts in their berths off Sausalito, Tiburon and the Marina district -----------------
   {
-    const hulls: Block[] = [];
-    const masts: Array<[number, number, number]> = [];
+    const fleet: Array<{ x: number; y: number; len: number; turn: number; color: THREE.Color }> = [];
     const basin = (x0: number, x1: number, y0: number, y1: number, turn: number, count: number) => {
       let placed = 0;
       for (let tries = 0; tries < count * 14 && placed < count; tries++) {
@@ -221,33 +224,35 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
         const px = x0 + rnd() * (x1 - x0);
         const py = y0 + (row / 12) * (y1 - y0);
         if (heightAt(px, py) > 0.3) continue;
+        // Nothing lies in the way in to a guest dock, or hides the place from the water.
+        if (keepClear.some(([cx, cy, cr]) => Math.hypot(px - cx, py - cy) < cr)) continue;
         // In a marina the boats lie close under the shore.
         let sheltered = false;
         for (let a = 0; a < 6 && !sheltered; a++) sheltered = dry(px + Math.cos(a * 1.05) * 230, py + Math.sin(a * 1.05) * 230);
         if (!sheltered) continue;
         const len = 9 + rnd() * 6;
-        hulls.push({ x: px, y: py, base: -0.3, w: len, d: 3.2, h: 1.5, turn, color: rnd() < 0.8 ? col(0.93, 0.93, 0.9) : col(0.14, 0.22, 0.36) });
-        masts.push([px, py, len * 1.25]);
+        const color = rnd() < 0.8 ? col(0.93, 0.93, 0.9) : col(0.14, 0.22, 0.36);
+        // Bows to the walkway on either side of it, turn about.
+        fleet.push({ x: px, y: py, len, turn: turn + (placed % 2 ? Math.PI : 0), color });
         placed++;
       }
     };
     basin(-2950, -2150, 2700, 4500, 0.9, 150);
     basin(-950, -150, 4300, 5000, 0.2, 45);
     basin(150, 1150, -2700, -2400, 1.5, 40);
-    group.add(boxes(hulls, 'marina_hulls'));
-    // Masts are drawn a little stouter than life so a marina still reads as a thicket from a mile off.
-    const mastMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.32, 0.32, 1, 4).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xdedcd4 }), masts.length);
-    const m = new THREE.Matrix4();
-    masts.forEach(([x, y, h], i) => mastMesh.setMatrixAt(i, m.makeScale(1, h, 1).setPosition(x, 1, -y)));
-    mastMesh.name = 'marina_masts';
-    mastMesh.frustumCulled = false;
-    group.add(mastMesh);
+    // Each is a hull with a sheer and a transom, a coachroof, a mast, and a boom with the sail stowed on it.
+    group.add(mooredFleet(fleet, 'marina'));
   }
 
   // ---- trees: dark clumps in the Presidio, on Angel Island and in the gullies of the headlands -------
   {
-    const clump = new THREE.IcosahedronGeometry(1, 0);
     const spots: Array<[number, number, number, number]> = [];
+    /** True within a few hundred metres of the water, or among the houses: there a tree is seen against things whose size is known. */
+    const inView = (x: number, y: number, z: number): boolean => {
+      if (landUse(x, y, z) === 'town') return true;
+      for (let a = 0; a < 8; a++) if (!dry(x + Math.cos(a * 0.785) * 320, y + Math.sin(a * 0.785) * 320)) return true;
+      return false;
+    };
     const plant = (x0: number, x1: number, y0: number, y1: number, step: number, keep: (x: number, y: number, z: number) => boolean) => {
       for (let y = y0; y <= y1; y += step) {
         for (let x = x0; x <= x1; x += step) {
@@ -255,7 +260,16 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
           const py = y + (rnd() - 0.5) * step;
           const z = heightAt(px, py);
           if (z < 2.5 || !keep(px, py, z)) continue;
-          spots.push([px, py, z, 12 + rnd() * 14]);
+          const r = 12 + rnd() * 14;
+          if (!inView(px, py, z)) { spots.push([px, py, z, r]); continue; }
+          // Near the waterfront one far-off clump becomes a handful of trees of a real size: crowns six to ten metres across.
+          const n = 3 + Math.floor(rnd() * 3);
+          for (let k = 0; k < n; k++) {
+            const tx = px + (rnd() - 0.5) * step * 0.9;
+            const ty = py + (rnd() - 0.5) * step * 0.9;
+            const tz = heightAt(tx, ty);
+            if (tz > 2.5) spots.push([tx, ty, tz, -(3 + rnd() * 2.2)]);
+          }
         }
       }
     };
@@ -268,20 +282,35 @@ export function buildScenery(course: CourseData, terrainHeights: Uint8Array, dep
     // Headlands and the Tiburon ridge: only the sheltered gullies hold trees.
     plant(-9000, -2000, -1700, 5200, 170, (x, y, z) => z < 260 && smoothNoise(x / 420, y / 420) * 0.6 + smoothNoise(x / 130, y / 130) * 0.4 > 0.66 && rnd() < 0.5);
     plant(-1800, 1100, 3700, 6400, 120, (_x, _y, z) => z < 180 && rnd() < 0.3);
-    const trees = new THREE.InstancedMesh(clump, new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true }), spots.length);
+    // Two meshes: the far clumps are the plain twenty-sided lump they always were; the single trees near the water
+    // are one level rounder, so each reads as a tree and not a boulder.
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const c = new THREE.Color();
-    spots.forEach(([x, y, z, r], i) => {
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28);
-      m.compose(new THREE.Vector3(x, z + r * 0.3, -y), q, new THREE.Vector3(r * (1.2 + rnd() * 0.8), r * (0.6 + rnd() * 0.3), r * (1.2 + rnd() * 0.8)));
-      trees.setMatrixAt(i, m);
-      trees.setColorAt(i, c.setRGB(0.15 + rnd() * 0.06, 0.23 + rnd() * 0.09, 0.13 + rnd() * 0.05));
-    });
-    if (trees.instanceColor) trees.instanceColor.needsUpdate = true;
-    trees.name = 'trees';
-    trees.frustumCulled = false;
-    group.add(trees);
+    const stand = (list: Array<[number, number, number, number]>, geom: THREE.BufferGeometry, name: string) => {
+      const trees = new THREE.InstancedMesh(geom, new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true }), list.length);
+      list.forEach(([x, y, z, size], i) => {
+        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28);
+        if (size > 0) {
+          // Far from the water: a broad clump standing for a whole stand of trees.
+          m.compose(new THREE.Vector3(x, z + size * 0.3, -y), q, new THREE.Vector3(size * (1.2 + rnd() * 0.8), size * (0.6 + rnd() * 0.3), size * (1.2 + rnd() * 0.8)));
+        } else {
+          // A single tree: a crown a little taller than it is wide, its foot just in the ground.
+          const r = -size;
+          const tall = r * (1.15 + rnd() * 0.45);
+          m.compose(new THREE.Vector3(x, z + tall * 0.75, -y), q, new THREE.Vector3(r * (0.9 + rnd() * 0.3), tall, r * (0.9 + rnd() * 0.3)));
+        }
+        trees.setMatrixAt(i, m);
+        trees.setColorAt(i, c.setRGB(0.15 + rnd() * 0.06, 0.23 + rnd() * 0.09, 0.13 + rnd() * 0.05));
+      });
+      if (trees.instanceColor) trees.instanceColor.needsUpdate = true;
+      trees.name = name;
+      trees.frustumCulled = false;
+      group.add(trees);
+    };
+    stand(spots.filter((t) => t[3] > 0), new THREE.IcosahedronGeometry(1, 0), 'trees');
+    stand(spots.filter((t) => t[3] < 0), new THREE.IcosahedronGeometry(1, 1), 'trees_near');
+    group.userData.trees = [spots.filter((t) => t[3] > 0).length, spots.filter((t) => t[3] < 0).length];
   }
 
   return group;

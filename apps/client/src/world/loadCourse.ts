@@ -3,6 +3,7 @@ import type { RaceCourse } from '../race/race';
 import type { TrafficSpec } from '../scene/traffic';
 import type { Place } from '../session';
 import type { StartSpot, StartTime } from '../ui/join';
+import type { CourseFeatures } from './features';
 
 // The waters there are to sail. A course is a folder under `courses/`: adding one adds data, not code.
 // Each folder's small `about.json` is read up front, so the join screen can offer every water. Everything else
@@ -27,11 +28,21 @@ export interface CourseAbout {
    */
   sea?: SeaSpec;
   scenery?: {
-    /** Which built-in ground cover colours the land: `sf-bay` or `evergreen`. */
+    /** Which built-in ground cover colours the land: `sf-bay`, `evergreen`, `gulf` or `tropic`. */
     landCover?: string;
-    /** Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`. */
+    /** Which built-in water: left out for the Bay's green-grey, `clear` for blue water whose shoals show turquoise. */
+    water?: string;
+    /**
+     * Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`, and for the tropics `palms`,
+     * `mooring-fields` (yachts lying off every place with moorings) and `virgin-islands` (the Baths' boulders, Road Town).
+     * `marine-layer` also brings the fog bank in through the Golden Gate; `morning-haze` is haze among islands at dawn.
+     */
     pieces?: string[];
   };
+  /** Which layers are recorded and which are worked out by rule, for the join screen to say. */
+  data?: string;
+  /** Where each layer of the water came from, in a line each, when it is not all one source: shown to nobody yet, kept for the record. */
+  layers?: Record<string, string>;
 }
 
 export interface LoadedCourse extends ReplayData {
@@ -43,6 +54,8 @@ export interface LoadedCourse extends ReplayData {
   places: Place[];
   races: RaceCourse[];
   traffic: TrafficSpec;
+  /** Hazards, traffic lanes, refuges and lights, where the water has a `features.json`. */
+  features?: CourseFeatures;
 }
 
 const ROOT = '../../../../courses/';
@@ -54,8 +67,8 @@ const ready = <T>(all: Record<string, T>): Record<string, () => Promise<T>> => O
 // The single-file build has no network to fetch from, and inlining load-on-demand modules into one script leaves them
 // defined after the code that waits for them. So there everything is loaded up front; on the web each water is fetched when chosen.
 const json = __SINGLE__
-  ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic}.json', { import: 'default', eager: true }))
-  : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic}.json', { import: 'default' });
+  ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features}.json', { import: 'default', eager: true }))
+  : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features}.json', { import: 'default' });
 const binaries = __SINGLE__
   ? ready(import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default', eager: true }))
   : import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default' });
@@ -95,13 +108,15 @@ async function read(id: string): Promise<LoadedCourse> {
     return loadBinary(await get());
   };
   const course = await file<CourseData>('course');
+  const optional = <T>(name: string): Promise<T | undefined> => (json[`${ROOT}${id}/${name}.json`]?.() as Promise<T> | undefined) ?? Promise.resolve(undefined);
+  const features = await optional<CourseFeatures>('features');
   const [current, depth, terrain, starts, times, places, races, traffic] = await Promise.all([
     binary(course.current.file), binary(course.depth.file), binary(course.terrain.file),
     file<StartSpot[]>('starts'), file<StartTime[]>('times'), file<Place[]>('places', []), file<RaceCourse[]>('races', []),
     // A water with no traffic file simply has none.
     file<TrafficSpec>('traffic', { referenceHours: 0, routes: [] }),
   ]);
-  return { about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic };
+  return { about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic, features };
 }
 
 /** A course and everything that goes with it. Asking twice for the same one fetches it once. */

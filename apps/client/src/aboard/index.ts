@@ -8,11 +8,14 @@ import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
 import { FlowView } from './flow';
 import { Mooring } from './mooring';
+import { Pilotage } from './pilotage';
 import { Guide } from './guide';
 import { Kayak } from './kayak';
+import { Landmarks } from './landmarks';
 import { SeamanshipPoints } from './seamanship';
 import { CrabPots } from './pots';
 import { Radio } from './radio';
+import { Residents } from './residents';
 import { Tips } from './tips';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
@@ -26,6 +29,8 @@ import { Wildlife } from './wildlife';
  */
 export function createFeatures(ctx: AboardContext): Feature[] {
   return [
+    // Local knowledge comes first only so that it can keep the kayak aboard inside a wildlife refuge. It takes O nowhere else and gives no status.
+    new Pilotage(ctx),
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),
@@ -38,6 +43,10 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new CheatStrip(ctx),
     new Radio(ctx),
     new Wildlife(ctx),
+    // The boats that live here take no keys. Their status (a race to the next point) comes after everything the player does herself.
+    new Residents(ctx),
+    // The names over the places ashore: they take no keys either.
+    new Landmarks(ctx),
     // Wind shadow and collisions watch the other boats and take no keys. A holed boat's status is given by the session before any other.
     new BadAir(ctx),
     new Contact(ctx),

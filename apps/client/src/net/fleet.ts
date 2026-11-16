@@ -5,6 +5,7 @@ import type { YardBoat } from '../boat/yard';
 import type { Wave } from '../scene/waves';
 import { waveHeight } from '../scene/waves';
 import { myAvatarCode, readAvatar } from '../boat/avatar';
+import { mySailStyleCode, readSailStyle } from '../boat/sailStyle';
 import { readDamage } from '../aboard/contactRules';
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
@@ -110,6 +111,8 @@ class Remote implements RemoteBoat {
   private hailStamp = -1;
   /** The skipper's avatar as she last sent it. */
   private av = '';
+  /** Her sails as she sent them, a code to be read with `readSailStyle`. */
+  private sl = '';
   readonly colour: string;
   get avatar(): string {
     return this.av;
@@ -166,6 +169,7 @@ class Remote implements RemoteBoat {
     if (typeof v.sk === 'string' && !this.platformName) this.name = v.sk.slice(0, 20);
     this.fresh = v.nw === 1;
     if (typeof v.av === 'string' && v.av !== this.av) this.view.setAvatar(readAvatar((this.av = v.av.slice(0, 120))));
+    if (typeof v.sl === 'string' && v.sl !== this.sl) this.view.setSailStyle(readSailStyle((this.sl = v.sl.slice(0, 60))));
     this.status = typeof v.st === 'string' ? v.st.slice(0, 48) : '';
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.damage = readDamage(v.dm);
@@ -395,6 +399,7 @@ export class Fleet {
       wire.nm = this.me.name;
       if (this.me.skipper) wire.sk = this.me.skipper;
       (wire as unknown as Record<string, unknown>).av = myAvatarCode();
+      (wire as unknown as Record<string, unknown>).sl = mySailStyleCode();
       if (this.hailed) {
         wire.msg = this.hailed.text;
         wire.mt = this.hailed.at;

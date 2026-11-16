@@ -6,6 +6,6 @@
   "order": 2,
   "scenery": {
     "landCover": "evergreen",
-    "pieces": []
+    "pieces": ["morning-haze"]
   }
 }

@@ -1,0 +1,39 @@
+[
+  {
+    "id": "ebb",
+    "name": "Early, on the ebb",
+    "hours": 1,
+    "say": "Low water. The ebb is pouring out over the bar at two and a half knots into a rising north-westerly: a fast ride out and a lumpy one. This is the bar to respect"
+  },
+  {
+    "id": "morning",
+    "name": "Late morning",
+    "hours": 2.5,
+    "default": true,
+    "say": "The ebb is easing and the breeze is filling in: 12 knots at the Gate, 10 to 15 from the north-west outside. The time to leave for anywhere"
+  },
+  {
+    "id": "afternoon",
+    "name": "Early afternoon",
+    "hours": 5.5,
+    "say": "The flood has made and the sea breeze is in: 18 knots at the Gate with gusts over 20, a steady 15 from the north-west offshore"
+  },
+  {
+    "id": "evening",
+    "name": "Late afternoon",
+    "hours": 8.5,
+    "say": "Twenty knots through the Gate, gusting 26, on the last of the flood. Coming home, it is a run in under the bridge with the sun behind you"
+  },
+  {
+    "id": "night",
+    "name": "After dark",
+    "hours": 13,
+    "say": "The lights are lit and the night ebb is running over the bar, 14 knots of westerly still blowing over it. Ships in the lanes are a row of lights"
+  },
+  {
+    "id": "dawn",
+    "name": "Saturday at first light",
+    "hours": 21.5,
+    "say": "A grey dawn, 13 knots of westerly and a fair tide just turning: the whole day ahead for the islands or the coast"
+  }
+]

@@ -87,7 +87,9 @@ describe("a ship's wake", () => {
 
 describe('the wakes of the Bay traffic', () => {
   const here = dirname(fileURLToPath(import.meta.url));
-  const spec = JSON.parse(readFileSync(resolve(here, '../../../courses/sf-bay/traffic.json'), 'utf8')) as TrafficSpec;
+  const bay = JSON.parse(readFileSync(resolve(here, '../../../courses/sf-bay/traffic.json'), 'utf8')) as TrafficSpec;
+  // The ferries and the one ship these tests were laid out for: the Bay's other ships would cross the boat's water too.
+  const spec: TrafficSpec = { ...bay, routes: bay.routes.filter((r) => r.kind === 'ferry' && r.model !== 'tug' && r.model !== 'pilot' || r.id === 'ship-inbound') };
   const route = spec.routes.find((r) => r.id === 'ship-inbound')!;
   const track = new Track(route, spec.referenceHours * 3600);
   const state = (t: number, out: TrackState) => track.state(t, out);

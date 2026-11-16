@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Sim, SIM_DT, KT, R2D, initialState, type SimState } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import { BoatView, type BoatPose, type Livery } from './boat/boatView';
+import type { SailStyle } from './boat/sailStyle';
 import type { YardBoat } from './boat/yard';
 import { DroneCamera, VIEWS } from './camera/drone';
 import { Controls } from './input/controls';
@@ -17,6 +18,7 @@ import { Passage } from './ui/passage';
 import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
 import type { AboardContext, Feature } from './aboard/feature';
+import type { Residents } from './aboard/residents';
 import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
 import { myAvatar } from './boat/avatar';
@@ -27,6 +29,7 @@ import { damageNote } from './aboard/contactRules';
 import { capsizeAlarm } from './aboard/pressedRules';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
+import type { CourseFeatures } from './world/features';
 
 /** Somewhere worth sailing to. */
 export interface Place {
@@ -37,8 +40,13 @@ export interface Place {
   say: string;
   /** How a boat stops here: on a mooring buoy, alongside a dock, or on her own anchor. */
   kind?: 'mooring' | 'dock' | 'anchorage';
-  /** Where the crew goes once ashore. */
-  ashore?: { name: string; say: string };
+  /**
+   * Where the crew goes once ashore. `kind` is what stands there (club, bar, marina, hotel, store, park) and how the chart marks it.
+   * The rest shapes the venue drawn on the shore, all optional: see `VenuePlace` in `scene/venue.ts`.
+   */
+  ashore?: { name: string; say: string; kind?: string; site?: [number, number]; sign?: string; deck?: [number, number]; tables?: number; umbrellas?: string };
+  /** What kind of stop it is, where a water says: the sort a bar hop or a poker run would score. */
+  stop?: 'bar' | 'beach' | 'snorkel' | 'marina';
 }
 
 export interface SessionOptions {
@@ -61,6 +69,8 @@ export interface SessionOptions {
   skipper: string;
   logbook: Logbook;
   places: Place[];
+  /** Hazards, traffic lanes, refuges and lights, on a water that has them. */
+  features?: CourseFeatures;
   /** Race courses on offer. */
   races: RaceCourse[];
   /** True while the roadmap and feedback screen is open. */
@@ -112,7 +122,16 @@ export class Session {
   private readonly identity: Identity;
   /** What the features aboard are handed. Its boat is kept current. */
   private aboard!: AboardContext;
+  /** The boats that live on this water, as other vessels. See `aboard/residents.ts`. */
+  private residents: Residents | null = null;
+  private readonly elsewhere: TrafficVessel[] = [];
   private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0, capsizes: 0 };
+
+  /** New sails from the Profile tab: hoisted now, and kept in the livery so a class race's boat flies them too. */
+  setSailStyle(style: SailStyle): void {
+    this.opts.livery.sails = style;
+    this.boatView.setSailStyle(style);
+  }
 
   constructor(private readonly stage: Stage, private readonly opts: SessionOptions) {
     const world = stage.world;
@@ -128,6 +147,7 @@ export class Session {
     this.before = grab(this.sim.state);
     this.after = this.before;
     this.seaway = new Seaway(this.sim, stage, (text, seconds = 5) => this.hud.raiseAlarm(text, seconds));
+    this.seaway.on((event, strength) => { if (event !== 'wake') stage.spray.kick(event === 'slam' ? strength : strength * 0.5); });
     this.watch.crashGybes = this.sim.state.crashGybes;
     this.watch.knockdowns = this.sim.state.knockdowns;
     this.watch.capsizes = this.sim.state.capsizes;
@@ -153,11 +173,16 @@ export class Session {
       boat: () => ({ x: this.sim.state.x, y: this.sim.state.y, heading: this.sim.state.heading, cog: this.sim.out.cog, sog: this.sim.out.sog }),
       traffic: () => this.everyoneElse(),
       places: opts.places,
+      features: opts.features,
     });
 
     this.pilot = new Pilot(this.sim, this.passage, {
       say: (text) => this.hud.raiseAlarm(text, 4),
       alarm: (text) => this.alarm(text),
+      racing: () => {
+        const race = this.race;
+        return race?.call && race.started && race.finish === null ? race.call.id : null;
+      },
     });
 
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
@@ -255,19 +280,21 @@ export class Session {
 
     this.aboard = {
       sim: this.sim, world, air: this.air, seaway: this.seaway, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
-      spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
+      spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, features: opts.features, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       heard: (from, text) => this.heard(from, text),
       alarm: (text) => this.alarm(text),
       sharing: () => this.sharing,
       company: () => this.fleet.boats,
       race: this.race,
+      races: opts.races,
       seasonNow: () => world.seasonTime(this.sim.state.t),
       held: (code) => this.controls.isHeld(code),
       sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
     };
     this.features = createFeatures(this.aboard);
+    this.residents = this.features.find((f): f is Residents => f.id === 'residents') ?? null;
   }
 
   /**
@@ -347,8 +374,11 @@ export class Session {
       input.value = '';
       this.stage.canvas.focus();
       if (!text) return;
-      if (this.fleet.hail(text)) this.heard('You', text);
-      else this.hud.raiseAlarm(alone() ? 'Nobody to hear that: hailing other boats is not available in this copy of the game' : 'Nobody to hear that: hailing works when other boats are on the water with you', 5);
+      // Other people's boats hear it, and so does any boat that lives here and is close enough.
+      const company = this.fleet.hail(text);
+      const locals = this.features.filter((f) => f.hail?.(text)).length > 0;
+      if (company || locals) this.heard('You', text);
+      else this.hud.raiseAlarm(alone() ? 'Nobody near enough to hear that. Sail within a few hundred metres of a boat and hail her again' : 'Nobody near enough to hear that. Hail when other people are on the water with you, or within a few hundred metres of a boat that lives here', 6);
     });
     input.addEventListener('blur', () => { this.hailBox.hidden = true; });
   }
@@ -356,7 +386,9 @@ export class Session {
   private openHail(): void {
     this.hailBox.hidden = false;
     const input = this.hailBox.querySelector('input') as HTMLInputElement;
-    input.placeholder = this.sharing ? 'Hail the fleet, then Enter' : alone() ? 'No hailing in this copy of the game. Enter to close' : 'No other boats here yet. Enter to close';
+    let local: string | null = null;
+    for (const f of this.features) local ??= f.withinHail?.() ?? null;
+    input.placeholder = this.sharing ? (local ? `Hail the fleet and ${local}, then Enter` : 'Hail the fleet, then Enter') : local ? `Hail ${local}, then Enter` : 'Nobody within hail. Sail closer to a boat. Enter to close';
     input.focus();
   }
 
@@ -373,7 +405,18 @@ export class Session {
 
   /** Every other vessel on the water: the course's traffic and any boats sailing in company. */
   private everyoneElse(): TrafficVessel[] {
-    const traffic = this.race.pacers.length ? [...this.stage.traffic.vessels, ...this.race.vessels()] : this.stage.traffic.vessels;
+    // The boats that live on this water are vessels like any other: on the chart, and with a wake.
+    // One list, filled again each time it is asked for, so nothing is made every frame.
+    const locals = this.residents?.vessels;
+    let traffic = this.stage.traffic.vessels;
+    if (locals?.length || this.race.pacers.length) {
+      const all = this.elsewhere;
+      all.length = 0;
+      for (const v of traffic) all.push(v);
+      if (locals) for (const v of locals) all.push(v);
+      if (this.race.pacers.length) for (const v of this.race.vessels()) all.push(v);
+      traffic = all;
+    }
     if (!this.fleet.boats.length) return traffic;
     const company: TrafficVessel[] = this.fleet.boats.map((b) => ({ id: `boat-${b.peer}`, name: b.boatName || b.name || 'Another boat', kind: 'sail', x: b.x, y: b.y, heading: b.heading, sog: b.sog, length: b.length, beam: b.length / 3 }));
     return [...traffic, ...company];
@@ -606,6 +649,7 @@ export class Session {
     if (doing) hud.setSail(doing, '', airLine);
     else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, airLine);
     hud.setPilot(pilot.line());
+    this.race.note = pilot.raceNote();
     this.hints.update(paused ? 0 : dtReal);
     this.opts.logbook.update(dtReal);
     boatView.setPilot({ engaged: pilot.engaged, mode: pilot.mode, label: pilot.label() });
@@ -615,7 +659,7 @@ export class Session {
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
     this.sound.update(o.aws / KT, sim.state.speed / KT + motion.surf * 3, loose, paused);
 
-    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower, held: sim.state.hold !== 'none' }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
 
   /** A short account of the boat and the conditions, for attaching to feedback. */

@@ -31,7 +31,7 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['W', 'S'], name: 'Mainsail', what: 'The big sail. W pulls it in, S lets it out.' },
     { keys: ['Q', 'E'], name: 'Jib', what: 'The front sail. Q pulls it in, E lets it out.' },
     { keys: ['T'], name: 'Tack', what: 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.' },
-    { keys: ['P'], name: 'Autopilot', what: 'On or off. While it is on the boat steers herself and the crew looks after the sails.' },
+    { keys: ['P'], name: 'Autopilot', what: 'Press once and the pilot steers while you trim. Press again and the crew trims too, so she sails herself. A third press hands everything back. In a race the full pilot is limited to 3 minutes from the gun; steering alone is unlimited.', since: 'v30' },
     { keys: ['Shift', '+', 'P'], name: 'Autopilot mode', what: 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.' },
     { keys: ['N'], name: 'Spinnaker', since: 'v19', what: 'The big coloured sail for when the wind is behind you. N puts it up or takes it down; while it is up, Q and E work its sheet. It will not go up with the wind ahead, must come down before a tack, and in more than about 20 knots it lays the boat over.' },
     { keys: ['J'], name: 'Reef', since: 'v19', what: 'Make the mainsail smaller when the wind gets up: the boat stands up straighter and steers again. Shift and J lets it back out.' },
@@ -39,9 +39,9 @@ export const KEY_GROUPS: KeyGroup[] = [
   ] },
   { id: 'racing', title: 'Racing and talking', note: `How a race works. ${HOW_A_RACE_WORKS.join(' ')}`, rows: [
     { keys: ['R'], name: 'Fleet and racing', since: 'v8', what: 'See who else is out, call a race, join one, or fix one for later and send the link.' },
-    { keys: ['Enter'], name: 'Hail', what: 'Type a message to the other boats on this water, then Enter again to send it.' },
+    { keys: ['Enter'], name: 'Hail', what: 'Type a message to the other boats on this water, then Enter again to send it. A boat that lives here answers too when she is within a few hundred metres: who she is, then the wind, the tide, a place to lie, the fishing.' },
     { keys: ['V'], name: 'Radio', since: 'v22', what: 'Hold to talk to every boat on this water on channel 16, let go to listen. Nothing is recorded. Voice works on the website only.' },
-    { keys: ['Shift', '+', 'V'], name: 'Ferry and ship calls', since: 'v22', what: 'The ferries and ships call on the radio as they leave a berth, and call you by name when they will pass close. This turns their calls off or on.' },
+    { keys: ['Shift', '+', 'V'], name: 'Ferry and ship calls', since: 'v22', what: 'The ferries and ships call on the radio as they leave a berth, and call you by name when they will pass close; the coast station reads the weather, and yachts call for a radio check. This turns the spoken calls off or on.' },
     { keys: ['G'], name: 'Course guide', since: 'v15', what: 'Buoys on the marks, a ring round each one in a race, and a line of arrows on the water to the next. On by itself in a race.' },
   ] },
   { id: 'anchor', title: 'At anchor and ashore', rows: [
