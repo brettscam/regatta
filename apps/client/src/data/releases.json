@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v30",
+      "date": "2026-11-16",
+      "title": "Two levels of autopilot",
+      "items": [
+        "P now has two levels. Press once and the pilot steers while you trim the sails. Press again and the crew trims too, so she sails herself. A third press hands everything back.",
+        "Steering alone is unlimited, in a race or out, but your speed still depends on your own trimming.",
+        "In a race the full pilot is limited to 3 minutes from the gun. The race line shows what is left, and when it runs out the pilot keeps steering and the sheets come back to you.",
+        "Before the gun both levels are unlimited, so getting to the start stays easy. The spinnaker is yours to trim unless the full pilot is on."
+      ]
+    },
+    {
       "id": "v29",
       "date": "2026-11-16",
       "title": "A real sea",

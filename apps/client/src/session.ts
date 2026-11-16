@@ -158,6 +158,10 @@ export class Session {
     this.pilot = new Pilot(this.sim, this.passage, {
       say: (text) => this.hud.raiseAlarm(text, 4),
       alarm: (text) => this.alarm(text),
+      racing: () => {
+        const race = this.race;
+        return race?.call && race.started && race.finish === null ? race.call.id : null;
+      },
     });
 
     // Shared water: other people with this page open, each sailing their own boat. One clock for everyone.
@@ -606,6 +610,7 @@ export class Session {
     if (doing) hud.setSail(doing, '', airLine);
     else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, airLine);
     hud.setPilot(pilot.line());
+    this.race.note = pilot.raceNote();
     this.hints.update(paused ? 0 : dtReal);
     this.opts.logbook.update(dtReal);
     boatView.setPilot({ engaged: pilot.engaged, mode: pilot.mode, label: pilot.label() });

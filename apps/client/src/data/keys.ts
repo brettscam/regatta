@@ -31,7 +31,7 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['W', 'S'], name: 'Mainsail', what: 'The big sail. W pulls it in, S lets it out.' },
     { keys: ['Q', 'E'], name: 'Jib', what: 'The front sail. Q pulls it in, E lets it out.' },
     { keys: ['T'], name: 'Tack', what: 'Turn the boat through the wind onto her other side. The crew swaps the sails over for you.' },
-    { keys: ['P'], name: 'Autopilot', what: 'On or off. While it is on the boat steers herself and the crew looks after the sails.' },
+    { keys: ['P'], name: 'Autopilot', what: 'Press once and the pilot steers while you trim. Press again and the crew trims too, so she sails herself. A third press hands everything back. In a race the full pilot is limited to 3 minutes from the gun; steering alone is unlimited.', since: 'v30' },
     { keys: ['Shift', '+', 'P'], name: 'Autopilot mode', what: 'Choose what the autopilot follows: a compass heading, an angle to the wind, or your route on the chart.' },
     { keys: ['N'], name: 'Spinnaker', since: 'v19', what: 'The big coloured sail for when the wind is behind you. N puts it up or takes it down; while it is up, Q and E work its sheet. It will not go up with the wind ahead, must come down before a tack, and in more than about 20 knots it lays the boat over.' },
     { keys: ['J'], name: 'Reef', since: 'v19', what: 'Make the mainsail smaller when the wind gets up: the boat stands up straighter and steers again. Shift and J lets it back out.' },

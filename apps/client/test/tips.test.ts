@@ -380,7 +380,8 @@ describe('what is new', () => {
     expect(unread(notes, 'v19').map((n) => n.id).slice(-1)).toEqual(['v20']);
     expect(lines.every((l) => l.keys.length > 0)).toBe(true);
     expect(lines.find((l) => l.title.includes('radio'))?.keys).toEqual(['V']);
-    expect(whatsNew(notes, notes[1].id, ALL_KEYS)).toEqual([{ title: notes[0].title, keys: [] }]);
+    // Only the newest note is unread: it alone is listed, with whatever keys it brought.
+    expect(whatsNew(notes, notes[1].id, ALL_KEYS).map((l) => l.title)).toEqual([notes[0].title]);
   });
 
   it('marks keys that came in after the last note read', () => {

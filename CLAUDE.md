@@ -30,7 +30,7 @@ Browser sailing simulator. The plan is `docs/PRD.md`. Read it before starting a 
 - Course coordinates are flat metres east and north of `course.origin`. Grids have row 0 at the southern edge
 - Chart and planning live in `apps/client/src/ui/chart.ts` and `passage.ts`. The maths is in `packages/nav` and is tested there
 
-- The autopilot's steering is in the sim (`helmMode` heading, wind or route, `setRoute`). The player-facing part is `apps/client/src/input/pilot.ts`. Pilot on means crew trimming on
+- The autopilot's steering is in the sim (`helmMode` heading, wind or route, `setRoute`). The player-facing part is `apps/client/src/input/pilot.ts`. It has two levels: partial (steering, the player trims) and full (crew trimming on, `state.crewTrim`); P steps off, partial, full, off. In a race full is rationed to `FULL_PILOT_IN_RACE` seconds from the gun, counted in the pilot and shown on the race line through `race.note`
 - Shared water is `apps/client/src/net/fleet.ts`, built on a `room` with presence (the artifact runtime's on claude.ai, Supabase's on the website). It needs `capabilities: { room: {}, user: { scopes: ["profile"] } }` when publishing. Clocks agree two ways: a boat that has just arrived takes up the clock of the boats already out (she sends `nw: 1` for her first seconds and nobody follows her then), and after that everyone moves up to the furthest-on boat with `world.shiftTime`
 - Traffic positions are pure functions of session time, so every player sees the same vessels
 - Wind is NOAA HRRR, stream and tide NOAA SFBOFS. The season runs 36 hours from 08:00 PDT on 14 July 2024. Start times offered on the join screen are in `courses/sf-bay/times.json`
