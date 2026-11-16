@@ -146,7 +146,7 @@ export class BoatView {
     this.model = buildSloop(spec, livery);
     this.root = this.model.root;
     this.root.rotation.order = 'YXZ';
-    this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38));
+    this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38), livery.sail);
     this.jib = new Jib(this.model.geo);
     this.spinnaker = new Spinnaker(this.model.geo, livery.spinnaker ?? spinnakerColour(livery.topsides ?? (spec as BoatSpec & { topsides?: string }).topsides));
     this.root.add(this.main.mesh, this.jib.mesh, this.spinnaker.mesh, this.spinSheet.mesh, this.spinTackLine.mesh);

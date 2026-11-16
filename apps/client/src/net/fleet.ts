@@ -69,6 +69,9 @@ export interface RemoteBoat {
   damage: number;
   /** The name on her transom. */
   boatName: string;
+  /** Her topsides colour as she sent it ('' if she sent none or nonsense), and her skipper's avatar code, to be read with `readAvatar`. */
+  readonly colour: string;
+  readonly avatar: string;
   /** What she says she is doing: at anchor, ashore at Sam's, fishing. Another page's word. */
   status: string;
   /** A race she has called, if any, exactly as she sent it. Check it before use. */
@@ -107,6 +110,10 @@ class Remote implements RemoteBoat {
   private hailStamp = -1;
   /** The skipper's avatar as she last sent it. */
   private av = '';
+  readonly colour: string;
+  get avatar(): string {
+    return this.av;
+  }
   x = 0; y = 0; heading = 0; cog = 0; sog = 0; seasonTime = 0; guest = false;
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
@@ -133,6 +140,7 @@ class Remote implements RemoteBoat {
 
   constructor(readonly peer: string, spec: BoatSpec, who: Identity, env: Environment, scene: THREE.Scene) {
     this.identity = `${who.boat}|${who.colour}|${who.name}`;
+    this.colour = HEX.test(who.colour) ? who.colour : '';
     this.length = spec.dimensions.loa;
     this.beam = spec.dimensions.beam;
     this.mast = spec.dimensions.mastHeight;

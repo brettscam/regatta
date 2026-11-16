@@ -19,6 +19,7 @@ import { createFeatures } from './aboard/index';
 import type { AboardContext, Feature } from './aboard/feature';
 import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
+import { myAvatar } from './boat/avatar';
 import { Race, type RaceCourse } from './race/race';
 import { ShadedWind } from './race/shadow';
 import { damageNote } from './aboard/contactRules';
@@ -164,7 +165,7 @@ export class Session {
     this.race = new Race({
       sim: this.sim, world, passage: this.passage, fleet: this.fleet, scene: stage.scene, logbook: opts.logbook,
       own: opts.spec, boat: () => this.spec, classes: opts.classes, setBoat: (boat) => this.changeBoat(boat),
-      skipper: opts.skipper, boatName: opts.livery.name ?? '', courses: opts.races,
+      skipper: opts.skipper, boatName: opts.livery.name ?? '', colour: opts.livery.topsides, courses: opts.races,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       alarm: (text) => this.alarm(text),
       finished: () => this.fleetPanel.toggle(true),
@@ -268,7 +269,8 @@ export class Session {
     const old = this.boatView;
     this.spec = spec;
     sim.setBoat(spec);
-    this.boatView = new BoatView(spec, this.opts.livery);
+    // Her figure as it is now: she may have changed her look since she cast off.
+    this.boatView = new BoatView(spec, this.opts.livery.avatar ? { ...this.opts.livery, avatar: myAvatar() } : this.opts.livery);
     stage.scene.add(this.boatView.root);
     this.boatView.update({ x: sim.state.x, z: -sim.state.y, heading: sim.state.heading, heel: sim.state.heel, pitch: 0, heave: 0, rudder: sim.state.rudder, boom: sim.state.boomAngle, jib: sim.state.jibAngle }, sim.state, sim.out, sim.state.t, 0);
     this.controls.setBoat(this.boatView);

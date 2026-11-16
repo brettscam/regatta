@@ -1,4 +1,5 @@
 import { BadAir } from './badair';
+import { ClubBanter } from './banter';
 import { CheatStrip } from './cheat';
 import { Contact } from './contact';
 import { Dockside } from './dock';
@@ -40,5 +41,7 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new BadAir(ctx),
     new Contact(ctx),
     new SeamanshipPoints(ctx),
+    // The club skippers' remarks during a race. It only listens.
+    new ClubBanter(ctx),
   ];
 }

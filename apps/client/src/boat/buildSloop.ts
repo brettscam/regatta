@@ -20,6 +20,8 @@ export interface Livery {
   homePort?: string;
   /** Spinnaker colour, as a CSS hex colour. Left out, it is the hull's colour made bright. */
   spinnaker?: string;
+  /** The number on her mainsail. Left out, it is her class's own. */
+  sail?: string;
   /** The skipper at the wheel. The default figure where none is given. */
   avatar?: import('./avatar').Avatar;
 }

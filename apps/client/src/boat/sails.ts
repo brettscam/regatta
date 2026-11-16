@@ -24,7 +24,7 @@ type SailKind = 'main' | 'jib';
  * Sailcloth drawn on a canvas. Across the canvas is luff to leech, up the canvas is foot to head.
  * Seams, draft stripes, battens and numbers on the main, a sun-cover strip on the furling jib.
  */
-function sailTexture(kind: SailKind, mark: string): THREE.CanvasTexture {
+function sailTexture(kind: SailKind, mark: string, sailNo?: string): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 1024;
@@ -82,7 +82,7 @@ function sailTexture(kind: SailKind, mark: string): THREE.CanvasTexture {
       g.translate(W * 0.6, Y(v));
       g.scale(flip * 1.9, 1);
       g.font = '700 40px ui-sans-serif, "Helvetica Neue", Arial, sans-serif';
-      g.fillText(`USA ${mark}${mark}`, 0, 0);
+      g.fillText(`USA ${sailNo ? sailNo.replace(/[^0-9A-Za-z ]/g, '').slice(0, 5) : `${mark}${mark}`}`, 0, 0);
       g.restore();
     };
     number(0.655, 1);
@@ -180,7 +180,7 @@ function spinnakerTexture(colour: string): THREE.CanvasTexture {
   return tex;
 }
 
-function makeSailMesh(nu: number, nv: number, kind: SailKind | THREE.CanvasTexture, mark: string): THREE.Mesh {
+function makeSailMesh(nu: number, nv: number, kind: SailKind | THREE.CanvasTexture, mark: string, sailNo?: string): THREE.Mesh {
   const count = (nu + 1) * (nv + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3).setUsage(THREE.DynamicDrawUsage));
@@ -198,7 +198,7 @@ function makeSailMesh(nu: number, nv: number, kind: SailKind | THREE.CanvasTextu
   }
   g.setIndex(idx);
   const mat = new THREE.MeshStandardMaterial({
-    map: typeof kind === 'string' ? sailTexture(kind, mark) : kind, color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
+    map: typeof kind === 'string' ? sailTexture(kind, mark, sailNo) : kind, color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide,
     emissive: 0x6f6a5c, emissiveIntensity: 0.1,
   });
   // Sailcloth lets light through. When the sun is behind the sail, the side you are looking at glows with it.
@@ -243,9 +243,12 @@ export class Mainsail {
   /** Share of the luff hoisted, eased toward the reef setting. */
   private hoist = 1;
 
-  /** @param mark the boat's length in feet, for the class mark and sail number */
-  constructor(private readonly geo: SloopGeometry, mark = '38') {
-    this.mesh = makeSailMesh(this.nu, this.nv, 'main', mark);
+  /**
+   * @param mark the boat's length in feet, for the class mark and sail number
+   * @param sailNo her own sail number, in place of the class's
+   */
+  constructor(private readonly geo: SloopGeometry, mark = '38', sailNo?: string) {
+    this.mesh = makeSailMesh(this.nu, this.nv, 'main', mark, sailNo);
     this.mesh.name = 'main';
   }
 
