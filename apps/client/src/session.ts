@@ -44,6 +44,8 @@ export interface Place {
    * The rest shapes the venue drawn on the shore, all optional: see `VenuePlace` in `scene/venue.ts`.
    */
   ashore?: { name: string; say: string; kind?: string; site?: [number, number]; sign?: string; deck?: [number, number]; tables?: number; umbrellas?: string };
+  /** What kind of stop it is, where a water says: the sort a bar hop or a poker run would score. */
+  stop?: 'bar' | 'beach' | 'snorkel' | 'marina';
 }
 
 export interface SessionOptions {

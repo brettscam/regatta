@@ -1193,6 +1193,13 @@ export class Chart {
       </section>
       ${traffic}
       <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
-      <p class="source">Wind and gusts: NOAA HRRR 3 km model. Stream and tide: NOAA ${/NOAA (\w+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
+      <p class="source">Wind and gusts: ${windSource(this.course)}. Stream and tide: NOAA ${/NOAA ([\w-]+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
+}
+
+/** Where a course's wind comes from, in a few words: the Bay's and the San Juans' from HRRR, others as their bake says. */
+export function windSource(course: CourseData): string {
+  const named = /Wind and gusts: NOAA (\w+)/.exec(course.season.source)?.[1] ?? 'HRRR';
+  const what = named === 'HRRR' ? 'NOAA HRRR 3 km model' : `NOAA ${named} analysis`;
+  return course.wind.modelled ? `${what}; ${course.wind.modelled}` : what;
 }

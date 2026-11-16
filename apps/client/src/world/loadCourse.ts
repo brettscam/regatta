@@ -28,11 +28,19 @@ export interface CourseAbout {
    */
   sea?: SeaSpec;
   scenery?: {
-    /** Which built-in ground cover colours the land: `sf-bay`, `evergreen` or `gulf`. */
+    /** Which built-in ground cover colours the land: `sf-bay`, `evergreen`, `gulf` or `tropic`. */
     landCover?: string;
-    /** Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer` (the fog bank that comes in through the Gate), `morning-haze`. */
+    /** Which built-in water: left out for the Bay's green-grey, `clear` for blue water whose shoals show turquoise. */
+    water?: string;
+    /**
+     * Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`, and for the tropics `palms`,
+     * `mooring-fields` (yachts lying off every place with moorings) and `virgin-islands` (the Baths' boulders, Road Town).
+     * `marine-layer` also brings the fog bank in through the Golden Gate; `morning-haze` is haze among islands at dawn.
+     */
     pieces?: string[];
   };
+  /** Which layers are recorded and which are worked out by rule, for the join screen to say. */
+  data?: string;
   /** Where each layer of the water came from, in a line each, when it is not all one source: shown to nobody yet, kept for the record. */
   layers?: Record<string, string>;
 }

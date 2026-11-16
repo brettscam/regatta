@@ -372,7 +372,7 @@
         },
         {
           "id": "bvi",
-          "status": "later",
+          "status": "shipped",
           "title": "British Virgin Islands",
           "text": "Trade winds, short hops and a mooring ball every night: Tortola, Virgin Gorda, Jost Van Dyke and Anegada.",
           "area": "world"
@@ -402,7 +402,7 @@
       "items": [
         {
           "id": "xp",
-          "status": "next",
+          "status": "shipped",
           "title": "Points that show",
           "text": "Your rank beside your name on the water, a season table, and a sound when you make a new rank.",
           "area": "progress"

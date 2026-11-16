@@ -199,6 +199,9 @@ export class JoinFlow {
       const on = c.id === (this.loading ?? this.choice.water);
       return `<button type="button" class="chip" data-water="${c.id}" aria-pressed="${on}" title="${esc(c.say)}"><b>${esc(c.name)}</b>${esc(this.loading === c.id ? 'Fetching the chart' : c.where)}</button>`;
     }).join('')}</div>`;
+    // A water whose record is partly worked out by rule says so here, before anyone casts off.
+    const told = this.opts.waters.find((c) => c.id === this.choice.water)?.data;
+    const sources = told && !this.loading ? `<p class="sources">${esc(told)}</p>` : '';
     const cards = this.water.spots.map((s) => {
       const wind = w.wind(s.x, s.y, 0);
       const c = w.current(s.x, s.y, 0);
@@ -228,6 +231,7 @@ export class JoinFlow {
       : '';
     return `${race}<h2>Where do you want to sail?</h2>
       ${waters}
+      ${sources}
       <div class="when" role="group" aria-label="Time to cast off">${when}</div>
       <p class="soon">${esc(picked?.say ?? '')}. The wind and tide then follow the real day.</p>
       <div class="when weather" role="group" aria-label="How hard it blows"><span class="k">Wind</span>${weather}</div>

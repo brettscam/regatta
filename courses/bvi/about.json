@@ -1,0 +1,14 @@
+{
+  "id": "bvi",
+  "name": "British Virgin Islands",
+  "where": "The Sir Francis Drake Channel",
+  "say": "Steady trade winds, flat blue water between green islands, and a beach bar at the end of every passage",
+  "order": 3,
+  "sea": { "openFetchKm": 400, "swell": { "height": 0.9, "period": 8, "fromDeg": 80 } },
+  "data": "Wind: recorded, NOAA's hourly RTMA analysis for 9 and 10 February 2025, with the wind shadow under the high islands added by rule. Tide and stream: recorded, NOAA's global tide model (STOFS-2D-Global) for the same hours. Depths are that model's, with Colquhoun Reef charted by hand. Anegada is off the chart.",
+  "scenery": {
+    "landCover": "tropic",
+    "water": "clear",
+    "pieces": ["palms", "mooring-fields", "virgin-islands"]
+  }
+}

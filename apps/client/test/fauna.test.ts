@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ReplayWorld, type CourseData } from '@slack-tide/world';
 import {
   BAIT_TIDE, FAUNA, FIELD_GUIDE, FLOAT_BEAM, FLOAT_LENGTH, KINDS, SIGHT, WHALE_FLOOD,
-  Sightings, baitAt, baitBalls, haulFloats, lookAbout, pathLength, pathPoint, quietShallows, whaleAt, whereAway, type Animal, type Sea,
+  Sightings, baitAt, baitBalls, fieldGuide, haulFloats, lookAbout, pathLength, pathPoint, quietShallows, whaleAt, whereAway, type Animal, type Sea,
 } from '../src/aboard/fauna';
 
 const BAY = 'sf-bay';
@@ -448,5 +448,39 @@ describe('on the Bay itself', () => {
         "sealion head": 1,
       }
     `);
+  });
+});
+
+describe('the British Virgin Islands', () => {
+  const BVI = 'bvi';
+  const ROAD_HARBOUR = { x: -5900, y: -600 };
+  const INDIANS = { x: -8000, y: -9800 };
+  const seenFrom = (eye: { x: number; y: number }, from: number) => {
+    const kinds = new Set<string>();
+    for (let t = from; t < from + 2 * HOUR; t += 5) for (const a of lookAbout(BVI, t, water(0.2, 0.02), eye, [], new Sightings()).all()) kinds.add(a.kind);
+    return kinds;
+  };
+
+  it('has pelicans along the harbour fronts and gulls over the rocks, and none of the cold-water animals of the Bay', () => {
+    expect(seenFrom(ROAD_HARBOUR, 20000).has('pelican')).toBe(true);
+    expect(seenFrom(INDIANS, 20000).has('gull')).toBe(true);
+    for (const eye of [ROAD_HARBOUR, INDIANS, { x: 19000, y: 8900 }, { x: -21300, y: 1900 }]) {
+      const kinds = seenFrom(eye, 40000);
+      for (const k of ['seal', 'sealion', 'porpoise', 'cormorant', 'humpback']) expect(kinds.has(k), k).toBe(false);
+    }
+    expect(haulFloats(BVI)).toEqual([]);
+    for (let h = 0; h < 36; h++) expect(whaleAt(BVI, h * HOUR + 1800, water(0.5, 0.15))).toBeNull();
+  });
+
+  it('calls its gull a laughing gull, and keeps the names the Bay uses for the Bay', () => {
+    expect(fieldGuide(BVI, 'gull').name).toBe('Laughing gull');
+    expect(fieldGuide(BVI, 'pelican').first).not.toMatch(/Channel Islands/);
+    expect(fieldGuide(BAY, 'gull')).toBe(FIELD_GUIDE.gull);
+    expect(fieldGuide('somewhere-else', 'seal')).toBe(FIELD_GUIDE.seal);
+    for (const g of Object.values(FAUNA[BVI].guide ?? {})) {
+      expect(g.first.length).toBeGreaterThan(40);
+      expect(g.first.length).toBeLessThan(230);
+      expect(g.first).toMatch(/^[\x20-\x7e]+$/);
+    }
   });
 });

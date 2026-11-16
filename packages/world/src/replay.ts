@@ -38,7 +38,11 @@ export interface CourseData {
   current: GridSpec & { scale: number; steps: number; file: string; insets?: GridSpec[] };
   depth: GridSpec & { scale: number; file: string; insets?: GridSpec[] };
   terrain: GridSpec & { max: number; file: string; source: string; insets?: GridSpec[] };
-  wind: GridSpec & { scale: number; truth: WindStep[]; forecast: WindStep[]; note: string };
+  wind: GridSpec & {
+    scale: number; truth: WindStep[]; forecast: WindStep[]; note: string;
+    /** What in the wind is worked out by rule and not recorded, where anything is. Shown with the sources. */
+    modelled?: string;
+  };
   tide: { station: string; x: number; y: number; truth: number[]; forecast: number[]; note: string };
   /** The towers of a bridge over the course, where there is one. */
   bridge?: { south: [number, number]; north: [number, number] };
