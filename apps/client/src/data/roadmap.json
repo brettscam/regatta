@@ -516,10 +516,10 @@
         },
         {
           "id": "moreboats",
-          "status": "later",
+          "status": "next",
           "area": "experience",
           "title": "More boats",
-          "text": "The 42 ft catamaran, the 50 ft blue-water cruiser, and something small and quick."
+          "text": "Something small and quick: a dinghy or a sportboat to throw around."
         },
         {
           "id": "chill",
