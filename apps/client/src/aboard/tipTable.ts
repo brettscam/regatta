@@ -14,6 +14,8 @@ const SITE = 'bajaregatta.com';
 const novice = (s: Snap): boolean => s.sails <= 2 && s.hours < 1.5;
 const sailing = (s: Snap): boolean => s.hold === 'none' && !s.tender && !s.aground;
 const other = (s: Snap): string => s.boatName || 'Another boat';
+/** The tender she carries, as the skipper would call it: the skiff is the dinghy. */
+const dinghy = (s: Snap): string => (s.tenderName === 'Skiff' ? 'dinghy' : s.tenderName.toLowerCase());
 
 export const TIPS: Tip[] = [
   // ---- the first sail: four tips over the first minutes ------------------------------------------------
@@ -176,7 +178,7 @@ export const TIPS: Tip[] = [
       if (!a) return 'Press O to go ashore.';
       return a.dock
         ? `Press O to step ashore to ${a.where}. Every place you land is stamped on the bar hop, on the board's Logbook tab.`
-        : `${a.where} is close. Press O to launch the kayak and paddle in with W A S D, then O at the beach to land. Every place you land is stamped on the bar hop, on the board's Logbook tab.`;
+        : `${a.where} is close. Press O to launch the ${dinghy(s)} and ${s.tenderName === 'Kayak' ? 'paddle' : 'run'} in with W A S D, then O at the beach to land. Every place you land is stamped on the bar hop, on the board's Logbook tab.`;
     },
     when: (s) => s.hold !== 'none' && !s.tender && s.ashore !== null && s.ashore.d < 700,
     done: ['KeyO'], doneWhen: (s) => s.tender,
@@ -184,8 +186,20 @@ export const TIPS: Tip[] = [
   {
     id: 'tender', icon: 'kayak', title: 'In the kayak', keys: ['W', 'A', 'S', 'D', 'O'], priority: 60, hold: 3,
     text: 'W and S paddle ahead and back, A and D turn her. Press O at a beach to land, and O beside your boat to climb back aboard.',
-    when: (s) => s.tender,
+    when: (s) => s.tender && s.tenderName === 'Kayak',
     ack: ['KeyO'],
+  },
+  {
+    id: 'tender-powered', icon: 'kayak', title: 'Under power', keys: ['W', 'Shift', 'A', 'D', 'O'], priority: 60, hold: 3,
+    text: (s) => `W opens the throttle and Shift with it is flat out; S ${s.tenderName === 'Skiff' ? 'goes astern' : 'brakes'}, A and D steer. ${s.tenderName === 'Skiff' ? 'Ease off into a steep sea or she fills.' : 'Ease off before a hard turn or she throws you.'} Five knots near anchored boats and docks. O lands her, or brings you back aboard.`,
+    when: (s) => s.tender && s.tenderName !== 'Kayak',
+    ack: ['KeyO'],
+  },
+  {
+    id: 'tender-launch', icon: 'kayak', title: 'Take the tender', keys: ['O', 'Shift', '+', 'O'], priority: 14, hold: 25,
+    text: (s) => `She is ${s.hold === 'anchor' ? 'anchored' : 'made fast'}, so the tender can go. O to launch the ${dinghy(s)}${s.tenderOthers.length ? ` (Shift+O: ${s.tenderOthers.map((t) => t.toLowerCase()).join(' / ')})` : ''}. The boat stays where she is while you are away.`,
+    when: (s) => s.hold !== 'none' && !s.tender && !s.racing && (s.berth === null || s.berth.kind !== 'dock' || s.berth.d > 40) && (s.ashore === null || s.ashore.d >= 700),
+    done: ['KeyO', 'Shift+KeyO'], doneWhen: (s) => s.tender,
   },
   {
     id: 'sleep', icon: 'moon', title: 'Turn in', keys: ['Z'], priority: 30, hold: 20,

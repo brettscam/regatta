@@ -18,7 +18,7 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 const lerp = THREE.MathUtils.lerp;
 const clamp = THREE.MathUtils.clamp;
 
-interface Section {
+export interface Section {
   /** Half the beam at the sheer. */
   half: number;
   keel: number;
@@ -29,7 +29,7 @@ interface Section {
  * A hull lofted through sections from stern (t = -1) to bow (t = 1): the skin below the sheer and the deck above it,
  * as two shapes so each can take its own colour and the sheer stays a crisp edge.
  */
-function loft(length: number, section: (t: number) => Section, camber: number): { skin: THREE.BufferGeometry; deck: THREE.BufferGeometry } {
+export function loft(length: number, section: (t: number) => Section, camber: number): { skin: THREE.BufferGeometry; deck: THREE.BufferGeometry } {
   const stations = 28;
   const round = 8;
   const across = 4;
@@ -83,6 +83,10 @@ const hullSection = (t: number): Section => {
 
 export class KayakModel {
   readonly root = new THREE.Group();
+  /** What every tender's model gives (`TenderModel` in `tenderModel.ts`): her size, and where her painter is made fast. */
+  readonly length = KAYAK_LENGTH;
+  readonly halfBeam = KAYAK_HALF_BEAM;
+  readonly bow = new THREE.Vector3(0, 0.3, -KAYAK_LENGTH * 0.5 + 0.12);
   private readonly figure: Figure;
   private readonly paddle = new THREE.Group();
   private readonly owned: Array<THREE.BufferGeometry | THREE.Material> = [];

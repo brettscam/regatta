@@ -88,8 +88,11 @@ export interface Snap {
   berth: { name: string; kind: 'mooring' | 'dock' | 'anchorage'; d: number } | null;
   /** The nearest place with somewhere to go ashore. */
   ashore: { name: string; where: string; d: number; dock: boolean } | null;
-  /** The kayak is out. */
+  /** The tender is out. */
   tender: boolean;
+  /** The tender she carries: its name ('Kayak', 'Skiff', 'Wave runner'), and the others this yacht could carry instead. */
+  tenderName: string;
+  tenderOthers: string[];
   night: boolean;
   /** Depth of water, metres. */
   depth: number;
@@ -110,7 +113,7 @@ export function emptySnap(): Snap {
     windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
     hand: false, mistrim: false, aground: false, stuck: 0, knockdowns: 0,
     manoeuvre: false, knocked: false, hitAgo: Infinity, panel: false,
-    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, night: false, depth: 30,
+    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,
     marks: 0, mark: null,
   };
 }

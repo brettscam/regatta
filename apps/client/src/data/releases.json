@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v37",
+      "date": "2026-11-16",
+      "title": "A dinghy and a wave runner",
+      "items": [
+        "Your tender is now your choice. Every yacht carries the kayak, every boat a dinghy with an outboard that planes at 15 knots, and the catamaran, the 45 and the 50 a wave runner that does 38.",
+        "Anchor or pick up a mooring, then press O to launch. Shift+O changes tender while it is stowed. Hold Shift with W to go flat out.",
+        "The dinghy skids in tight turns and can swamp driven flat out into a blow. Throw the wave runner round at full speed and you fall off; she circles back for you.",
+        "Mind the harbour's five knots, land at any bar's guest dock, and your friends now see you zip past."
+      ]
+    },
+    {
       "id": "v36",
       "date": "2026-11-16",
       "title": "Setting up a race is easier",
