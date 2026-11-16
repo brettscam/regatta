@@ -309,6 +309,9 @@ export class SkySystem {
     this.sunLight.position.copy(target).addScaledVector(this.sunDir, 60);
     // The cloud dome is all direction and no place, so it rides along with the boat.
     this.cirrus.position.set(target.x, 0, target.z);
+    // So is the sky itself: its colour depends only on the direction looked in. Left at the origin, a boat more than
+    // 18 km out (the Farallones are 50) sails out of the dome and the sky goes black.
+    this.sky.position.set(target.x, 0, target.z);
   }
 
   private bake(): void {

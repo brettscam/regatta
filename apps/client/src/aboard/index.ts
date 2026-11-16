@@ -8,6 +8,7 @@ import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
 import { FlowView } from './flow';
 import { Mooring } from './mooring';
+import { Pilotage } from './pilotage';
 import { Guide } from './guide';
 import { Kayak } from './kayak';
 import { Landmarks } from './landmarks';
@@ -28,6 +29,8 @@ import { Wildlife } from './wildlife';
  */
 export function createFeatures(ctx: AboardContext): Feature[] {
   return [
+    // Local knowledge comes first only so that it can keep the kayak aboard inside a wildlife refuge. It takes O nowhere else and gives no status.
+    new Pilotage(ctx),
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),

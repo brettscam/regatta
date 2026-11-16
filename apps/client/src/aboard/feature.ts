@@ -13,6 +13,7 @@ import type { ShadedWind } from '../race/shadow';
 import type { Seaway } from './seaway';
 import type { Hud } from '../ui/hud';
 import type { Passage } from '../ui/passage';
+import type { CourseFeatures } from '../world/features';
 
 /** What a feature is handed to work with. Everything a feature needs from the game comes through here. */
 export interface AboardContext {
@@ -36,6 +37,8 @@ export interface AboardContext {
   livery: Livery;
   skipper: string;
   places: Place[];
+  /** Hazards, traffic lanes, refuges and lights, on a water that has them. See `world/features.ts`. */
+  features?: CourseFeatures;
   logbook: Logbook;
   /** A passing remark at the bottom of the screen. */
   say(text: string, seconds?: number): void;

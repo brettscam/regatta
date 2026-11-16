@@ -28,6 +28,7 @@ import { damageNote } from './aboard/contactRules';
 import { capsizeAlarm } from './aboard/pressedRules';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
+import type { CourseFeatures } from './world/features';
 
 /** Somewhere worth sailing to. */
 export interface Place {
@@ -65,6 +66,8 @@ export interface SessionOptions {
   skipper: string;
   logbook: Logbook;
   places: Place[];
+  /** Hazards, traffic lanes, refuges and lights, on a water that has them. */
+  features?: CourseFeatures;
   /** Race courses on offer. */
   races: RaceCourse[];
   /** True while the roadmap and feedback screen is open. */
@@ -160,6 +163,7 @@ export class Session {
       boat: () => ({ x: this.sim.state.x, y: this.sim.state.y, heading: this.sim.state.heading, cog: this.sim.out.cog, sog: this.sim.out.sog }),
       traffic: () => this.everyoneElse(),
       places: opts.places,
+      features: opts.features,
     });
 
     this.pilot = new Pilot(this.sim, this.passage, {
@@ -266,7 +270,7 @@ export class Session {
 
     this.aboard = {
       sim: this.sim, world, air: this.air, seaway: this.seaway, stage, hud: this.hud, passage: this.passage, boatView: this.boatView, drone: this.drone,
-      spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, logbook: opts.logbook,
+      spec: opts.spec, livery: opts.livery, skipper: opts.skipper, places: opts.places, features: opts.features, logbook: opts.logbook,
       say: (text, seconds = 5) => this.hud.raiseAlarm(text, seconds),
       heard: (from, text) => this.heard(from, text),
       alarm: (text) => this.alarm(text),
