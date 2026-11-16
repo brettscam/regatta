@@ -333,6 +333,19 @@ describe('shipping in the lanes', () => {
     for (let h = 0; h < 11; h++) expect(passes[h] + passes[h + 1], `hours ${h} and ${h + 1}`).toBeGreaterThan(0);
   });
 
+  it('never shows a ship coming in while she is also going out', () => {
+    const s = state();
+    for (const name of new Set(ships.map((r) => r.name))) {
+      const [a, b] = ships.filter((r) => r.name === name);
+      for (let t = 0; t < 86400; t += 300) {
+        tracks.get(a.id)!.state(t, s);
+        const first = s.active;
+        tracks.get(b.id)!.state(t, s);
+        expect(first && s.active, `${name} at ${(t / 3600 + 8).toFixed(1)} h`).toBe(false);
+      }
+    }
+  });
+
   it('never has two ships on top of each other', () => {
     const a = state();
     const b = state();

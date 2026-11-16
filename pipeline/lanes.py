@@ -112,16 +112,16 @@ def lanes():
 # Arrivals bunch on the morning and afternoon tides, as they do: three or four ships an hour then, one or two between.
 SHIPS = [
     ("Pacific Meridian", "container", 300, 43, 16, "#14181c", "western", "western", 5.2, 14),
-    ("Kowloon Bridge", "container", 335, 46, 17, "#1d3f6e", "western", "northern", 6.4, 20),
+    ("Kowloon Bridge", "container", 335, 46, 17, "#1d3f6e", "western", "northern", 6.4, 13),
     ("Maersk Tamalpais", "container", 294, 32, 15, "#5e8fb0", "southern", "western", 7.1, 11),
     ("Oakland Express", "container", 260, 32, 16, "#b55a1e", "northern", "southern", 8.0, 16),
     ("Sierra Madre", "container", 280, 40, 16, "#2e5d3a", "southern", "southern", 14.3, 13),
-    ("Hanjin Carquinez", "container", 304, 40, 17, "#14181c", "western", "western", 15.6, 18),
+    ("Hanjin Carquinez", "container", 304, 40, 17, "#14181c", "western", "western", 15.6, 12),
     ("Tokyo Bay", "container", 320, 44, 16, "#7a2a22", "northern", "western", 16.4, 10),
-    ("Polar Endeavour", "tanker", 272, 46, 13, "#1a1c20", "northern", "northern", 6.0, 22),
-    ("Valdez Trader", "tanker", 250, 44, 12, "#2a2f36", "northern", "northern", 9.3, 19),
+    ("Polar Endeavour", "tanker", 272, 46, 13, "#1a1c20", "northern", "northern", 6.0, 14),
+    ("Valdez Trader", "tanker", 250, 44, 12, "#2a2f36", "northern", "northern", 9.3, 11),
     ("Richmond Star", "tanker", 183, 32, 13, "#7d2c26", "southern", "southern", 7.6, 9),
-    ("Martinez Voyager", "tanker", 228, 42, 12, "#1a1c20", "western", "southern", 13.2, 21),
+    ("Martinez Voyager", "tanker", 228, 42, 12, "#1a1c20", "western", "southern", 13.2, 9),
     ("Benicia Spirit", "tanker", 183, 32, 13, "#31445c", "southern", "northern", 17.1, 15),
     ("Golden Bear Carrier", "carcarrier", 200, 32, 17, "#2c5a8a", "western", "western", 5.9, 8),
     ("Hoegh Sausalito", "carcarrier", 199, 36, 18, "#c9cdd0", "southern", "western", 10.4, 7),
@@ -129,8 +129,8 @@ SHIPS = [
     ("Star of the Pacific", "cruise", 290, 37, 19, "#1f3f77", "southern", "southern", 6.7, 9.5),
     ("Coral Monarch", "cruise", 330, 38, 20, "#c23b2a", "northern", "southern", 5.6, 11),
     ("Matson Farallon", "container", 262, 32, 20, "#1b2f55", "western", "western", 8.6, 12.5),
-    ("Bulk Cordell", "tanker", 190, 32, 12, "#5a4a32", "northern", "western", 11.5, 17),
-    ("Ever Bonita", "container", 366, 51, 16, "#2f6d3e", "western", "northern", 17.8, 23),
+    ("Bulk Cordell", "tanker", 190, 32, 12, "#5a4a32", "northern", "western", 11.5, 12),
+    ("Ever Bonita", "container", 366, 51, 16, "#2f6d3e", "western", "northern", 17.8, 10),
 ]
 
 
@@ -197,6 +197,10 @@ def ship_routes(centres):
                     or too_close(placed["out"], pts_in, speed, start_in, meeting) or too_close(placed["in"], pts_out, speed, start_out, meeting)):
                 break
             start_in += 360.0
+        # She is one ship: she must be in and alongside before she sails, and gone before she comes again.
+        dist_out = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts_out[:-1], pts_out[1:]))
+        away = (start_out - start_in) % 86400.0
+        assert dist_in / speed + 3600.0 < away < 86400.0 - dist_out / speed - 3600.0, f"{name} would meet herself: change her hours in port"
         placed["in"].append((pts_in, speed, start_in))
         placed["out"].append((pts_out, speed, start_out))
         bridge = lambda pts: min(range(len(pts)), key=lambda i: math.hypot(pts[i][0] + 2512.0, pts[i][1] + 1145.0))
