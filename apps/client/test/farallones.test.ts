@@ -7,7 +7,7 @@ import { ReplayWorld, type CourseData } from '@slack-tide/world';
 import { Track, type TrafficRoute, type TrafficSpec } from '../src/scene/traffic';
 import { OCEAN_MODELS, buildOceanVessel } from '../src/scene/oceanTraffic';
 import { landHeight, landParts } from '../src/scene/terrain';
-import { inArea, lightShows, type CourseFeatures, type SeaSpec } from '../src/world/features';
+import { inArea, lightShows, type CourseFeatures, type SeaRecord } from '../src/world/features';
 import { areasAt, barState, barWord, crossedEastward, entered, noLanding } from '../src/aboard/pilotageRules';
 import { FAUNA, Sightings, lookAbout, pathLength, pathPoint, whaleAt } from '../src/aboard/fauna';
 
@@ -19,7 +19,8 @@ const bin = (name: string) => readFileSync(resolve(dir, name));
 const world = new ReplayWorld({ course, current: new Int8Array(bin('current.bin').buffer.slice(0)), depth: new Uint8Array(bin('depth.bin').buffer.slice(0)) }, 0);
 const features = json<CourseFeatures>('features.json');
 const traffic = json<TrafficSpec>('traffic.json');
-const sea = json<SeaSpec>('sea.json');
+const sea = json<SeaRecord>('sea.json');
+const about = json<{ sea: { swell: { height: number; period: number; fromDeg: number }; openFetchKm: number } }>('about.json');
 interface Named { id: string; name: string; x: number; y: number }
 const starts = json<Array<Named & { route: Named[] }>>('starts.json');
 const places = json<Array<Named & { kind: string; ashore?: { name: string } }>>('places.json');
@@ -562,6 +563,9 @@ describe('the sea', () => {
     expect(main.from).toBeGreaterThan(280);
     expect(main.from).toBeLessThan(330);
     expect(sea.shelter!.fullWestOf).toBeLessThan(sea.shelter!.noneEastOf);
+    // The block the sea-state model reads is the same swell, in its own terms.
+    expect(about.sea.swell).toEqual({ height: main.height, period: main.period, fromDeg: main.from });
+    expect(about.sea.openFetchKm).toBeGreaterThan(100);
     // The declared height is the recorded sea's, give or take: the mean of the combined sea over the season.
     const mean = sea.recorded!.height.reduce((a, b) => a + b, 0) / sea.recorded!.height.length;
     expect(Math.abs(main.height - mean)).toBeLessThan(0.3);

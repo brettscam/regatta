@@ -71,11 +71,11 @@ export interface Swell {
 }
 
 /**
- * A water's sea state, for the sea-state model. `swell` is the declaration to use: the ocean swell that runs here
- * whatever the local wind is doing. The wind sea is not in it: that comes from the wind of the hour, as on every water.
+ * A water's `sea.json`: the record behind the swell its `about.json` declares in its `sea` block (which is what the
+ * sea-state model in `packages/world/src/sea.ts` reads). `swell` here is that same declaration, in the record's terms.
  * `recorded` is what a wave model said of the replayed season itself, hour by hour, for whoever wants every hour of it.
  */
-export interface SeaSpec {
+export interface SeaRecord {
   note?: string;
   swell: Swell[];
   /** What a typical day brings, where the replayed day was not typical. For a model that wants it. */

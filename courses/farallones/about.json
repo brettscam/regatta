@@ -4,6 +4,10 @@
   "where": "The ocean outside the Golden Gate, California",
   "say": "Out under the bridge and over the bar: shipping lanes, Point Reyes, Bodega Bay and the Farallon Islands 27 miles off",
   "order": 3,
+  "sea": {
+    "swell": { "height": 1.2, "period": 8, "fromDeg": 292 },
+    "openFetchKm": 300
+  },
   "scenery": {
     "landCover": "gulf",
     "pieces": ["golden-gate-bridge", "san-francisco"]
@@ -14,7 +18,7 @@
     "tide": "Recorded. SFBOFS water level at San Francisco (Presidio), the Bay's own station. One tide for the whole water: Bodega and Point Reyes are really about half an hour ahead of it.",
     "depth": "SFBOFS model depths where it has water, Terrarium elevation tiles elsewhere. 200 m grid, with finer insets over the Gate and bar (100 m), Bodega Harbour (25 m), Southeast Farallon, Pillar Point and Bolinas (50 m). Two dredged channels are cut in by rule: the main ship channel over the bar at its charted 55 feet, and Bodega Harbour's, deeper and wider than life.",
     "land": "Terrarium elevation tiles. 200 m grid, with 80 m insets over the Golden Gate, Bodega Head, Point Reyes and Pillar Point and 40 m over Southeast Farallon.",
-    "swell": "Recorded, as a declaration: sea.json gives the north-west sea and the southerly swell NOAA's GFS wave model had off the Gate for these 36 hours, averaged, with the model's hourly figures and a typical July swell beside them.",
+    "swell": "Recorded, as a declaration: the `sea` block above is the north-west sea NOAA's GFS wave model had off the Gate for these 36 hours, averaged (1.2 m at 8 s from 292). sea.json holds the model's hourly figures, the southerly swell beside it, and a typical July swell. Open fetch 300 km: west of the chart is the open Pacific.",
     "fog": "Not drawn. The Bay draws a fixed bank of marine layer where this water is sailed, so that piece is left off here. features.json says what this water wants of the fog."
   }
 }
