@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v28",
+      "date": "2026-11-16",
+      "title": "Tips, and a radio you can see",
+      "items": [
+        "Small cards now pop up at the right moment to show a key you may not know: hold V to talk when another boat appears, J to reef when it blows, X near an anchorage, O to go ashore. Each goes away once you use the key, and Don't show tips turns them off.",
+        "The radio has a light at the bottom left. It shows RX when anyone is on the air and TX when you are. Click it to learn how the radio works.",
+        "The Keys tab on the board is grouped, searchable, and marks keys that are new since you last sailed.",
+        "The strip of keys at the start of a sail now changes with what you are doing: sailing, racing, at anchor or in the kayak."
+      ]
+    },
+    {
       "id": "v27",
       "date": "2026-11-16",
       "title": "A catamaran and a bluewater 50",
