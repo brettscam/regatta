@@ -1,6 +1,6 @@
 import { D2R, R2D, KT, clamp, lerp, wrapPi, wrapTau, smoothstep, approach, interp1 } from './math';
 import { polarSpeed } from './polar';
-import type { BoatSpec, ControlName, EngineSpec, Environment, HelmMode, SailReport, SimOutputs, SimState } from './types';
+import type { BoatSpec, ControlName, EngineSpec, Environment, HelmMode, SailReport, SeaSample, SimOutputs, SimState } from './types';
 
 /** Fixed step. The sim never takes any other step size. */
 export const SIM_DT = 1 / 60;
@@ -22,6 +22,71 @@ const KNOCKDOWN_LOAD = 52;
 const SPIN_OVER_PER_KT = 2.2;
 /** The most the crew will let the main out beyond its best setting to spill a gust. Past this it is time to reef. */
 const GUST_EASE_MAX = 11 * D2R;
+
+/**
+ * The boat in a seaway. Every number the sea changes is here. None of it runs unless the environment gives a sea.
+ * `hl` below is the sea's height over the boat's waterline length: the same sea is a bigger sea to a smaller boat.
+ */
+export const SEAWAY = {
+  /** Seas lower than this, metres, do nothing. */
+  minHeight: 0.05,
+  /** Speed lost beating or motoring into it: `resist * hl^1.25 * (steepness / 0.05)^0.7`, full within 35 degrees of the bow, nothing abaft 72: cracking off a little takes the waves on her shoulder. */
+  resist: 2.0,
+  /** The most the sea alone takes, as a share of her speed. */
+  resistCap: 0.35,
+  /** Steepness below which she never slams, and the range above it over which the chance of slamming on a wave comes on. */
+  slamSteep: 0.03,
+  slamRange: 0.04,
+  /** `hl` below which the waves are too small to drop her, about 0.2 m for the 30 and 0.3 m for the 45. Full chance comes 0.05 above it. */
+  slamFromHl: 0.025,
+  /** The most likely she is to slam on any one wave. */
+  slamChance: 0.35,
+  /** Speed a slam takes: `slamBase + slamPerHl * hl`, as a share, capped. */
+  slamBase: 0.02,
+  slamPerHl: 0.25,
+  slamCap: 0.05,
+  /** Surfing: the most a running boat gains, as a share of her speed, for a boat of displacement/length ratio 190. Lighter gains more. */
+  surf: 0.05,
+  /** Height, metres, at which she starts to surf, and the further height over which the full gain comes on. */
+  surfFrom: 0.3,
+  surfRange: 0.9,
+  /** Yaw a quartering sea puts on her at its worst, radians a second for each unit of `hl`. */
+  yaw: 30 * D2R,
+  /** A sea dead astern yaws her this share of what a quartering one does. */
+  yawAstern: 0.4,
+  /** Extra leeway with the sea forward of the quarter: `1 + leeway * hl`. */
+  leeway: 1.5,
+  /**
+   * Rolling downwind. In flat water the boom stays put until she is 10 degrees by the lee. Running in a sea the roll
+   * throws it across sooner: that margin shrinks by `rollLee * hl` degrees, by 8 at the most.
+   */
+  rollLee: 60,
+  rollLeeCap: 8,
+} as const;
+
+/** Displacement/length ratio: long tons over (waterline feet / 100) cubed. About 140 is a light fast boat, 220 a moderate cruiser. */
+export function displacementLength(boat: BoatSpec): number {
+  const d = boat.dimensions;
+  return (d.displacementKg / 1016) / Math.pow((d.lwl * 3.28084) / 100, 3);
+}
+
+/** A number from 0 to 1 that depends only on `n`: which waves she slams on is settled by the count of waves met, not by chance. */
+function waveHash(n: number): number {
+  const v = Math.sin(n * 12.9898 + 4.1414) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/** What the sea is doing to her this step. */
+interface Seaway {
+  /** Share of speed lost to the head sea. */
+  loss: number;
+  /** Share of speed gained surfing, this instant. */
+  gain: number;
+  /** Yaw the sea is putting on her, rad/s. */
+  yaw: number;
+  /** Multiplier on leeway. */
+  leeway: number;
+}
 
 /**
  * The engine's throttle positions, from full astern to full ahead. `speed` is the share of her cruising speed under
@@ -53,6 +118,9 @@ const PROP_WASH = 0.75;
 /** Going astern the rudder has this share of its usual bite, and the propeller walks the stern to port. */
 const ASTERN_BITE = 0.45;
 const PROP_WALK = 2.2 * D2R;
+/** How far a light air stretches, and a blow shrinks, the time a boat with `handling.carryAwsKt` carries her way. */
+const CARRY_LEAST = 0.75;
+const CARRY_MOST = 2.6;
 
 /** Best boom angle in degrees for an apparent wind angle in degrees. */
 export function idealBoomDeg(awaDeg: number): number {
@@ -140,6 +208,7 @@ export function initialState(init: InitialConditions = {}): SimState {
     knockHold: 0,
     crashGybes: 0,
     knockdowns: 0,
+    capsizes: 0,
     hold: 'none',
     holdX: 0,
     holdY: 0,
@@ -162,6 +231,9 @@ export function initialState(init: InitialConditions = {}): SimState {
     engineStops: 0,
     batteryTrips: 0,
     damage: 0,
+    seaPhase: 0,
+    seaCount: 0,
+    slams: 0,
     maneuver: null,
   };
 }
@@ -186,6 +258,8 @@ export class Sim {
   readonly dt = SIM_DT;
   state: SimState;
   out: SimOutputs;
+  /** How much sooner the boom comes across by the lee for her rolling in a following sea, radians. Set afresh every step; 0 in flat water. */
+  private rollLee = 0;
 
   constructor(
     public boat: BoatSpec,
@@ -392,8 +466,12 @@ export class Sim {
         s.helmMode = 'hand';
         break;
       case 'mainsheet': s.mainSheet = v; break;
-      case 'jibsheet_port': s.jibSheetPort = v; break;
-      case 'jibsheet_stbd': s.jibSheetStbd = v; break;
+      case 'jibsheet_port':
+      case 'jibsheet_stbd':
+        // A self-tacking jib has one sheet: either winch works it.
+        if (name === 'jibsheet_port' || this.boat.sails.jib.selfTacking) s.jibSheetPort = v;
+        if (name === 'jibsheet_stbd' || this.boat.sails.jib.selfTacking) s.jibSheetStbd = v;
+        break;
       case 'furl': s.furl = v; break;
       case 'reef': s.reef = Math.round(v); break;
       case 'pilot':
@@ -506,8 +584,7 @@ export class Sim {
   private routeError(): number {
     const s = this.state;
     const o = this.out;
-    const CLOSE = 44 * D2R;
-    const draft = this.boat.dimensions.draft;
+    const CLOSE = (this.boat.handling?.closeHauledDeg ?? 44) * D2R;
     const dx = s.routeX - s.x;
     const dy = s.routeY - s.y;
     // Crab across the tide and leeway: learn the angle between where she points and where she goes.
@@ -515,36 +592,75 @@ export class Sim {
     const desired = Math.atan2(dx, dy) + s.routeCrab;
     const twaDirect = wrapPi(o.twd - desired);
     const side = o.twa >= 0 ? 1 : -1;
-    const rested = s.t - s.routeTurnAt > 25;
-    const depthAhead = (heading: number, metres: number): number =>
+    const rested = s.t - s.routeTurnAt > (this.boat.handling?.pilotRestS ?? 25);
+    const depthAt = (heading: number, metres: number): number =>
       this.env.sample(s.x + Math.sin(heading) * metres, s.y + Math.cos(heading) * metres, s.t).depth ?? Infinity;
 
     // Under power ahead she can go straight at a mark to windward.
     const motoring = this.underPower && s.throttle > 0;
+    // A boat that says how long she needs between turns cannot simply be spun through the wind: she is steered warily.
+    const wary = this.boat.handling?.pilotRestS !== undefined && !motoring;
+    // A sloop's pilot sounds one point ahead. A wary one sounds every 35 m on the way there, so a rock or a point of
+    // land narrower than the look-ahead is not stepped over.
+    const depthAhead = !wary ? depthAt : (heading: number, metres: number): number => {
+      let least = Infinity;
+      for (let d = metres; d > 1; d -= 35) least = Math.min(least, depthAt(heading, d));
+      return least;
+    };
     o.pilotBeating = Math.abs(twaDirect) < CLOSE && !motoring;
     if (!o.pilotBeating) {
       // The mark can be pointed at. If that means putting the wind on the other side, tack or gybe for it.
       const newSide = twaDirect >= 0 ? 1 : -1;
-      if (newSide !== side && Math.abs(o.twa) > 8 * D2R && Math.abs(o.twa) < 172 * D2R && rested && !(motoring && Math.abs(twaDirect) < CLOSE)) {
-        s.routeTurnAt = s.t;
-        s.routeTurns++;
-        this.turnTo(desired);
-        return wrapPi(desired - s.heading);
+      if (newSide !== side && Math.abs(o.twa) > 8 * D2R && Math.abs(o.twa) < 172 * D2R && !(motoring && Math.abs(twaDirect) < CLOSE)) {
+        // Steered warily, she does not turn for the mark while the shore lies close on that heading.
+        const draft = this.boat.dimensions.draft;
+        if (rested && !(wary && (depthAhead(desired, 140) < draft + 2 || depthAhead(desired, 280) < draft + 1))) {
+          s.routeTurnAt = s.t;
+          s.routeTurns++;
+          this.turnTo(desired);
+          return wrapPi(desired - s.heading);
+        }
+        // Not yet rested from her last turn. A sloop is steered for the mark all the same and comes through the wind
+        // on her way. A boat that says how long she needs between turns holds the tack she is on until then.
+        if (wary && Math.abs(o.twa) < Math.PI / 2) return wrapPi(o.twa - side * (CLOSE - D2R));
+      }
+      // Fetching the mark with the shore in the way: she short-tacks off it as she would when beating.
+      if (wary && Math.abs(o.twa) < 80 * D2R) {
+        const off = this.shoalTack(side, CLOSE, depthAhead, true);
+        if (off !== null) return off;
       }
       return wrapPi(desired - s.heading);
     }
     // The mark is to windward: sail close-hauled on this tack until it can be laid on the other one.
     // Short-tack off a shoal rather than run up it.
-    if (rested && s.speed > 1.2 && (depthAhead(s.heading, 140) < draft + 2 || depthAhead(s.heading, 280) < draft + 1)) {
-      const other = wrapTau(o.twd + side * CLOSE);
-      if (depthAhead(other, 200) > draft + 2) {
-        s.routeTurnAt = s.t;
-        s.routeTurns++;
-        this.turnTo(other);
-        return wrapPi(other - s.heading);
-      }
-    }
+    const off = this.shoalTack(side, CLOSE, depthAhead, wary);
+    if (off !== null) return off;
     return wrapPi(o.twa - side * (CLOSE - D2R));
+  }
+
+  /**
+   * The route pilot's answer to shoal water ahead: tack onto the other board if that one is clear.
+   * @param wary true for a boat steered warily, see `HandlingSpec.pilotRestS`
+   * @returns the steering error for the new tack, or null when she carries on as she is
+   */
+  private shoalTack(side: number, close: number, depthAhead: (heading: number, metres: number) => number, wary: boolean): number | null {
+    const s = this.state;
+    const draft = this.boat.dimensions.draft;
+    // A wary pilot sounds more points, so it does it four times a second, not sixty. Its boat is tacked by her crew
+    // holding the jib aback, which works with less way on than a sloop needs.
+    if (wary && s.tick % 15 !== 0) return null;
+    const shoal = (way: number) => depthAhead(way, 140) < draft + 2 || depthAhead(way, 280) < draft + 1;
+    // It also sounds along the way she is really going, which the tide and her leeway may have set well off her
+    // heading, and a little either side of that for a corner she would only just clear.
+    const track = this.out.cog;
+    const set = wary && this.out.sog > 0.5 && (shoal(track) || depthAhead(track - 0.21, 140) < draft + 2 || depthAhead(track + 0.21, 140) < draft + 2);
+    if (!(s.t - s.routeTurnAt > 25 && s.speed > (wary ? 0.6 : 1.2) && (shoal(s.heading) || set))) return null;
+    const other = wrapTau(this.out.twd + side * close);
+    if (!(depthAhead(other, 200) > draft + 2)) return null;
+    s.routeTurnAt = s.t;
+    s.routeTurns++;
+    this.turnTo(other);
+    return wrapPi(other - s.heading);
   }
 
   /**
@@ -556,8 +672,8 @@ export class Sim {
     const twa = this.out.twa;
     const kind = Math.abs(twa) < Math.PI / 2 ? 'tack' : 'gybe';
     if (kind === 'tack' && this.spinnakerUp) return 'spinnaker';
-    // Never aim closer than 38 degrees to the wind, so a tack begun in irons still ends up sailing.
-    const mag = clamp(Math.abs(twa), 38 * D2R, 178 * D2R);
+    // Never aim closer than 38 degrees to the wind (six inside the pilot's close-hauled angle), so a tack begun in irons still ends up sailing.
+    const mag = clamp(Math.abs(twa), ((this.boat.handling?.closeHauledDeg ?? 44) - 6) * D2R, 178 * D2R);
     const side = twa >= 0 ? 1 : -1;
     const targetHeading = wrapTau(this.out.twd + side * mag);
     s.maneuver = {
@@ -621,6 +737,8 @@ export class Sim {
     this.computeWind();
     if (b.engine) this.stepEngine(b.engine);
     if (s.hold !== 'none') return this.stepHeld();
+    // The sea, where the world gives one. Without it `seaway` is null and nothing below differs from flat water.
+    const seaway = this.seaway(this.env.sea?.(s.x, s.y, s.t));
     const windSide = o.awa >= 0 ? 1 : -1;
     const awaAbs = Math.abs(o.awa);
     const awsKt = o.aws / KT;
@@ -670,7 +788,9 @@ export class Sim {
     // she does not just heel a little more, she lies over, the rudder lets go and she rounds up. Easing the sheets,
     // feathering up or a reef takes the load off. Held past the point of no return for a second, she is knocked flat.
     o.overpower = 0;
-    if (kite || twsKt > GUST_FROM) {
+    // A boat that does not heel to spill her sail has a number instead: see below.
+    const pr = b.pressed;
+    if (!pr && (kite || twsKt > GUST_FROM)) {
       let raw = loadDeg;
       let gate = smoothstep(GUST_FROM, GUST_FULL, twsKt);
       let over = 0;
@@ -689,6 +809,21 @@ export class Sim {
         if (s.gustTime > 1) this.knockDown(30 * D2R, clamp(2.5 + (loadDeg - KNOCKDOWN_LOAD) / 6, 2.5, 5), flying > 0.5);
       } else if (s.gustTime > 0) s.gustTime = Math.max(0, s.gustTime - dt);
     }
+    // Her number is the apparent wind her set sail will take.
+    let pressSlow = 1;
+    if (pr) {
+      // Sail that is drawing carries the load. The wind abeam is the worst of it; well aft there is less to trip over.
+      const share = Math.max(0, sailLoad) * lerp(1, 0.75, smoothstep(90 * D2R, 170 * D2R, awaAbs));
+      const loaded = awsKt * Math.sqrt(share);
+      const over = Math.max(0, loaded - pr.limitAwsKt);
+      o.press = loaded / pr.limitAwsKt;
+      o.overpower = over;
+      pressSlow = Math.max(pr.slowFloor, 1 - pr.slowPerKt * over);
+      if (over > pr.capsizeOverKt && s.knock === 0) {
+        s.gustTime += dt;
+        if (s.gustTime > pr.capsizeAfterS) this.capsize(pr);
+      } else if (s.gustTime > 0) s.gustTime = Math.max(0, s.gustTime - dt);
+    }
     o.heelLoad = loadDeg * D2R;
     // A crash gybe throws her over further than the wind alone would. She hangs there, then comes back up.
     if (s.knock > 0) {
@@ -696,7 +831,9 @@ export class Sim {
       else s.knock *= Math.exp(-dt / 2.5);
       if (s.knock < 0.01) s.knock = 0;
     }
-    const heelTarget = -windSide * Math.min(82 * D2R, o.heelLoad + s.knock);
+    // Capsized, she lies on the side she went over on whatever the wind does next.
+    const heelSide = pr && s.knock > 0 && Math.abs(s.heel) > 0.3 ? Math.sign(s.heel) : -windSide;
+    const heelTarget = heelSide * Math.min(82 * D2R, o.heelLoad + s.knock);
     s.heel += (heelTarget - s.heel) * (1 - Math.exp(-dt / (s.knock > 0 ? 0.55 : 1.2)));
     const heelDeg = Math.abs(s.heel) * R2D;
     o.heelPenalty = heelDeg > h.penaltyStartDeg
@@ -709,13 +846,17 @@ export class Sim {
     const spill = s.knock > 0 ? clamp(1 - (heelDeg - 40) / 30, 0.03, 1) : 1;
     o.knockedDown = heelDeg > 55;
     let targetKt = polarSpeed(b.polar, twaDeg, twsEff) * headK * Math.max(0, drive) * o.heelPenalty * spill;
+    if (pr) targetKt *= pressSlow;
     // Set and drawing, the spinnaker adds to what the white sails would give: most on a broad reach, nothing forward of the beam.
     if (kite) targetKt *= 1 + interp1(kite.gain.twa, kite.gain.pct, twaDeg) * interp1(kite.fade.tws, kite.fade.k, twsKt) * Math.max(0, o.spin.eff) * flying;
     o.targetSpeed = targetKt * KT;
     o.polarSpeed = polarSpeed(b.polar, twaDeg, twsKt) * KT;
     // She gathers way slowly and carries it a long time: about four boat lengths shooting head to wind.
     // Laid flat, with the rig and half the deck in the water, she stops in a few lengths.
-    let tau = o.targetSpeed > s.speed ? 12 : spill < 0.5 ? 3 : 16;
+    const hd = b.handling;
+    let tau = o.targetSpeed > s.speed ? hd?.gatherS ?? 12 : spill < 0.5 ? 3 : hd?.carryS ?? 16;
+    // What stops a boat with a lot of windage is the wind: she carries her way longer in a light air than in a blow.
+    if (hd?.carryAwsKt !== undefined && tau === hd.carryS) tau *= clamp(hd.carryAwsKt / Math.max(awsKt, 1), CARRY_LEAST, CARRY_MOST);
     // Under power the propeller's push goes in with the sails' drive. Resistance climbs so steeply with speed that
     // the two together give a little more than the better of them, never the sum, and nothing past hull speed.
     const motor = this.engineSpeed();
@@ -728,6 +869,8 @@ export class Sim {
       // The propeller gets her moving, and stops her, quicker than the sails do.
       if (spill >= 0.5) tau = Math.abs(v) > Math.abs(s.speed) && v * s.speed >= 0 ? 9 : 14;
     }
+    // Punching into a sea costs her speed, under sail or power. Running before a big one, she surfs.
+    if (seaway && o.targetSpeed > 0) o.targetSpeed *= (1 - seaway.loss) * (1 + seaway.gain);
     // A damaged hull drags, under sail or power. Holed, she stops in a few lengths.
     if (s.damage > 0) {
       o.targetSpeed *= damageSpeed(s.damage);
@@ -766,7 +909,11 @@ export class Sim {
     let flow = s.speed;
     if (geared && motor > s.speed && s.throttle > 0) flow = s.speed + PROP_WASH * (motor - s.speed);
     let rudderYaw = b.helm.turnGain * flow * s.rudder * o.rudderGrip;
-    if (s.speed < 0) rudderYaw *= ASTERN_BITE;
+    // Two screws far apart: no race over a rudder to lose astern, and worked against each other they turn her where she lies.
+    const twin = s.engineOn ? b.engine?.twinPivotDegS : undefined;
+    if (s.speed < 0 && !(twin && geared)) rudderYaw *= ASTERN_BITE;
+    // In astern gear the wheel takes her stern the way it is turned, as a rudder would.
+    if (twin) rudderYaw += (s.throttle < 0 ? -1 : 1) * twin * D2R * (s.rudder / maxRudder) * (1 - clamp(Math.abs(s.speed) / 2.5, 0, 1));
     // Heel makes the boat want to turn into the wind.
     const speedShare = clamp(s.speed / 3, 0, 1.2);
     o.weatherHelm = windSide * 0.024 * D2R * Math.pow(Math.max(0, heelDeg - 8), 1.5) * speedShare;
@@ -774,12 +921,21 @@ export class Sim {
     const backedYaw = -windSide * 6 * D2R * o.jib.backed * s.furl * Math.min(2, (awsKt / 15) ** 2) * (kite ? 1 - flying : 1);
     // With no way on, the bow blows off until the sails can fill.
     const slow = clamp(1 - s.speed / 1.0, 0, 1);
-    const fallOff = -windSide * 3 * D2R * slow * clamp(awsKt / 12, 0, 1.5) * (1 - smoothstep(40 * D2R, 70 * D2R, Math.abs(o.twa)));
+    let fallOff = -windSide * 3 * D2R * slow * clamp(awsKt / 12, 0, 1.5) * (1 - smoothstep(40 * D2R, 70 * D2R, Math.abs(o.twa)));
+    if (hd?.blowOff !== undefined) fallOff *= hd.blowOff;
     let yawTarget = rudderYaw + o.weatherHelm + backedYaw + fallOff;
+    // A self-tacking jib cannot be left aback on its old sheet. In a tack the crew is handling, someone holds its clew
+    // out to windward by hand as she comes head to wind, which pushes her bows round onto the new tack.
+    const byHand = b.sails.jib.backByHandDegS;
+    if (byHand && m?.kind === 'tack' && s.furl > 0.3 && Math.abs(o.twa) < 40 * D2R) {
+      yawTarget += Math.sign(wrapPi(m.targetHeading - s.heading)) * byHand * D2R * s.furl * clamp(awsKt / 10, 0.5, 1.3);
+    }
     // Overpowered, she gripes up into the wind whatever way she has on, until the sails spill.
-    if (o.overpower > 0) yawTarget += windSide * 7 * D2R * clamp((o.overpower - 2) / 8, 0, 1) * smoothstep(25 * D2R, 45 * D2R, awaAbs);
+    if (o.overpower > 0 && !pr) yawTarget += windSide * 7 * D2R * clamp((o.overpower - 2) / 8, 0, 1) * smoothstep(25 * D2R, 45 * D2R, awaAbs);
     // In astern the propeller walks the stern to port, so her bow swings to starboard, most before she has sternway.
-    if (geared && s.throttle < 0) yawTarget += PROP_WALK * (-s.throttle / 2) * (1 - 0.5 * clamp(-s.speed / 1.2, 0, 1));
+    if (geared && s.throttle < 0 && !twin) yawTarget += PROP_WALK * (-s.throttle / 2) * (1 - 0.5 * clamp(-s.speed / 1.2, 0, 1));
+    // A sea on the quarter slews her about as each wave passes under.
+    if (seaway) yawTarget += seaway.yaw;
     s.yawRate += (yawTarget - s.yawRate) * (1 - Math.exp(-dt / 0.7));
     s.heading = wrapTau(s.heading + s.yawRate * dt);
 
@@ -787,7 +943,9 @@ export class Sim {
     const slowGain = clamp((2.8 / Math.max(s.speed, 0.8)) ** 2, 1, 6);
     // Leeway comes from the side force of sails that are drawing. Flogging sails push nothing sideways.
     const sideForce = clamp(sailLoad, 0, 1.2);
-    const leeway = Math.min(25 * D2R, pointOfSail * sideForce * (3 + 0.12 * heelDeg) * D2R * slowGain);
+    let leeway = Math.min((hd?.leewayMaxDeg ?? 25) * D2R, pointOfSail * sideForce * ((hd?.leewayBaseDeg ?? 3) + (hd?.leewayPerHeelDeg ?? 0.12) * heelDeg) * D2R * slowGain);
+    // Each wave knocks her bodily to leeward.
+    if (seaway) leeway = Math.min((hd?.leewayMaxDeg ?? 25) * D2R, leeway * seaway.leeway);
     const lateralTarget = -windSide * s.speed * Math.tan(leeway);
     s.lateral += (lateralTarget - s.lateral) * (1 - Math.exp(-dt / 1.0));
 
@@ -828,7 +986,7 @@ export class Sim {
     o.sog = Math.hypot(vx, vy);
     o.cog = o.sog > 0.01 ? wrapTau(Math.atan2(vx, vy)) : s.heading;
 
-    o.inIrons = Math.abs(o.twa) < 30 * D2R && s.speed < 2 * KT && !geared;
+    o.inIrons = Math.abs(o.twa) < ((hd?.closeHauledDeg ?? 44) - 14) * D2R && s.speed < 2 * KT && !geared;
     o.roundingUp = o.rudderGrip < 0.5 && Math.abs(o.weatherHelm) > Math.abs(rudderYaw);
     // The pilot gives up when it is overpowered: a few seconds of losing to the helm and it hands the wheel back.
     if (s.helmMode !== 'hand' && !s.maneuver) {
@@ -842,6 +1000,73 @@ export class Sim {
 
     s.tick += 1;
     s.t = s.tick * dt;
+  }
+
+  // ---- in a seaway ------------------------------------------------------------------------------
+
+  /**
+   * What the sea does to her this step: see `SEAWAY` for the numbers. Moves her along the wave under her, and now and
+   * then drops her off one: a slam, which checks her speed there and then.
+   * @returns null in flat water, with every sea output at rest
+   */
+  private seaway(sea: SeaSample | null | undefined): Seaway | null {
+    const o = this.out;
+    if (!sea || !(sea.height > SEAWAY.minHeight) || !(sea.length > 0.5)) {
+      o.seaLoss = 0;
+      o.surf = 0;
+      this.rollLee = 0;
+      return null;
+    }
+    const s = this.state;
+    const lwl = this.boat.dimensions.lwl;
+    const hl = sea.height / lwl;
+    const steepK = clamp(sea.steepness / 0.05, 0.4, 1.8);
+    // Where the waves come from, off the bow: 0 a head sea, positive on the starboard side, pi dead astern.
+    const rel = wrapPi(sea.dir - s.heading);
+    const relAbs = Math.abs(rel);
+    const head = 1 - smoothstep(35 * D2R, 72 * D2R, relAbs);
+    const follow = smoothstep(120 * D2R, 160 * D2R, relAbs);
+
+    // She meets the waves faster going into them and slower running with them.
+    const k = (Math.PI * 2) / sea.length;
+    const sigma = Math.sqrt(9.81 * k);
+    const met = sigma + k * s.speed * Math.cos(rel);
+    const before = Math.floor(s.seaPhase / (Math.PI * 2));
+    s.seaPhase += met * this.dt;
+    const crest = Math.floor(s.seaPhase / (Math.PI * 2)) !== before;
+    // Keep the number small. Nothing reads more of it than where she is on the wave.
+    if (Math.abs(s.seaPhase) > 1e4) s.seaPhase -= Math.round(s.seaPhase / (Math.PI * 2)) * Math.PI * 2;
+
+    const loss = Math.min(SEAWAY.resistCap, SEAWAY.resist * head * Math.pow(hl, 1.25) * Math.pow(steepK, 0.7));
+    o.seaLoss = loss;
+
+    // A wave top: going to windward fast in a steep sea she may fall off the back of it.
+    if (crest) {
+      s.seaCount++;
+      const hull = 2.43 * Math.sqrt(lwl) * KT;
+      const pace = clamp(s.speed / (0.85 * hull), 0, 1);
+      const chance = SEAWAY.slamChance * clamp((sea.steepness - SEAWAY.slamSteep) / SEAWAY.slamRange, 0, 1) * head * clamp((hl - SEAWAY.slamFromHl) / 0.05, 0, 1) * pace * pace;
+      if (met > 0 && chance > 0 && waveHash(s.seaCount) < chance) {
+        s.slams++;
+        s.speed *= 1 - Math.min(SEAWAY.slamCap, SEAWAY.slamBase + SEAWAY.slamPerHl * hl);
+      }
+    }
+
+    // Running in a sea big enough to pick her up, she surges down each face. A light boat gets more of it.
+    const light = clamp(280 / displacementLength(this.boat) - 0.6, 0.5, 1.6);
+    const waveSpeed = sigma / k;
+    const carry = follow * clamp((sea.height - SEAWAY.surfFrom) / SEAWAY.surfRange, 0, 1) * clamp(s.speed / (0.45 * waveSpeed), 0, 1);
+    const face = Math.sin(s.seaPhase);
+    o.surf = carry * clamp(0.5 + 0.7 * face, 0, 1);
+    const gain = SEAWAY.surf * light * carry * (1 + 0.6 * face);
+
+    // On the quarter each wave lifts the stern and slews her; dead astern she rolls and wanders; on the bow it only nudges her.
+    const quarter = relAbs > Math.PI / 2 ? -Math.sin(2 * rel) : 0.25 * Math.sin(2 * rel);
+    const yaw = SEAWAY.yaw * hl * Math.min(1.5, steepK) * (quarter + SEAWAY.yawAstern * follow) * face * clamp(s.speed / 2, 0.3, 1);
+
+    this.rollLee = follow * Math.min(SEAWAY.rollLeeCap, SEAWAY.rollLee * hl * Math.min(1.5, steepK)) * D2R;
+    const forward = 1 - smoothstep(100 * D2R, 150 * D2R, relAbs);
+    return { loss, gain, yaw, leeway: 1 + SEAWAY.leeway * hl * Math.min(1.5, steepK) * forward };
   }
 
   // ---- at anchor or on a mooring --------------------------------------------------------------
@@ -938,6 +1163,7 @@ export class Sim {
     Object.assign(o.jib, emptySail());
     Object.assign(o.spin, emptySail());
     o.overpower = 0;
+    o.press = 0;
     o.heelLoad = 0;
     o.heelPenalty = 1;
     o.targetSpeed = 0;
@@ -987,8 +1213,8 @@ export class Sim {
     const q = 0.5 * AIR_DENSITY * o.aws * o.aws;
 
     // Main. The boom swings to leeward until the sheet stops it.
-    // It stays put through small wind-angle wobbles dead ahead and dead astern.
-    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R && s.mainSide !== -windSide) {
+    // It stays put through small wind-angle wobbles dead ahead and dead astern, less so astern when she is rolling in a sea.
+    if (awaAbs > 3 * D2R && awaAbs < 170 * D2R + this.rollLee && s.mainSide !== -windSide) {
       if (slew && awaAbs > 100 * D2R) {
         this.gybed();
         this.spinGybed();
@@ -1021,8 +1247,9 @@ export class Sim {
     }
     const car = b.sails.jib.sheetHardDeg * D2R;
     const free = -windSide * Math.min(awaAbs, JIB_FREE_MAX);
-    const lo = Math.max(-car - s.jibSheetPort, car - s.jibSheetStbd);
-    const hi = Math.min(-car + s.jibSheetPort, car + s.jibSheetStbd);
+    const single = b.sails.jib.selfTacking;
+    const lo = single ? -car - s.jibSheetStbd : Math.max(-car - s.jibSheetPort, car - s.jibSheetStbd);
+    const hi = single ? car + s.jibSheetPort : Math.min(-car + s.jibSheetPort, car + s.jibSheetStbd);
     const clewTarget = lo > hi ? (lo + hi) / 2 : clamp(free, lo, hi);
     s.jibAngle = slew ? approach(s.jibAngle, clewTarget, JIB_SLEW * dt) : clewTarget;
 
@@ -1133,6 +1360,22 @@ export class Sim {
   }
 
   /**
+   * She has been held past her limit and gone over. A capsized multihull stays capsized: she lies there with her
+   * engines drowned until help has righted her, which takes minutes, not the seconds a keelboat needs to come up.
+   */
+  private capsize(pr: NonNullable<BoatSpec['pressed']>): void {
+    const s = this.state;
+    this.knockDown(82 * D2R, pr.capsizeHoldS, false);
+    s.capsizes++;
+    s.helmMode = 'hand';
+    s.maneuver = null;
+    s.rudderCmd = 0;
+    s.engineOn = false;
+    s.engineCrank = 0;
+    s.throttle = 0;
+  }
+
+  /**
    * The boom has just come across with the wind aft. If nobody was tending the mainsheet, how hard it lands depends
    * on how far it had to swing and how much wind is in it. Hauled in first, a gybe is gentle. Let run in a breeze,
    * it rounds her up, and in enough wind it lays her flat.
@@ -1147,6 +1390,8 @@ export class Sim {
     const severity = swing * (twsKt / 19) ** 2 * reef.drive;
     if (severity < 0.45) return;
     s.crashGybes++;
+    // A boat that does not heel takes the slam in her rig and stays on her feet.
+    if (this.boat.pressed) return;
     if (severity >= 1) {
       s.knockdowns++;
       s.knock = Math.max(s.knock, 72 * D2R);
@@ -1175,7 +1420,9 @@ export class Sim {
     }
     const slackMax = b.sails.jib.sheetMaxSlackDeg * D2R;
     const want = clamp((idealJibDeg(awaDeg) - b.sails.jib.sheetHardDeg) * D2R, 0, slackMax);
-    if (windSide > 0) {
+    if (b.sails.jib.selfTacking) {
+      s.jibSheetPort = s.jibSheetStbd = approach(windSide > 0 ? s.jibSheetPort : s.jibSheetStbd, want, rate);
+    } else if (windSide > 0) {
       s.jibSheetPort = approach(s.jibSheetPort, want, rate);
       s.jibSheetStbd = approach(s.jibSheetStbd, slackMax, rate * 6);
     } else {
@@ -1217,7 +1464,8 @@ export class Sim {
     const slackMax = b.sails.jib.sheetMaxSlackDeg * D2R;
     const want = clamp((idealJibDeg(awaDeg) - b.sails.jib.sheetHardDeg) * D2R, 0, slackMax);
     s.mainSheet = idealBoomDeg(awaDeg) * D2R;
-    if (this.out.awa >= 0) { s.jibSheetPort = want; s.jibSheetStbd = slackMax; }
+    if (b.sails.jib.selfTacking) s.jibSheetPort = s.jibSheetStbd = want;
+    else if (this.out.awa >= 0) { s.jibSheetPort = want; s.jibSheetStbd = slackMax; }
     else { s.jibSheetStbd = want; s.jibSheetPort = slackMax; }
     if (s.spin) this.setControl('spinsheet', idealSpinDeg(awaDeg) * D2R);
     this.settleSails();
@@ -1246,10 +1494,11 @@ export class Sim {
   private blankOutputs(): SimOutputs {
     return {
       tws: 0, twd: 0, twa: 0, aws: 0, awa: 0, sog: 0, cog: 0,
-      main: emptySail(), jib: emptySail(), spin: emptySail(), overpower: 0,
+      main: emptySail(), jib: emptySail(), spin: emptySail(), overpower: 0, press: 0,
       targetSpeed: 0, polarSpeed: 0, heelLoad: 0, heelPenalty: 1, weatherHelm: 0, rudderGrip: 1,
       inIrons: false, roundingUp: false, pilotBeating: false, knockedDown: false, underKeel: null, aground: false,
       engineRpm: 0, fuel: this.fuel, battery: this.battery, underPower: this.underPower,
+      seaLoss: 0, surf: 0,
     };
   }
 }

@@ -64,14 +64,15 @@ for (const boat of boats.values()) {
       expect(s.kt).toBeLessThan(target * 1.02);
     });
 
-    it('tacks through about 90 degrees over the ground', () => {
+    // A boat with a `pressed` limit is a multihull: she does not point like a sloop or reef by her heel. Hers are in catamaran.test.ts.
+    it.runIf(!boat.pressed)('tacks through about 90 degrees over the ground', () => {
       const twa = bestVmgAngle(boat.polar, 14).twaDeg;
       const through = angleBetweenDeg(settle(boat, 14, twa).sim.out.cog, settle(boat, 14, -twa).sim.out.cog);
       expect(through).toBeGreaterThan(84);
       expect(through).toBeLessThan(98);
     });
 
-    it('wants her first reef somewhere between 13 and 21 kt upwind', () => {
+    it.runIf(!boat.pressed)('wants her first reef somewhere between 13 and 21 kt upwind', () => {
       const pays = firstReefPaysAt(boat);
       expect(pays).toBeGreaterThanOrEqual(13);
       expect(pays).toBeLessThanOrEqual(21);

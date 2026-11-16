@@ -49,8 +49,8 @@ function cached(key: string, draw: () => HTMLCanvasElement): THREE.CanvasTexture
  * White dacron is drawn exactly as the sails always were. The other cloths follow the same cut in their own colours,
  * and a laminate or a carbon sail shows the lines of its fibres.
  */
-function sailTexture(kind: SailKind, mark: string, cloth: ClothLook): THREE.CanvasTexture {
-  return cached(`${kind}|${mark}|${cloth.id}`, () => {
+function sailTexture(kind: SailKind, mark: string, cloth: ClothLook, sailNo?: string): THREE.CanvasTexture {
+  return cached(`${kind}|${mark}|${sailNo ?? ''}|${cloth.id}`, () => {
     const c = document.createElement('canvas');
     c.width = 512;
     c.height = 1024;
@@ -128,7 +128,7 @@ function sailTexture(kind: SailKind, mark: string, cloth: ClothLook): THREE.Canv
         g.translate(W * 0.6, Y(v));
         g.scale(flip * 1.9, 1);
         g.font = '700 40px ui-sans-serif, "Helvetica Neue", Arial, sans-serif';
-        g.fillText(`USA ${mark}${mark}`, 0, 0);
+        g.fillText(`USA ${sailNo ? sailNo.replace(/[^0-9A-Za-z ]/g, '').slice(0, 5) : `${mark}${mark}`}`, 0, 0);
         g.restore();
       };
       number(0.655, 1);
@@ -369,9 +369,9 @@ function makeSailMesh(nu: number, nv: number, map: THREE.CanvasTexture, glow: nu
 }
 
 /** Put a cloth on a white sail's material: its texture, how it glows and how it shines. */
-function dress(mesh: THREE.Mesh, kind: SailKind, mark: string, cloth: ClothLook): void {
+function dress(mesh: THREE.Mesh, kind: SailKind, mark: string, cloth: ClothLook, sailNo?: string): void {
   const mat = mesh.material as THREE.MeshStandardMaterial;
-  mat.map = sailTexture(kind, mark, cloth);
+  mat.map = sailTexture(kind, mark, cloth, sailNo);
   if (cloth.id === 'dacron') mat.emissive.set(0x6f6a5c);
   else mat.emissive.set(cloth.base).multiplyScalar(0.45);
   // Film and carbon have a sheen that woven cloth has not. On a black sail it is what shows the shape.
@@ -427,15 +427,18 @@ export class Mainsail {
   private uvHoist = -1;
 
   /** @param mark the boat's length in feet, for the class mark and sail number */
-  constructor(private readonly geo: SloopGeometry, private readonly mark = '38', cloth: ClothLook = CLOTHS[0]) {
-    this.mesh = makeSailMesh(this.nu, this.nv, sailTexture('main', mark, cloth), cloth.glow);
+  /**
+   * @param sailNo her own sail number, in place of the class's
+   */
+  constructor(private readonly geo: SloopGeometry, private readonly mark = '38', cloth: ClothLook = CLOTHS[0], private readonly sailNo?: string) {
+    this.mesh = makeSailMesh(this.nu, this.nv, sailTexture('main', mark, cloth, sailNo), cloth.glow);
     this.mesh.name = 'main';
-    dress(this.mesh, 'main', mark, cloth);
+    dress(this.mesh, 'main', mark, cloth, sailNo);
   }
 
   /** Change the cloth she is cut from. */
   setCloth(cloth: ClothLook): void {
-    dress(this.mesh, 'main', this.mark, cloth);
+    dress(this.mesh, 'main', this.mark, cloth, this.sailNo);
   }
 
   /** Share of the luff that is up the mast right now: 1 full sail, 0 down on the boom. */
@@ -447,7 +450,7 @@ export class Mainsail {
   private chord(v: number): number {
     const foot = this.geo.mainFoot;
     // Roach in proportion to the foot, so a small main and a big one have the same shape.
-    return THREE.MathUtils.lerp(foot, 0.22, v) + 0.2135 * foot * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
+    return THREE.MathUtils.lerp(foot, this.geo.mainHeadWidth ?? 0.22, v) + 0.2135 * foot * Math.sin(Math.PI * v) * (0.45 + 0.2 * (1 - v));
   }
 
   /**

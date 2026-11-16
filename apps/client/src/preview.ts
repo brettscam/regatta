@@ -1,6 +1,7 @@
 // The boat yard: one boat on plain ground, for looking at a model without the sea, the Bay or the game around it.
 // Open /boat-preview.html?boat=sloop30&colour=%23aa2222&name=Kestrel&view=quarter
-// Views: side, quarter, top, cockpit, stern, bow, hull. Add &hauled=1 to stand her upright out of the water.
+// Views: side, quarter, top, cockpit, stern, bow, hull, helm. Add &hauled=1 to stand her upright out of the water,
+// &beside=sloop38 for a second boat alongside, &anchored=1 to see her held.
 // Drag to orbit, scroll to zoom.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -46,11 +47,25 @@ scene.add(water);
 const wind: Environment = { sample: () => ({ windDir: -52 * D2R, windSpeed: 13 * KT, currentX: 0, currentY: 0 }) };
 const sim = new Sim(spec, wind, { headingDeg: 0, speedKt: 6 });
 sim.trimForWind();
-sim.state.heel = (params.get('hauled') ? 0 : 12) * D2R;
+// A sloop is shown heeled as she sails. A boat that stands up to her sail is shown nearly flat, as she sails too.
+sim.state.heel = (params.get('hauled') ? 0 : spec.pressed ? 2.5 : 12) * D2R;
 
 const view = new BoatView(spec, livery);
 view.setPilot({ engaged: true, mode: 'wind', label: '52° P' });
 scene.add(view.root);
+
+// &beside=sloop38 puts a second boat alongside to port, for judging one against another. &anchored=1 shows her held.
+const besideSpec = boats.get(params.get('beside') ?? '');
+const beside = besideSpec ? { sim: new Sim(besideSpec, wind, { headingDeg: 0, speedKt: 6 }), view: new BoatView(besideSpec, {}), x: -(spec.dimensions.beam + besideSpec.dimensions.beam) / 2 - 3 } : null;
+if (beside) {
+  beside.sim.trimForWind();
+  beside.sim.state.heel = (besideSpec!.pressed ? 2.5 : 12) * D2R;
+  scene.add(beside.view.root);
+}
+if (params.get('anchored')) {
+  sim.holdAt('anchor', 0, 40, 30);
+  sim.state.heel = 0;
+}
 
 const L = spec.dimensions.loa;
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
@@ -62,6 +77,8 @@ switch (params.get('view') ?? 'quarter') {
   case 'cockpit': Object.assign(orbit, { yaw: 0.5, pitch: 0.42, dist: Math.max(5.5, L * 0.55) }); orbit.target.set(0, 1.9, L * 0.26); break;
   case 'bow': Object.assign(orbit, { yaw: Math.PI - 0.6, pitch: 0.12, dist: H * 1.7 }); break;
   case 'stern': Object.assign(orbit, { yaw: 0.38, pitch: 0.13, dist: L * 0.95 }); orbit.target.set(0, 1.3, L * 0.32); break;
+  case 'helm': { const hv = view.views.helm; Object.assign(orbit, { yaw: hv.yaw, pitch: hv.pitch, dist: hv.dist }); orbit.target.fromArray(hv.target); break; }
+  case 'close': Object.assign(orbit, { yaw: 0.75, pitch: 0.2, dist: L * 1.25 }); orbit.target.set(0, 2.6, 0.5); break;
   case 'hull': Object.assign(orbit, { yaw: 1.05, pitch: 0.16, dist: L * 1.25 }); orbit.target.set(0, 1.4, 0); break;
   default: Object.assign(orbit, { yaw: 0.62, pitch: 0.14, dist: H * 1.7 });
 }
@@ -114,6 +131,10 @@ function frame(now: number): void {
   const s = sim.state;
   const pose: BoatPose = { x: 0, z: 0, heading: 0, heel: s.heel, pitch: 0, heave: 0, rudder: s.rudder, boom: s.boomAngle, jib: s.jibAngle };
   view.update(pose, s, sim.out, (now - start) / 1000, dt);
+  if (beside) {
+    const b = beside.sim.state;
+    beside.view.update({ ...pose, x: beside.x, heel: b.heel, rudder: b.rudder, boom: b.boomAngle, jib: b.jibAngle }, b, beside.sim.out, (now - start) / 1000, dt);
+  }
   placeCamera();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

@@ -73,6 +73,26 @@ export function setSeaState(waves: Wave[], twsKt: number): void {
   }
 }
 
+/** Significant height of the wave set as tuned, before any scaling: four times the root of its variance. About 0.63 m. */
+export const BASE_HEIGHT = 4 * Math.sqrt(BASE.reduce((sum, [, amp]) => sum + (amp * amp) / 2, 0));
+
+/**
+ * Set the drawn sea from a sea state (`@slack-tide/world`'s `SeaState`): its significant height, and how steep it is.
+ * Heights scale to the height asked for. A steeper sea pinches its crests harder. Lengths, directions and phases
+ * stay, so the water never jumps.
+ * @param height significant height, metres
+ * @param steepness height over length of the sea state: about 0.03 easy, 0.05 steep, 0.1 breaking
+ */
+export function setSea(waves: Wave[], height: number, steepness: number): void {
+  const scale = Math.min(3.2, Math.max(0.06, height / BASE_HEIGHT));
+  // On nearly flat water the crests are not pinched at all, or the surface would slide about with no height to it.
+  const pinch = Math.min(1, Math.max(0.45, 0.4 + steepness * 8)) * Math.min(1, scale * 1.5);
+  for (const w of waves) {
+    w.amp = w.base * scale;
+    w.q = pinch / (w.k * w.amp * WAVE_COUNT);
+  }
+}
+
 /** Height of the long waves at a point. Good enough for floating the hull and keeping the camera dry. */
 export function waveHeight(waves: Wave[], x: number, z: number, t: number, count = 4): number {
   let y = 0;

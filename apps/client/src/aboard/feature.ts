@@ -8,10 +8,12 @@ import type { Logbook } from '../net/logbook';
 import type { RemoteBoat } from '../net/fleet';
 import type { Place } from '../session';
 import type { Stage } from '../stage';
-import type { Race } from '../race/race';
+import type { Race, RaceCourse } from '../race/race';
 import type { ShadedWind } from '../race/shadow';
+import type { Seaway } from './seaway';
 import type { Hud } from '../ui/hud';
 import type { Passage } from '../ui/passage';
+import type { CourseFeatures } from '../world/features';
 
 /** What a feature is handed to work with. Everything a feature needs from the game comes through here. */
 export interface AboardContext {
@@ -19,6 +21,11 @@ export interface AboardContext {
   world: ReplayWorld;
   /** The wind her sim is fed: the world's, scaled by `air.factor` when another boat is taking it. See `race/shadow.ts`. */
   air: ShadedWind;
+  /**
+   * The sea as she meets it: `seaway.sea` the sea state at the boat, `seaway.wake` a ship's wake at whoever is being
+   * followed, and `seaway.on((event, strength) => ...)` to be told when she slams, surfs or meets a wake. See `seaway.ts`.
+   */
+  seaway: Seaway;
   /** The shared scene: `stage.scene` to add meshes to, `stage.seaLevel(x, z, seaTime)` for the height of the water. */
   stage: Stage;
   hud: Hud;
@@ -30,6 +37,8 @@ export interface AboardContext {
   livery: Livery;
   skipper: string;
   places: Place[];
+  /** Hazards, traffic lanes, refuges and lights, on a water that has them. See `world/features.ts`. */
+  features?: CourseFeatures;
   logbook: Logbook;
   /** A passing remark at the bottom of the screen. */
   say(text: string, seconds?: number): void;
@@ -43,6 +52,8 @@ export interface AboardContext {
   company(): RemoteBoat[];
   /** The race this boat is in, if any, and its marks. */
   race?: Race;
+  /** Every race course on this water. */
+  races: RaceCourse[];
   /** Seconds into the recorded season, now. */
   seasonNow(): number;
   /** True while a key is held down, by its KeyboardEvent.code. */
@@ -76,6 +87,12 @@ export interface Feature {
    * For when the player has left the boat, in the kayak for instance. Sim coordinates: x east, y north, heading compass radians.
    */
   focus?(): { x: number; y: number; heading: number; height: number } | null;
+  /**
+   * The player has hailed (Enter, then words). Return true if somebody this feature looks after heard it and will answer.
+   * `withinHail` says who that would be, for the prompt in the hail box, or null when nobody is in range.
+   */
+  hail?(text: string): boolean;
+  withinHail?(): string | null;
   /** A few short fields to tell the other boats along with this boat's position. Keys of two or three letters. */
   wire?(): Record<string, unknown>;
   /**

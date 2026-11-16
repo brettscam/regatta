@@ -16,16 +16,12 @@
   },
   {
     "id": "cat42",
-    "status": "yard",
-    "name": "42 ft catamaran",
-    "lengthFt": 42,
-    "role": "No heel to warn you. Reef by the numbers"
+    "file": "cat42.json",
+    "status": "ready"
   },
   {
     "id": "blue50",
-    "status": "yard",
-    "name": "50 ft bluewater cruiser",
-    "lengthFt": 50,
-    "role": "Long passages and heavy weather"
+    "file": "blue50.json",
+    "status": "ready"
   }
 ]

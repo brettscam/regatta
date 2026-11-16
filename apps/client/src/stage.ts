@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 import { KT } from '@slack-tide/sim';
-import type { CourseData, ReplayWorld } from '@slack-tide/world';
+import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildTerrain } from './scene/terrain';
+import { Buoy, buildBridge, buildLand, landHeight } from './scene/terrain';
+import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
+import { buildShoreside, type ShoreSpot } from './scene/shoreside';
+import { groundHeight, type HeightGrid } from './aboard/paddle';
 import { clearCityNight, setCityNight } from './scene/massing';
-import { buildWaves, setSeaState, waveHeight, type Wave } from './scene/waves';
+import { WakeField } from './scene/wakes';
+import { buildWaves, setSea, setSeaState, waveHeight, type Wave } from './scene/waves';
 import { SeaField } from './scene/seaField';
 import { Wake, type WakeVessel } from './scene/wake';
 import { Spray } from './scene/spray';
@@ -30,6 +34,27 @@ export interface StageBoat {
   /** Under engine and in gear, or lying to an anchor or a mooring: for the lights she shows at night. */
   power?: boolean;
   held?: boolean;
+  /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
+  hulls?: number;
+}
+
+/**
+ * The ground the city is stood on. A plain course's land is one grid and is handed over as it is. Where the land has
+ * insets (the ocean outside the Gate), the city gets one even grid over the Bay's shores, read from the finest land
+ * there is at each point, so a building's footing is the ground that is drawn under it.
+ */
+function sceneryGround(course: CourseData, terrain: Uint8Array): [CourseData, Uint8Array] {
+  const main = course.terrain;
+  if (!main.insets?.length) return [course, terrain];
+  const height = landHeight(course, terrain);
+  const dx = 80;
+  const x0 = Math.max(main.x0, -9000);
+  const y0 = Math.max(main.y0, -12400);
+  const nx = Math.floor((Math.min(main.x0 + (main.nx - 1) * main.dx, 14000) - x0) / dx) + 1;
+  const ny = Math.floor((Math.min(main.y0 + (main.ny - 1) * main.dx, 13200) - y0) / dx) + 1;
+  const cells = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) cells[j * nx + i] = Math.round(Math.sqrt(Math.min(1, height(x0 + i * dx, y0 + j * dx) / main.max)) * 255);
+  return [{ ...course, terrain: { ...main, x0, y0, dx, nx, ny, insets: undefined } }, cells];
 }
 
 /**
@@ -65,12 +90,23 @@ export class Stage {
   course!: CourseData;
   world!: ReplayWorld;
   readonly waves: Wave[] = [];
+  /** The wakes of the water's ships and ferries. See `scene/wakes.ts`. */
+  wakes!: WakeField;
+  /** The sea state the water is drawn with: the one where the boat being followed is, eased so it never jumps. */
+  readonly sea: Sea = emptySea();
+  /** The venue standing on the shore at each place there is to go ashore: where it is, and its deck, dock and named spots. */
+  shore: ShoreSpot[] = [];
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
   private buoys: Buoy[] = [];
+  /** Lighthouses and lit marks, on a water that has them. */
+  private seamarks: Seamarks | null = null;
+  /** Where the charted lights are, course metres. */
+  private litMarks: Array<[number, number]> = [];
   private readonly focus = new THREE.Vector3();
   private seaKt = 0;
+  private seaSet = false;
   private pixelRatio = Math.min(window.devicePixelRatio, 2);
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
@@ -122,18 +158,47 @@ export class Stage {
     const pieces = new Set(scenery.pieces ?? []);
     const land = new THREE.Group();
     land.name = 'course';
-    land.add(buildTerrain(this.course, data.terrain, scenery.landCover));
-    if (pieces.has('san-francisco')) land.add(buildScenery(this.course, data.terrain, data.depth));
+    const terrain = buildLand(this.course, data.terrain, scenery.landCover);
+    land.add(terrain);
+    this.seamarks = data.features?.lights.length ? new Seamarks(data.features.lights, landHeight(this.course, data.terrain)) : null;
+    if (this.seamarks) land.add(this.seamarks.group);
+    this.litMarks = (data.features?.lights ?? []).map((l): [number, number] => [l.x, l.y]);
     if (pieces.has('golden-gate-bridge') && this.course.bridge) land.add(buildBridge(this.course.bridge));
     this.sky.setMarineLayer(pieces.has('marine-layer'));
     // The weather that belongs to this water: the Bay's fog bank, the islands' morning haze.
     this.fogPath = pieces.has('marine-layer') ? SF_FOG_PATH : null;
     this.hazy = pieces.has('morning-haze');
+    // Something to steer for at every place there is to go ashore. They stand on the shore as it is drawn, so the
+    // heights are read back off the land's own mesh, as the kayak reads them.
+    // One land grid is one mesh, read back exactly; land with insets is read through the same lookup the seamarks use.
+    const t = this.course.terrain;
+    const heightAt = terrain instanceof THREE.Mesh
+      ? ((drawn: HeightGrid) => (x: number, y: number) => groundHeight(drawn, x, y))({ x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: terrain.geometry.getAttribute('position').array, stride: 3, offset: 1 })
+      : landHeight(this.course, data.terrain);
+    const shore = buildShoreside(this.course.depth, data.depth, heightAt, (x, y) => world.chartDepth(x, y), data.places, scenery.landCover);
+    land.add(shore.group);
+    this.shore = shore.spots;
+    // The moored boats of the scenery keep out of the way in to each guest dock.
+    const approaches: Array<[number, number, number]> = [];
+    for (const spot of shore.spots) {
+      const { dock, berth } = spot.layout;
+      if (dock) approaches.push([dock.x, dock.y, 170]);
+      if (berth) approaches.push([berth.x, berth.y, 170]);
+    }
+    for (const place of data.places) approaches.push([place.x, place.y, 150]);
+    const plots = shore.spots.map((spot): [number, number, number] => [spot.x + Math.sin(spot.layout.heading) * 8, spot.y + Math.cos(spot.layout.heading) * 8, 44]);
+    if (pieces.has('san-francisco')) land.add(buildScenery(...sceneryGround(this.course, data.terrain), data.depth, approaches, plots));
     this.buoys = this.course.marks.filter((m) => m.kind === 'buoy').map((m, i) => new Buoy(m.x, m.y, i % 2 ? 0x2f8f55 : 0xb5332a));
     for (const b of this.buoys) land.add(b.group);
     // Other vessels on the water. Where each one is depends only on the time, so everyone sees the same traffic.
     this.traffic = new Traffic(data.traffic, world);
     land.add(this.traffic.group);
+    // What a ship's wake does to the water a boat sails through. It is drawn by `scene/wake.ts` with every other wake,
+    // so its own crest lines are not added.
+    this.wakes = new WakeField(data.traffic);
+    // The water gets its sea state here: every sim sailed on this world feels it from now on.
+    if (!world.seas) world.seas = new SeaState(world, data.about.sea ?? data.course.sea);
+    this.seaSet = false;
     this.scene.add(land);
     this.land = land;
 
@@ -186,28 +251,41 @@ export class Stage {
         const y = this.seaAt(s.x, -s.y, 4);
         if (s.kind === 'sail') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 1.4, s.sog < 0.25 ? 'anchor' : 'sail');
         else if (s.kind === 'ship') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 0.12 + 14, 'ship');
+        // A paddler carries only a white light, seen all round.
+        else if (s.kind === 'paddle') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, 1.2, 'anchor');
         else lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 0.2 + 5, 'power');
       }
       // Buoys flash every four seconds, each a little out of step with the next.
-      this.buoys.forEach((b, i) => lights.buoy(b.x, 2.6, -b.y, i % 2 === 0, ((seaTime + i * 1.3) % 4) < 0.7 ? 1 : 0));
+      // A mark that is also a charted light is shown by `Seamarks` in its own rhythm, so it is not lit twice.
+      this.buoys.forEach((b, i) => {
+        if (!this.litMarks.some(([x, y]) => Math.hypot(x - b.x, y - b.y) < 120)) lights.buoy(b.x, 2.6, -b.y, i % 2 === 0, ((seaTime + i * 1.3) % 4) < 0.7 ? 1 : 0);
+      });
     }
     lights.end();
   }
 
   /** Every vessel's wake into the sea's maps, and spray off the bows near enough to see. */
-  private wakes(seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windFrom: number, windSpeed: number, windKt: number, day: number): void {
+  private drawWakes(seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windFrom: number, windSpeed: number, windKt: number, day: number): void {
     const list = this.afloat;
-    const n = ships.length + 1;
+    // A catamaran leaves a wake from each hull, each about its own centreline.
+    const hulls = boat.hulls && boat.hulls > 0 ? 2 : 1;
+    const n = ships.length + hulls;
     while (list.length < n) list.push({ id: '', x: 0, z: 0, heading: 0, speed: 0, length: 11.6, beam: 3.8, lee: 0 });
     list.length = n;
-    const me = list[0];
-    me.id = 'own';
-    me.x = boat.x; me.z = boat.z; me.heading = boat.heading; me.speed = boat.speed;
-    me.length = boat.length ?? 11.6; me.beam = boat.beam ?? 3.8;
-    me.lee = THREE.MathUtils.clamp(boat.heel / 0.3, -1, 1);
+    for (let h = 0; h < hulls; h++) {
+      const me = list[h];
+      const off = hulls === 2 ? (h === 0 ? -1 : 1) * boat.hulls! : 0;
+      me.id = h === 0 ? 'own' : 'own-stbd';
+      me.x = boat.x + Math.cos(boat.heading) * off;
+      me.z = boat.z + Math.sin(boat.heading) * off;
+      me.heading = boat.heading; me.speed = boat.speed;
+      me.length = boat.length ?? 11.6;
+      me.beam = hulls === 2 ? Math.max(1.2, (boat.beam ?? 3.8) * 0.28) : boat.beam ?? 3.8;
+      me.lee = hulls === 2 ? 0 : THREE.MathUtils.clamp(boat.heel / 0.3, -1, 1);
+    }
     for (let i = 0; i < ships.length; i++) {
       const s = ships[i];
-      const v = list[i + 1];
+      const v = list[i + hulls];
       v.id = s.id;
       v.x = s.x; v.z = -s.y; v.heading = s.heading; v.speed = s.sog; v.length = s.length; v.beam = s.beam;
       // A sailing boat heels away from the wind, and her leeward bow wave is the bigger one.
@@ -231,9 +309,9 @@ export class Stage {
     this.spray.update(seaTime, camera, this.renderer.domElement.height, Math.sin(toward) * windSpeed, -Math.cos(toward) * windSpeed, this.white);
   }
 
-  /** Height of the sea at a scene position. */
+  /** Height of the sea at a scene position: the waves that are drawn, and any ship's wake going by. */
   seaLevel(x: number, z: number, seaTime: number, count = 6): number {
-    return waveHeight(this.waves, x, z, seaTime, count);
+    return waveHeight(this.waves, x, z, seaTime, count) + this.wakes.height(x, -z);
   }
 
   resize(camera: THREE.PerspectiveCamera | null = this.camera): void {
@@ -291,19 +369,35 @@ export class Stage {
     }
     if (!covered) this.keepPace(dtReal);
     const world = this.world;
-    // The sea follows the hourly wind: slowly, as a real sea does.
+    // The sea is the sea state where the boat is: wind, fetch, stream and depth (`SeaState`). It is eased over a few
+    // seconds so that sailing into a lee lays the water down smoothly.
     const hourly = world.wind(boat.x, -boat.z, t);
     this.seaKt += (hourly.speed / KT - this.seaKt) * Math.min(1, dtReal * rate * 0.004);
-    setSeaState(this.waves, this.seaKt);
+    const here = world.seas?.at(boat.x, -boat.z, t);
+    if (here) {
+      const ease = this.seaSet ? Math.min(1, dtReal * rate * 0.15) : 1;
+      const sea = this.sea;
+      const height = sea.height + (here.height - sea.height) * ease;
+      const steepness = sea.steepness + (here.steepness - sea.steepness) * ease;
+      Object.assign(sea, here);
+      sea.height = height;
+      sea.steepness = steepness;
+      this.seaSet = true;
+      setSea(this.waves, height, steepness);
+    } else setSeaState(this.waves, this.seaKt);
     this.ocean.setWaves(this.waves, hourly.dir);
+    // Whitecaps follow how steep and broken the sea is, as well as the wind on it.
+    this.ocean.setSea(here ? this.sea.steepness : 0.045, here ? this.sea.breaking : 0);
     this.field.update(world, t);
 
+    this.wakes.advance(world.seasonTime(t));
     this.traffic.update(t, seaTime, this.waves);
     for (const b of this.buoys) {
       const c = world.current(b.x, b.y, t);
       b.update(waveHeight(this.waves, b.x, -b.y, seaTime), Math.atan2(c.x, c.y), Math.hypot(c.x, c.y), seaTime);
     }
 
+    this.seamarks?.update(world.seasonTime(t), camera);
     const sky = this.sky;
     const w = this.forecast(t, camera);
     sky.setTime(world.dateAt(t), this.course.origin.lat, this.course.origin.lon);
@@ -337,7 +431,7 @@ export class Stage {
     setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
     this.ocean.setSun(sky.sunDir, sky.sunColor, sky.lightPower, overcast, sky.night);
     this.ocean.update(seaTime, camera, boat);
-    this.wakes(seaTime, camera, boat, ships, hourly.dir, hourly.speed, windKt, up * (1 - 0.9 * sky.night));
+    this.drawWakes(seaTime, camera, boat, ships, hourly.dir, hourly.speed, windKt, up * (1 - 0.9 * sky.night));
     this.lights(seaTime, camera, boat, ships);
     const toward = hourly.dir + Math.PI;
     this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));

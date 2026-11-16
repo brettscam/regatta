@@ -187,6 +187,7 @@ const fragmentShader = /* glsl */ `
   uniform float uSeason;   // seconds into the season: the clock the world's gusts run on
   uniform float uTide;
   uniform float uOvercast; // 0 a clear sky, 1 under a squall
+  uniform vec2 uSeaState;  // the sea state here: steepness (height over length), and how much of it is breaking
   uniform float uLight;    // how strong the light from uSunDir is: 1 the sun, a few hundredths the moon
   uniform float uNight;    // 0 by day, 1 at full night: the sky the sea reflects goes dark with it
   uniform float uSee;      // how far you can see, metres
@@ -208,6 +209,7 @@ const fragmentShader = /* glsl */ `
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
   uniform float uBoatSpeed;
   uniform float uBoatHeel;
+  uniform float uHulls;    // half the distance between her two hulls, 0 for one hull
   varying vec3 vWorld;
   varying vec2 vBase;
   varying vec3 vAir;
@@ -372,7 +374,8 @@ const fragmentShader = /* glsl */ `
     float foamFine = texture2D(uDetail, vBase / 1.7).b;
     float noise = foamTex * 0.55 + foamFine * 0.45;
     float patch_ = texture2D(uDetail, vBase / 23.0 + vec2(uTime * 0.012, 0.0)).a;
-    float cover = clamp((kt * (1.0 - 0.3 * vLee) - 9.5) / 22.0, 0.0, 1.0);
+    // The wind starts them; a steep sea, wind against tide, makes more of them, and a sea that is breaking is white.
+    float cover = clamp((kt * (1.0 - 0.3 * vLee) - 9.5) / 22.0 * mix(0.6, 1.4, smoothstep(0.02, 0.07, uSeaState.x)) + 0.55 * uSeaState.y, 0.0, 1.0);
     float thr = mix(0.98, 0.2, pow(cover, 0.6));
     // A crest breaks where the long waves pile up and the short ones on their backs pinch to a point: thin white
     // lines along the crests, gathered where the sea is steepest. Behind each, a moment's lace of spent foam.
@@ -395,14 +398,16 @@ const fragmentShader = /* glsl */ `
       float way = clamp(uBoatSpeed / 3.2, 0.0, 1.3);
       // Heel pushes the leeward side down, so the foam is wider there.
       float lee = local.x * sign(uBoatHeel) * min(abs(uBoatHeel) * 0.5, 0.2);
-      vec2 hq = vec2(local.x / (1.72 + lee), (local.y + 0.1) / 5.9);
+      // A boat with two hulls has two of everything, each about its own centreline.
+      float lx = uHulls > 0.0 ? abs(local.x) - uHulls : local.x;
+      vec2 hq = vec2(lx / ((uHulls > 0.0 ? 1.0 : 1.72) + lee), (local.y + 0.1) / 5.9);
       float he = dot(hq, hq);
       // A thin collar of foam at the waterline, heavier toward the stern where the flow breaks away.
       float aft = smoothstep(-5.0, 5.5, local.y);
       float alongside = smoothstep(1.5, 1.08, he) * smoothstep(0.38, 0.72, noise + way * 0.12 + aft * 0.12) * way * (0.35 + 0.65 * aft);
       // Bow wave: two short arms sweeping back from the stem.
       float bowZ = local.y + 5.2;
-      float arm = abs(abs(local.x) - (0.25 + bowZ * 0.42));
+      float arm = abs(abs(lx) - (0.25 + bowZ * 0.42));
       float bowWave = smoothstep(0.9, 0.0, arm) * smoothstep(-0.6, 0.4, bowZ) * smoothstep(4.6, 1.0, bowZ) * way * way;
       foam = max(foam, clamp(alongside + bowWave * smoothstep(0.3, 0.6, noise), 0.0, 1.0));
     }
@@ -458,6 +463,7 @@ export class Ocean {
       uSeason: { value: 0 },
       uTide: { value: 0 },
       uOvercast: { value: 0 },
+      uSeaState: { value: new THREE.Vector2(0.045, 0) },
       uLight: { value: 1 },
       uNight: { value: 0 },
       uSee: { value: 30000 },
@@ -484,6 +490,7 @@ export class Ocean {
       uBoat: { value: new THREE.Vector4() },
       uBoatSpeed: { value: 0 },
       uBoatHeel: { value: 0 },
+      uHulls: { value: 0 },
     };
     const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms: this.uniforms });
     this.mesh = new THREE.Mesh(makeRadialGrid(), material);
@@ -502,6 +509,11 @@ export class Ocean {
     });
     const toward = windFrom + Math.PI;
     (this.uniforms.uWind.value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
+  }
+
+  /** The sea state the whitecaps follow: steepness (height over length) and the share of it breaking, 0 to 1. */
+  setSea(steepness: number, breaking: number): void {
+    (this.uniforms.uSeaState.value as THREE.Vector2).set(steepness, breaking);
   }
 
   /** The sea's noise, for the sky to cut its low cloud from so cloud and shadow agree. */
@@ -545,13 +557,14 @@ export class Ocean {
    * @param camera the mesh is re-centred under it
    * @param boat world x, world z, heading (radians, compass), speed (m/s), heel (radians)
    */
-  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number }): void {
+  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number; hulls?: number }): void {
     const u = this.uniforms;
     u.uTime.value = time;
     (u.uCenter.value as THREE.Vector3).set(camera.position.x, 0, camera.position.z);
     (u.uBoat.value as THREE.Vector4).set(boat.x, boat.z, Math.sin(boat.heading), Math.cos(boat.heading));
     u.uBoatSpeed.value = boat.speed;
     u.uBoatHeel.value = boat.heel;
+    u.uHulls.value = boat.hulls ?? 0;
 
     u.uSeason.value = this.field.season;
     u.uTide.value = this.field.tide;

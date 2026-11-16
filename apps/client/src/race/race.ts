@@ -9,7 +9,9 @@ import type { Wave } from '../scene/waves';
 import type { TrafficVessel } from '../scene/traffic';
 import type { Passage } from '../ui/passage';
 import { CLOSES_AFTER, addEvent, eventWater, gunTime, inText, isOpen, nextEvent, readEvent, sharedEvent, whenText } from './events';
+import { MAX_PACE, drawEntrants, readMix, readPace, type Mix } from './cast';
 import { PaceBoat } from './pace';
+import { remainingBy, separate, startBerths } from './sailor';
 import { CALLS, RING, bearing3, dueCall, gunOutsideCall, inRingCall, preStart, preStartCall, preStartLine, shortRange, spokenRange, taken, takenCall, type Onward, type PreStart } from './startline';
 
 export interface RaceMark { name: string; x: number; y: number }
@@ -22,8 +24,10 @@ export interface RaceCall {
   /** Season time of the gun, seconds. */
   gun: number;
   host: string;
-  /** How many pace boats sail it too. */
+  /** How many pace boats sail it too: club skippers on the autopilot, drawn from the race's id so every page has the same ones. */
   pace: number;
+  /** What sort of fleet they are: mostly back-markers, the whole club, or mostly good. A call without one is the whole club. */
+  mix?: Mix;
   /**
    * For a race fixed on the real clock: the gun in milliseconds since 1970. The countdown then runs on the real clock,
    * which every boat shares exactly, and `gun` is only that moment as it fell on the season clock when the call was made.
@@ -44,6 +48,27 @@ export interface Standing {
   toGo: number;
   /** Seconds from the gun to the finish, or null while still racing. */
   finish: number | null;
+  /** Metres left to the finish by the marks. 0 once finished. */
+  remaining: number;
+  /** How far she is behind: seconds after the first boat home once she has finished, metres behind the leading boat still racing until then. */
+  gapS: number | null;
+  gapM: number | null;
+  /** She was in this race and has left it without finishing. */
+  retired: boolean;
+  /** Hull damage, whole percent: 100 is holed. */
+  damage: number;
+  /** Her topsides colour and sail number, where known, for her picture. */
+  colour: string;
+  sail: string;
+  /** Another person's boat: her room id, and her skipper's avatar code as she sent it. */
+  peer?: string;
+  avatar?: string;
+  /** A club pace boat: the skipper's id in the cast, how good she is and what she is like. */
+  castId?: string;
+  level?: string;
+  character?: string;
+  /** Who is aboard besides the skipper. Nobody yet: the slot is here for crews. */
+  crew: string[];
 }
 
 /** As near the wind as a towed boat is left pointing, radians. */
@@ -65,7 +90,8 @@ export function readCall(v: unknown): RaceCall | null {
     if (!m || typeof m.name !== 'string' || !finite(m.x) || !finite(m.y) || Math.abs(m.x) > 40000 || Math.abs(m.y) > 40000) return null;
     marks.push({ name: m.name.slice(0, 28), x: Math.round(m.x), y: Math.round(m.y) });
   }
-  const call: RaceCall = { id: c.id, name: c.name.slice(0, 60), marks, gun: c.gun, host: typeof c.host === 'string' ? c.host.slice(0, 24) : 'Someone', pace: finite(c.pace) ? Math.max(0, Math.min(3, Math.round(c.pace))) : 0 };
+  const call: RaceCall = { id: c.id, name: c.name.slice(0, 60), marks, gun: c.gun, host: typeof c.host === 'string' ? c.host.slice(0, 24) : 'Someone', pace: readPace(c.pace) };
+  if (call.pace > 0 && typeof c.mix === 'string') call.mix = readMix(c.mix);
   if (typeof c.cls === 'string' && CLASS_ID.test(c.cls)) call.cls = c.cls;
   return call;
 }
@@ -76,7 +102,7 @@ export const clockText = (seconds: number): string => {
   const m = Math.floor((s % 3600) / 60);
   return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(s % 60).padStart(2, '0')}`;
 };
-const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
+export const ORDINAL = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
 
 export interface RaceContext {
   sim: Sim;
@@ -95,6 +121,8 @@ export interface RaceContext {
   logbook: Logbook;
   skipper: string;
   boatName: string;
+  /** Her topsides colour, for her picture in the roster. */
+  colour?: string;
   /** The courses a fixed event can name. */
   courses: RaceCourse[];
   /** A passing remark, an alarm that needs the player, and word that someone has called a race. */
@@ -115,6 +143,8 @@ export class Race {
   /** Races other boats have called that this one could join. */
   readonly offers = new Map<string, RaceCall>();
   started = false;
+  /** A note the session adds to the racing line, such as what is left of the full pilot. */
+  note = '';
   leg = 0;
   toGo = 0;
   finish: number | null = null;
@@ -130,6 +160,8 @@ export class Race {
   coach = true;
   /** She has been told once that she is in the start ring. */
   private ringTold = false;
+  /** Other people's boats seen in this race, as last seen: one that leaves without finishing is shown as retired. */
+  private readonly seen = new Map<string, Standing>();
 
   constructor(private readonly ctx: RaceContext) {}
 
@@ -164,12 +196,13 @@ export class Race {
    * Call a race and enter it. Everyone on the water is told.
    * @param cls the class it is sailed in: a boat id. The caller's own boat unless given
    */
-  callRace(course: { name: string; marks: RaceMark[] }, minutes: number, pace: number, cls: string = this.ctx.own.id): void {
+  callRace(course: { name: string; marks: RaceMark[] }, minutes: number, pace: number, cls: string = this.ctx.own.id, mix: Mix = 'mixed'): void {
     const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e5).toString(36)}`;
     const call: RaceCall = {
       id, name: course.name.slice(0, 60), marks: course.marks.slice(0, 12).map((m) => ({ name: m.name.slice(0, 28), x: Math.round(m.x), y: Math.round(m.y) })),
-      gun: Math.round(this.now + minutes * 60), host: this.ctx.skipper || this.ctx.boatName || 'A skipper', pace: Math.max(0, Math.min(3, pace)),
+      gun: Math.round(this.now + minutes * 60), host: this.ctx.skipper || this.ctx.boatName || 'A skipper', pace: Math.max(0, Math.min(MAX_PACE, Math.round(pace))),
     };
+    if (call.pace > 0) call.mix = mix;
     if (this.ctx.classes[cls]) call.cls = cls;
     this.join(call, true);
   }
@@ -191,13 +224,19 @@ export class Race {
     this.place = 0;
     this.called.clear();
     this.offers.delete(call.id);
+    this.seen.clear();
+    // The club boats that have turned out, each in her berth. Who they are and where they lie comes from the call alone
+    // (and the chart), so every page in this race has the same boats in the same places.
+    const entrants = drawEntrants(call.id, call.pace, call.mix);
+    const need = spec.dimensions.draft + 2.5;
+    const berths = startBerths(call.marks, entrants, (x, y) => world.chartDepth(x, y) >= need);
+    entrants.forEach((e, i) => this.pacers.push(new PaceBoat(e, berths[i], spec, world, scene, call.marks, i)));
     const towed = this.musterAtStart(call);
     this.legStart = { x: sim.state.x, y: sim.state.y };
     const start = call.marks[0];
     const left = this.countdown;
     // Until the gun the chart's route, and the pilot's, goes to the start and no further. The course goes on at the gun.
     passage.setRoute(left > 0 ? [start] : call.marks, sim.state, sim.state.t);
-    for (let i = 0; i < call.pace; i++) this.pacers.push(new PaceBoat(i, spec, world, scene, call.marks));
     // A call due in the moment of joining would wipe out what is said on joining, which says more.
     for (const c of CALLS) if (left <= c + 1 && left > c - 12) this.called.add(c);
     const when = left > 0 ? `Gun in ${clockText(left)}` : `It started ${clockText(-left)} ago`;
@@ -239,7 +278,7 @@ export class Race {
       const x = start.x - Math.sin(along) * back + Math.cos(along) * side;
       const y = start.y - Math.cos(along) * back - Math.sin(along) * side;
       // Room to lie there: water under her and around her.
-      let clear = world.depth(x, y, s.t) >= need;
+      let clear = world.depth(x, y, s.t) >= need && this.pacers.every((p) => Math.hypot(p.sim.state.x - x, p.sim.state.y - y) > 40);
       for (let j = 0; j < 6 && clear; j++) clear = world.depth(x + Math.sin(j) * 70, y + Math.cos(j) * 70, s.t) >= spec.dimensions.draft + 1;
       if (!clear) continue;
       if (s.hold !== 'none') sim.release();
@@ -303,6 +342,7 @@ export class Race {
     if (!this.started) return;
     const elapsed = this.elapsed;
     for (const p of this.pacers) p.step(elapsed);
+    separate(this.pacers);
   }
 
   /** Once a frame, after the sim has stepped. */
@@ -431,20 +471,49 @@ export class Race {
     }
   }
 
-  /** Everyone in this race, leader first. */
+  /** Everyone in this race, leader first, with how far each is behind. Boats that have left it come last. */
   standings(): Standing[] {
     const call = this.call;
     if (!call) return [];
-    const rows: Standing[] = [{ name: this.ctx.skipper || 'You', boat: this.ctx.boatName, me: true, pace: false, leg: this.leg, toGo: this.toGo, finish: this.finish }];
+    const marks = call.marks;
+    const blank = { gapS: null, gapM: null, retired: false, damage: 0, colour: '', sail: '', crew: [] as string[] };
+    const rows: Standing[] = [{
+      ...blank, name: this.ctx.skipper || 'You', boat: this.ctx.boatName, me: true, pace: false, leg: this.leg, toGo: this.toGo, finish: this.finish,
+      remaining: this.finish !== null ? 0 : remainingBy(marks, this.leg, this.toGo), damage: Math.round(this.ctx.sim.state.damage * 100), colour: this.ctx.colour ?? '',
+    }];
+    const here = new Set<string>();
     for (const b of this.ctx.fleet.boats) {
       if (b.raceId !== call.id) continue;
-      rows.push({ name: b.name || 'A skipper', boat: b.boatName, me: false, pace: false, leg: b.raceLeg, toGo: b.raceToGo, finish: b.raceFinish > 0 ? b.raceFinish : null });
+      here.add(b.peer);
+      const finish = b.raceFinish > 0 ? b.raceFinish : null;
+      const leg = Math.max(0, Math.min(marks.length - 1, Math.round(b.raceLeg) || 0));
+      const row: Standing = {
+        ...blank, name: b.name || 'A skipper', boat: b.boatName, me: false, pace: false, leg, toGo: b.raceToGo, finish,
+        remaining: finish !== null ? 0 : remainingBy(marks, leg, b.raceToGo), damage: b.damage, colour: b.colour, peer: b.peer, avatar: b.avatar,
+      };
+      this.seen.set(b.peer, row);
+      rows.push(row);
     }
-    for (const p of this.pacers) rows.push({ name: p.skipper, boat: p.name, me: false, pace: true, leg: p.leg, toGo: p.toGo, finish: p.finish });
-    return rows.sort((a, b) => {
+    for (const p of this.pacers) {
+      const who = p.entrant.who;
+      rows.push({
+        ...blank, name: p.skipper, boat: p.name, me: false, pace: true, leg: p.leg, toGo: p.toGo, finish: p.finish, remaining: p.remaining,
+        colour: who.colour, sail: who.sail, castId: who.id, level: p.entrant.level.name, character: who.character,
+      });
+    }
+    rows.sort((a, b) => {
       if (a.finish !== null || b.finish !== null) return (a.finish ?? Infinity) - (b.finish ?? Infinity);
-      return b.leg - a.leg || a.toGo - b.toGo;
+      return a.remaining - b.remaining;
     });
+    const first = rows[0]?.finish ?? null;
+    const leader = rows.find((r) => r.finish === null);
+    for (const r of rows) {
+      if (r.finish !== null) r.gapS = first === null ? 0 : r.finish - first;
+      else if (leader && this.started) r.gapM = r.remaining - leader.remaining;
+    }
+    // Someone who was racing and is gone, or has left the race, without a finish: retired.
+    for (const [peer, last] of this.seen) if (!here.has(peer) && last.finish === null) rows.push({ ...last, retired: true, gapM: null });
+    return rows;
   }
 
   /** One line for the bar under the clock. */
@@ -464,10 +533,11 @@ export class Race {
     if (!this.started) return `Race · ${preStartLine(this.preStart()!, call.marks[0].name)}`;
     const table = this.standings();
     const place = table.findIndex((s) => s.me) + 1;
-    const pos = table.length > 1 ? ` · ${ORDINAL[place - 1] ?? place} of ${table.length}` : '';
+    const racing = table.filter((r) => !r.retired).length;
+    const pos = racing > 1 ? ` · ${ORDINAL[place - 1] ?? place} of ${racing}` : '';
     if (this.finish !== null) return `Finished in ${clockText(this.finish)}${pos}`;
     const what = this.leg === 0 ? 'start ring at' : this.leg === call.marks.length - 1 ? 'finish at' : 'next';
-    return `Racing ${clockText(this.elapsed)}${pos} · ${what} ${this.nextMark?.name ?? ''} ${shortRange(Math.max(0, this.toGo - RING))}`;
+    return `Racing ${clockText(this.elapsed)}${pos} · ${what} ${this.nextMark?.name ?? ''} ${shortRange(Math.max(0, this.toGo - RING))}${this.note ? ` · ${this.note}` : ''}`;
   }
 
   /** The pace boats, for the chart and the collision watch. */
@@ -476,7 +546,9 @@ export class Race {
   }
 
   draw(seaTime: number, waves: Wave[], dt: number, camera: THREE.Camera, width: number, height: number): void {
-    for (const p of this.pacers) p.draw(seaTime, waves, dt, camera, width, height);
+    // A pace boat not yet built is built here, one a frame.
+    let build = true;
+    for (const p of this.pacers) if (p.draw(seaTime, waves, dt, camera, width, height, build)) build = false;
   }
 }
 

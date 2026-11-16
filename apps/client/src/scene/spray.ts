@@ -67,6 +67,8 @@ export class Spray {
   private readonly bury = new Map<string, number>();
   private readonly owed = new Map<string, number>();
   private readonly curl = new Map<string, number>();
+  /** What is left of the last slam or surf the sim reported for her own boat. */
+  private kicked = 0;
   private frame = 0;
 
   constructor() {
@@ -115,7 +117,10 @@ export class Spray {
     const was = this.bury.get(id);
     this.bury.set(id, buried);
     if (was === undefined || speed < 1.2) return;
-    const slam = Math.max(0, (buried - was) / dt) * (buried > 0 ? 1 : 0.35);
+    // Her own boat throws spray when the sim says she has slammed or caught a wave (`kick`). Others, by the shape of the sea.
+    const own = id === 'own' || id === 'own-stbd';
+    const slam = own ? this.kicked : Math.max(0, (buried - was) / dt) * (buried > 0 ? 1 : 0.35);
+    if (id === 'own') this.kicked *= Math.exp(-dt / 0.18);
     const big = Math.min(3, Math.max(1, beam / 3.6));
     const rate = (slam * 34 + Math.max(0, speed - 3.1) * 3) * Math.min(2.2, speed / 3) * (0.45 + Math.min(2.2, windKt / 14)) * this.amount;
     let owed = (this.owed.get(id) ?? 0) + rate * dt;
@@ -153,6 +158,11 @@ export class Spray {
       );
     }
     this.owed.set(id, owed);
+  }
+
+  /** Her own boat has slammed into a sea or caught one (`ctx.seaway`): a burst of spray off her bow. Strength 0 to 1. */
+  kick(strength: number): void {
+    this.kicked = Math.max(this.kicked, 2.4 * Math.min(1, Math.max(0, strength)));
   }
 
   /**

@@ -6,6 +6,10 @@
  * the air there is a bed of static under them. `open` is the click as the squelch lifts, `close` the short rush of
  * noise as it shuts again. Everything ends at the node handed in, which is the game's master volume, so the radio is
  * as loud or as quiet as the rest of the game.
+ *
+ * A call spoken by the browser's own speech cannot be put through this chain: browsers give no way to route it into
+ * Web Audio. For those the set does everything round the voice instead: the click, the static for as long as the
+ * words last (`open` with a level, weaker signals hissing more), a faint hum of carrier, and the tail.
  */
 export class Vhf {
   /** Connect received voices here. */
@@ -13,6 +17,7 @@ export class Vhf {
   private readonly hiss: GainNode;
   private readonly gate: GainNode;
   private readonly noise: AudioBuffer;
+  private readonly hum: GainNode;
   private isOpen = false;
 
   constructor(readonly ctx: AudioContext, private readonly out: AudioNode) {
@@ -52,14 +57,34 @@ export class Vhf {
     this.hiss.gain.value = 0;
     src.connect(filter('bandpass', 1700, 0.6)).connect(this.hiss).connect(this.gate);
     src.start();
+
+    // The carrier: a low hum that is only there while somebody is on the air. Kept well under the voice.
+    const carrier = ctx.createOscillator();
+    carrier.type = 'triangle';
+    carrier.frequency.value = 118;
+    this.hum = ctx.createGain();
+    this.hum.gain.value = 0;
+    carrier.connect(filter('lowpass', 420)).connect(this.hum).connect(this.gate);
+    carrier.start();
   }
 
-  /** A carrier has come up: the squelch opens with a click and the static comes in under the voice. */
-  open(): void {
+  /**
+   * A carrier has come up: the squelch opens with a click and the static comes in under the voice.
+   * @param level how much static: 1 under a voice that comes through the set. A spoken call asks for less, so the
+   *   words stay easy to follow, and for more of it the further off the caller is.
+   */
+  open(level = 1): void {
+    const now = this.ctx.currentTime;
+    this.hiss.gain.setTargetAtTime(0.045 * level, now, 0.02);
+    this.hum.gain.setTargetAtTime(0.012 * Math.min(1, level), now, 0.03);
     if (this.isOpen) return;
     this.isOpen = true;
     this.click(0.2);
-    this.hiss.gain.setTargetAtTime(0.045, this.ctx.currentTime, 0.02);
+  }
+
+  /** True while the squelch is open. */
+  get on(): boolean {
+    return this.isOpen;
   }
 
   /** The carrier has gone: a short rush of noise, then quiet. */
@@ -67,6 +92,7 @@ export class Vhf {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.hiss.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+    this.hum.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
     this.tail();
   }
 

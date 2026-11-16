@@ -2,10 +2,12 @@ import { KT, R2D } from '@slack-tide/sim';
 import type { RemoteBoat } from '../net/fleet';
 import { alone as noHost, onWeb } from '../net/platform';
 import { addEvent, eventLink, inText, isOpen, makeEvent, nextEvent, whenText, OPENS_BEFORE } from '../race/events';
+import { MIXES, type Mix } from '../race/cast';
 import { classText, clockText, type Race, type RaceCourse, type RaceMark } from '../race/race';
 import { HOW_A_RACE_WORKS, RING, marginText, shortRange } from '../race/startline';
 import type { YardBoat } from '../boat/yard';
 import { damageNote } from '../aboard/contactRules';
+import { resultsTable, rosterCards } from './racecards';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const HOW = `<h3>How a race works</h3><p class="lede">${HOW_A_RACE_WORKS.join(' ')}</p>`;
@@ -34,8 +36,10 @@ export class FleetPanel {
   private readonly bar = document.getElementById('racebar') as HTMLElement;
   private course = '';
   private minutes = 10;
-  /** Pace boats asked for. Until the player chooses: two when alone, none with friends, since each player's pace boats sail a little differently. */
+  /** Pace boats asked for. Until the player chooses: five when alone, none with friends, since each player's pace boats sail a little differently. */
   private pace: number | null = null;
+  /** What sort of club fleet they are. The beer can league unless she asks for better. */
+  private mix: Mix = 'beer';
   /** The class chosen for a race called or fixed here. Until the player chooses: her own boat. */
   private cls: string | null = null;
   private clock = 0;
@@ -80,6 +84,7 @@ export class FleetPanel {
     else if (d.course) this.course = d.course;
     else if (d.minutes) this.minutes = Number(d.minutes);
     else if (d.pace) this.pace = Number(d.pace);
+    else if (d.mix) this.mix = MIXES.find((m) => m.id === d.mix)?.id ?? 'beer';
     else if (d.cls) this.cls = d.cls;
     else if (d.join) {
       const offer = race.offers.get(d.join);
@@ -87,7 +92,7 @@ export class FleetPanel {
     } else if (d.act === 'leave') race.leave();
     else if (d.act === 'call') {
       const course = this.course === 'chart' ? { name: 'The route on the chart', marks: this.ctx.chartRoute() } : this.ctx.courses.find((c) => c.id === this.course);
-      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.paceNow(), this.clsNow());
+      if (course && course.marks.length >= 2) race.callRace(course, this.minutes, this.paceNow(), this.clsNow(), this.mix);
     }
     this.render();
   };
@@ -135,7 +140,7 @@ export class FleetPanel {
   }
 
   private paceNow(): number {
-    return this.pace ?? (this.ctx.boats().length ? 0 : 2);
+    return this.pace ?? (this.ctx.boats().length ? 0 : 5);
   }
 
   private clsNow(): string {
@@ -192,8 +197,10 @@ export class FleetPanel {
       <div class="chips"><span>Class</span>${this.ctx.classes.map((b) => `<button type="button" data-cls="${esc(b.id)}" aria-pressed="${b.id === this.clsNow()}" title="${esc(b.name)}">${esc(b.lengthFt ? `${b.lengthFt} ft` : b.name)}</button>`).join('')}</div>
       <p class="lede">One design: everyone who joins races the ${esc(own.name)}, whatever boat she came in, and has her own back afterwards.</p>
       ${chips('Gun in', 'minutes', [3, 5, 10, 15, 20], this.minutes, ' min')}
-      ${chips('Pace boats', 'pace', [0, 1, 2, 3], this.paceNow(), '')}
-      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the pace boats.' : 'Everyone on the water is told and can join with R.'} Pace boats are sailed by the autopilot in the race's class; with friends racing, leave them at 0 so everyone sees the same race.</p>
+      ${chips('Club boats', 'pace', [0, 1, 2, 3, 5, 7, 9], this.paceNow(), '')}
+      ${this.paceNow() > 0 ? `<div class="chips"><span>Fleet</span>${MIXES.map((m) => `<button type="button" data-mix="${m.id}" aria-pressed="${m.id === this.mix}" title="${esc(m.says)}">${esc(m.name)}</button>`).join('')}</div>
+      <p class="lede">${esc(MIXES.find((m) => m.id === this.mix)?.says ?? '')}.</p>` : ''}
+      <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the club boats.' : 'Everyone on the water is told and can join with R.'} Club boats are the yacht club's own skippers, sailed by the autopilot in the race's class: same boat as yours, and each as well or as badly as she sails. Everyone in the race gets the same skippers, but each player's page sails them itself, so with friends racing their places can differ a little from page to page.</p>
       <button type="button" class="primary" data-act="call">Call the race</button>
       <h3>Or fix a time and send a link</h3>
       <div class="fixrow"><label for="race-at">Gun at</label><input id="race-at" type="time" value="${esc(this.atTime)}"><button type="button" data-act="fix">Fix the race</button></div>
@@ -208,10 +215,6 @@ export class FleetPanel {
     const call = race.call!;
     const me = this.ctx.me();
     const table = race.standings();
-    const rows = table.map((s, i) => {
-      const where = s.finish !== null ? clockText(s.finish) : !race.started ? `${(s.toGo / 1852).toFixed(2)} nm from the start` : `${esc(call.marks[s.leg]?.name ?? '')} in ${(s.toGo / 1852).toFixed(2)} nm`;
-      return `<tr class="${s.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(s.name)}${s.pace ? ' <i>pace</i>' : ''}</td><td>${esc(s.boat)}</td><td>${s.finish !== null ? 'Finished' : `${s.leg} of ${call.marks.length}`}</td><td>${where}</td></tr>`;
-    }).join('');
     const start = call.marks[0];
     const pre = race.preStart();
     const head = pre
@@ -219,11 +222,13 @@ export class FleetPanel {
         ? `You are in the start ring round <b>${esc(start.name)}</b>: stay in it or close by, and you start as the gun goes.`
         : `The start ring round <b>${esc(start.name)}</b> is ${esc(shortRange(pre.dist))} off at ${deg3(Math.atan2(start.x - me.x, start.y - me.y))}°, and at this speed you are <b>${esc(marginText(pre))}</b>. Be inside it when the gun goes, or sail into it after.`} The way to it is on your chart and on the water. The course goes on the chart at the gun, and the pilot will steer it (Shift+P to route, then P).</p>`
       : race.finish !== null
-        ? `<p class="count">${clockText(race.finish)}</p><p class="lede">Your time. ${table.length > 1 ? `You placed ${race.place} of ${table.length}.` : ''}</p>`
+        ? `<p class="count">${clockText(race.finish)}</p><p class="lede">Your time. ${table.length > 1 ? `You placed ${table.findIndex((r) => r.me) + 1} of ${table.filter((r) => !r.retired).length}.` : ''}${table.some((r) => r.finish === null && !r.retired) ? ' The boats still out are sailing on to the finish: their times go in as they cross.' : ''}</p>`
         : `<p class="count">${clockText(race.elapsed)}</p><p class="lede">Racing. ${race.leg === 0 ? 'Sail into the start ring round' : 'Next ring:'} <b>${esc(race.nextMark?.name ?? '')}</b>, ${esc(shortRange(Math.max(0, race.toGo - RING)))}.</p>`;
     const cls = race.classOf(call);
     return { live: `<h3>${esc(call.name)}${cls ? ` · one design, ${esc(cls.name)}` : ''}</h3>${head}
-      <table><thead><tr><th></th><th>Skipper</th><th>Boat</th><th>Marks</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      ${race.finish !== null ? `<h3>Results</h3>${resultsTable(table, call.marks.length)}` : ''}
+      <h3>${race.finish !== null ? 'The fleet' : pre ? `On the line: ${table.length} ${table.length === 1 ? 'boat' : 'boats'}` : 'The race'}</h3>
+      ${rosterCards(table, race.started, call.marks.length)}
       <p class="lede">${esc(call.marks.map((m) => m.name).join(' → '))}</p>`, form: `<button type="button" data-act="leave">${race.finish !== null ? 'Done' : 'Leave the race'}</button>${race.finish !== null ? '' : HOW}` };
   }
 

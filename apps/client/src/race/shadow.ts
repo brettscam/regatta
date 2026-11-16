@@ -1,4 +1,4 @@
-import type { EnvSample, Environment } from '@slack-tide/sim';
+import type { EnvSample, Environment, SeaSample } from '@slack-tide/sim';
 
 /**
  * Wind shadow: the bad air a boat under sail leaves to leeward of her. Pure: positions and wind in, a factor out.
@@ -124,6 +124,11 @@ export class ShadedWind implements Environment {
     o.currentY = e.currentY;
     o.depth = e.depth;
     return o;
+  }
+
+  /** The sea is the world's own: a wind shadow does not flatten it. */
+  sea(x: number, y: number, t: number): SeaSample | null | undefined {
+    return this.base.sea?.(x, y, t);
   }
 }
 
