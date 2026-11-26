@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BARE, BREATH, DIVE_POINTS, ENTRY, FLAG, GRAB, GUN, KICK,
-  alarm, blackoutAt, breathRate, cleanDive, effortOf, glide, lungsFor, urge, canDive, canFire, diverNear, fightSeconds, gauge, grab, holdBreath, inSeason, judge, lightAt, lobsterSeason, lobstersAt, makeGround,
+  alarm, blackoutAt, breathRate, cleanDive, lobsterAwards, effortOf, glide, lungsFor, urge, canDive, canFire, diverNear, fightSeconds, gauge, grab, holdBreath, inSeason, judge, lightAt, lobsterSeason, lobstersAt, makeGround,
   markRadius, nameKey, newBreath, packDive, populate, readDive, recover, runOver, shoot, siteAt, spook, stepFish, surfaceInterval, surfaced, surge,
   underwaterVisibility, zoneAt,
   type DiveFile, type DiveSpecies, type Diver, type Fish, type Lungs,
@@ -36,6 +36,7 @@ describe('the data', () => {
         expect(s.size[0]).toBeLessThan(s.size[1]);
         expect(s.wary).toBeGreaterThanOrEqual(0);
         expect(s.colour).toMatch(/^#[0-9a-f]{6}$/);
+        expect(['bass', 'jack', 'disc', 'flat', 'big', 'lion', 'ray', 'shark', 'eel', 'seal', 'turtle']).toContain(s.shape);
         // A protected fish has no size or bag to tempt anyone with.
         if (s.protected || s.spare) expect(s.minCm).toBeUndefined();
         expect(s.say.length).toBeGreaterThan(20);
@@ -705,6 +706,17 @@ describe('lobster', () => {
     expect(full.keep).toBe(false);
     expect(full.why).toBe('limit');
     expect(rule.bag).toBe(7);
+  });
+
+  it('a lobster taken in practice is practice: a couple of points, and not one for the logbook', () => {
+    const practice = lobsterAwards(true, true);
+    expect(practice.counts).toBe(false);
+    expect(practice.awards).toEqual([{ kind: 'dive', points: DIVE_POINTS.practice, label: 'A legal lobster, in practice' }]);
+    expect(DIVE_POINTS.practice).toBeLessThan(DIVE_POINTS.lobster / 2);
+    const real = lobsterAwards(false, true);
+    expect(real.counts).toBe(true);
+    expect(real.awards.map((x) => x.points)).toEqual([DIVE_POINTS.lobster, DIVE_POINTS.first]);
+    expect(lobsterAwards(false, false).awards).toHaveLength(1);
   });
 
   it('out of season every one goes back, and nothing leaves a reserve', () => {
