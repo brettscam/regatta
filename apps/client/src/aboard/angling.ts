@@ -392,8 +392,10 @@ export class Angling implements Feature {
       book.earn({ kind: 'fish', points: xpFor(l.points), label: l.fate === 'kept' ? 'Fish landed' : 'Fish let go' });
     }
     this.desk.landed(l);
-    const title = l.fate === 'kept' ? 'In the box' : l.fate === 'short' ? 'Short: back it goes' : l.fate === 'poached' ? 'Kept, against the law' : l.fate === 'protected' ? 'Let go, as she must be' : 'Let go';
-    const tail = landedWords(this.trip, hooked, l).split('. ').slice(1).join('. ');
+    const title = l.fate === 'kept' ? 'In the box' : l.fate === 'short' ? 'Too short' : l.fate === 'poached' ? 'Kept, against the law' : l.fate === 'protected' ? 'Let go, as she must be' : 'Let go';
+    const sp = hooked.species;
+    const box = this.trip.aboard.get(sp.id) ?? 0;
+    const tail = l.fate === 'kept' ? `${box} aboard today${sp.bag !== undefined ? ` of ${sp.bag}` : ''} · ${sp.limit}` : landedWords(this.trip, hooked, l).split('. ').slice(1).join('. ');
     this.showCatch(title, scoreWords(hooked.species.name, l.cm, l.kg, l.points, hooked.species.measure), tail, `Today: ${this.trip.landed.length} fish · ${this.trip.points} points${this.desk.call ? ` · ${this.desk.line()}` : ''}`, 8);
   }
 

@@ -228,7 +228,8 @@ export class FishCard {
       this.parts = [...this.el.querySelectorAll<HTMLElement>('.part')];
     }
     const d = this.derby();
-    const html = [this.here(), this.tackle(), d.live, d.form];
+    // In a tournament the clock and the leaderboard come first. Otherwise what is biting, then the tackle.
+    const html = this.m.desk.call ? [d.live, this.here(), this.tackle(), d.form] : [this.here(), this.tackle(), d.live, d.form];
     html.forEach((h, i) => {
       if (this.shown[i] === h) return;
       this.shown[i] = h;

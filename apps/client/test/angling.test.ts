@@ -8,6 +8,7 @@ import { hereOf, localClock } from '../src/fishing/here';
 import { addToCreel, bigness, creelRows, emptyCreel, firstTableWorth, landedPoints, pointsFor, readCreel, scoreWords, xpFor } from '../src/fishing/points';
 import { LURES, RIGS, fishingWaters, speciesOf, tableOf, type FishSpecies, type Habitat } from '../src/fishing/table';
 import { fateOf, freshAt, landFish, landedWords, newTrip, workPatch } from '../src/fishing/trip';
+import { fishTip } from '../src/fishing/tip';
 import { reserveAt, reservesOf } from '../src/fishing/zones';
 import { worldOf } from './waters';
 
@@ -577,5 +578,19 @@ describe('what may be kept', () => {
     expect(readCreel(JSON.parse(JSON.stringify(c)))).toEqual(c);
     expect(readCreel(null)).toEqual(emptyCreel());
     expect(readCreel({ points: -5, fish: 'many', species: { 'BAD ID': { name: 'x', n: 1 }, ok: { name: 'ok', n: 2, bestCm: 1e9, bestKg: NaN, bestPoints: 10 } } }).species).toEqual({ ok: { name: 'ok', n: 2, bestCm: 600, bestKg: 0, bestPoints: 10, water: '' } });
+  });
+});
+
+describe('the tip a boat that lives here would pass on', () => {
+  it('names a ground and a fish that are really biting there now', () => {
+    for (const hours of [0.5, 3, 7, 14.5]) {
+      const w = world(hours);
+      const tip = fishTip(table, reserves, w, TZ, 0, w.seasonTime(0));
+      expect(tip, `${hours} h`).not.toBeNull();
+      const g = table.grounds.find((k) => k.name === tip!.place)!;
+      const s = spotAt(table, reserves, hereOf(w, TZ, g.circle![0], g.circle![1], 0, 0.4, 0.4, false), w.seasonTime(0));
+      const rig = tip!.how === 'with a live bait' ? 'bait' : 'squid';
+      expect(prospects(table, s, tackle({ rig, bait: 1 }))[0].species.name).toBe(tip!.species);
+    }
   });
 });

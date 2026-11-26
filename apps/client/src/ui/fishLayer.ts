@@ -79,6 +79,11 @@ export function fishingLayer(table: FishTable, reserves: readonly Reserve[], sea
         }
       }
       for (const g of table.grounds) {
+        // The sand flats are a wide area with no edge worth drawing: a name in the middle of them.
+        if (g.box && g.kind === 'flats' && p.scale > 0.02) {
+          const [sx, sy] = p.to((g.box[0] + g.box[2]) / 2, (g.box[1] + g.box[3]) / 2 - 900);
+          label(ctx, g.name.replace(/^the /, ''), sx, sy, GREEN);
+        }
         if (g.box || g.kind === 'offshore') continue;
         const at = outline(ctx, p, g);
         if (!at) continue;

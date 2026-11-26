@@ -5,6 +5,9 @@ import type { AboardContext, Feature } from './feature';
 import { meet, metCount } from './met';
 import type { Radio } from './radio';
 import { residentsOf } from './residentData';
+import { tableOf } from '../fishing/table';
+import { fishTip } from '../fishing/tip';
+import { reservesOf } from '../fishing/zones';
 import { MAST_SHARE, ResidentView } from './residentModels';
 import {
   DUEL, Roster, alongside, blankState, duelCall, duelResult, gatherFacts, givesWay, grumble, hailReply, hasRadio, introduction, keepClear, lagAfter,
@@ -446,6 +449,9 @@ export class Residents implements Feature {
     this.introduce(i);
     const spec: ResidentSpec = this.roster.boats[i].spec;
     const facts = gatherFacts(ctx.world, ctx.places, s.x, s.y, s.t, this.hour());
+    // A water with its own fishing answers from its own table, so the tip is true of the fish that live here.
+    const fishing = tableOf(ctx.stage.course.id);
+    if (fishing) facts.fish = fishTip(fishing, reservesOf(ctx.stage.course.id), ctx.world, ctx.stage.course.timeZone, s.t, ctx.seasonNow());
     const text = hailReply(spec, { mode: this.all[i].mode, bound: this.states[i].bound }, facts, this.hails[i]++, this.boatName);
     this.greetedAt[i] = s.t;
     this.pending = { index: i, at: performance.now() + 1400 + 900 * ((i * 7) % 3), text };

@@ -2,7 +2,7 @@
 // They are here and not in `style.css` so that fishing brings everything it needs with it.
 const CSS = `
 .fishline[hidden], .fishcatch[hidden] { display: none; }
-.fishline { left: var(--edge-left); bottom: calc(var(--edge-bottom) + 46px); width: min(400px, calc(100% - 290px)); padding: 10px 13px 11px; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.4; pointer-events: none; }
+.fishline { z-index: 4; left: var(--edge-left); bottom: calc(var(--edge-bottom) + 98px); width: min(400px, calc(100% - 290px)); padding: 10px 13px 11px; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.4; pointer-events: none; }
 .fishline h4 { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 10px; }
 .fishline h4 i { font-style: normal; color: var(--amber); letter-spacing: 0.06em; }
 .fishline p { margin: 0; color: rgba(238, 243, 244, 0.88); }
@@ -27,7 +27,7 @@ const CSS = `
 .fishcatch span { font-size: 12.5px; color: rgba(238, 243, 244, 0.86); }
 .fishcatch i { font-style: normal; font-size: 12px; color: var(--dim); }
 body.lobby .fishline, body.lobby .fishcatch, body.lobby .fishcard { display: none; }
-.fleetpanel.fishcard { right: auto; left: var(--edge-left); top: calc(var(--edge-top, 16px) + 150px); max-height: calc(100% - 220px); width: min(440px, calc(100% - 32px)); }
+.fleetpanel.fishcard { width: min(460px, calc(100% - 32px)); }
 .fishcard .biting { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .fishcard .biting li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 64px; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; background: rgba(238, 243, 244, 0.04); border-radius: 8px; }
 .fishcard .biting span { color: var(--dim); font-size: 11.5px; }
