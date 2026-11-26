@@ -171,6 +171,8 @@ export class SkySystem {
   readonly sunDir = new THREE.Vector3(0, 1, 0);
   readonly sunColor = new THREE.Color(1, 1, 1);
   readonly sunLight = new THREE.DirectionalLight(0xffffff, 3);
+  /** Everything of the sky that is drawn, as against its lights: left out of a frame seen from under water (`Stage.drawUnder`). */
+  readonly backdrop: THREE.Object3D[] = [];
   readonly fill = new THREE.HemisphereLight(0xbfd7ee, 0x1c3a44, 0.35);
   readonly reflection: THREE.WebGLCubeRenderTarget;
   elevation = 0;
@@ -324,6 +326,7 @@ export class SkySystem {
     this.marineLayer.push(bank, envBank);
 
     scene.add(this.sky, this.cirrus, bank, this.sunLight, this.sunLight.target, this.fill, this.nightSky.group);
+    this.backdrop.push(this.sky, this.cirrus, bank, this.nightSky.group);
   }
 
   /** The fog bank offshore belongs to San Francisco Bay. Other waters do without it. */
