@@ -233,7 +233,8 @@ export class FleetPanel {
       <div class="go-bar"><p class="lede">${esc(picked ? picked.name : 'No course')}${this.when === 'now' ? `, gun in ${this.minutes} min` : gun !== null ? `, gun at ${esc(clockAt(gun))}` : ''}${this.paceNow() ? `, ${this.paceNow()} club boat${this.paceNow() > 1 ? 's' : ''}` : ''}</p>${action}</div>
       ${this.fixNote ? `<p class="lede note">${esc(this.fixNote)}</p>` : ''}
       <p class="lede">${noHost() ? 'In this copy of the game other people cannot join a race, so you race the club boats.' : 'Everyone on the water is told and can join with R.'} Club boats are the yacht club's own skippers, sailed by the autopilot in the race's class. Each player's page sails them itself, so with friends racing their places can differ a little from page to page.</p>
-      ${HOW}` };
+      ${HOW}
+      ${document.getElementById('fishcard') ? '<h3>Fishing tournaments</h3><p class="lede">This water has fishing tournaments too: most points, biggest fish, a jackpot. Press <b>Shift+L</b> for the fishing card to call one or join one.</p>' : '' /* fishing: the card is `ui/fishcard.ts` */}` };
   }
 
   /** In a race: the clock and the standings, which tick, and the way out, which does not. */

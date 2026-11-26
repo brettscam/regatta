@@ -106,6 +106,23 @@ export interface Snap {
   marks: number;
   /** The next one: how far, and whether it lies too close to the wind to sail straight at. */
   mark: { d: number; upwind: boolean } | null;
+
+  // ---- fishing, on a water with its own fishing table (`aboard/angling.ts`). Left out everywhere else. ----
+  fishing?: {
+    /** The lines are out. */
+    out: boolean;
+    /** She is over water a towed lure can fish: open water, a reef, a breakwater. */
+    trollWater: boolean;
+    /** The bait barge is within a mile, and the live baits in the tank. */
+    bargeNear: boolean;
+    bait: number;
+    /** A fish is on. */
+    fighting: boolean;
+    /** Somebody has called a fishing tournament she has not joined. */
+    offered: boolean;
+    /** Fish landed on this sail. */
+    landed: number;
+  };
 }
 
 /** A snapshot of nothing happening: a boat sailing along alone on her first minute. Tests and the feature start from this. */

@@ -16,6 +16,7 @@ import { account as askAccount, alone, onWeb, type Account } from '../net/platfo
 import { Store, type FeedbackEntry, type Tally } from '../net/store';
 import { mountAccountBadge } from './accountBadge';
 import { ProfilePane } from './profile';
+import { catchCard } from './catchCard'; // the fishing book
 
 interface RoadmapItem { id: string; status: string; area: string; title: string; text: string }
 interface Release { id: string; name: string; theme: string; when: string; blurb: string; items: RoadmapItem[] }
@@ -513,7 +514,7 @@ export class Board {
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${this.diveCard()}${this.metCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${catchCard()}${this.barHop()}${this.seenCard()}${this.diveCard()}${this.metCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */

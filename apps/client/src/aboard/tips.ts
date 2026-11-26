@@ -396,6 +396,8 @@ export class Tips implements Feature {
       tenderOthers: (ctx.feature('kayak') as { tenderOthers?: () => string[] } | undefined)?.tenderOthers?.() ?? [],
       depth: o.underKeel === null ? 99 : o.underKeel + ctx.spec.dimensions.draft,
       marks: passage.marks.length - passage.nextIndex, mark,
+      // Fishing, where the water has its own (`aboard/angling.ts`).
+      fishing: (ctx.feature('fishing') as { tipState?: () => Snap['fishing'] } | undefined)?.tipState?.(),
     };
   }
 }

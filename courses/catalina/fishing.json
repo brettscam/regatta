@@ -1,0 +1,268 @@
+{
+  "note": "Fishing on the San Pedro Channel: what lives where, what it takes, how big it runs and what may be kept. All of it is from general knowledge of Southern California sport fishing, not from a survey or the current regulations booklet: sizes, limits and positions are approximate. No-take reserves are not listed here: they are the `zones` of this water's dives.json, read through fishing/zones.ts, so fishing and diving obey one list. Read by apps/client/src/fishing/table.ts; the rules that use it are in fishing/grounds.ts and fishing/bites.ts. Lengths in centimetres, positions in flat metres east and north of the course origin.",
+  "name": "Southern California",
+  "jackpot": "yellowtail",
+  "bait": { "name": "live sardines", "scoop": 12, "most": 24 },
+  "grounds": [
+    { "id": "alamitos", "name": "Alamitos Bay", "kind": "harbor", "circle": [17000, 22300, 1500], "depth": [1, 9], "say": "Spotted bay bass round the docks and the eelgrass, halibut on the sand in the entrance." },
+    { "id": "bait-barge", "name": "the bait barge", "kind": "barge", "circle": [16900, 21550, 520], "say": "Stop here for a scoop of live sardines." },
+    { "id": "flats", "name": "the harbor flats", "kind": "flats", "box": [3500, 17300, 21500, 24600], "depth": [3, 22], "say": "Sand inside the breakwater: halibut on a drifted bait, sand bass and croaker." },
+    { "id": "sp-breakwater", "name": "the San Pedro breakwater", "kind": "rocks", "line": [[1900, 17450], [4100, 17500]], "width": 280, "say": "Calico and sand bass tight to the rocks." },
+    { "id": "mid-breakwater", "name": "the middle breakwater", "kind": "rocks", "line": [[4900, 17700], [10100, 18950]], "width": 280, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
+    { "id": "lb-breakwater", "name": "the Long Beach breakwater", "kind": "rocks", "line": [[10900, 19100], [15100, 19200]], "width": 280, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
+    { "id": "horseshoe", "name": "Horseshoe Kelp", "kind": "reef", "circle": [7400, 13300, 1700], "say": "A low reef three miles out: sand bass, calico, sculpin, and barracuda over the top of it." },
+    { "id": "kelp-line", "name": "the island kelp line", "kind": "kelp", "box": [-24500, -30500, 4500, -7500], "depth": [4, 30], "say": "The kelp along the island's front side: calico, sheephead, whitefish, and white seabass at first light." },
+    { "id": "hen-rock", "name": "Hen Rock", "kind": "point", "circle": [-6150, -16750, 550], "say": "The reef just outside the Long Point reserve: yellowtail come round the corner along the kelp." },
+    { "id": "east-end", "name": "the East End", "kind": "point", "circle": [-460, -27070, 1300], "say": "Yellowtail off the corner of the island, and the first place a marlin is seen." },
+    { "id": "bird-rock", "name": "Bird Rock", "kind": "point", "circle": [-17350, -10980, 650], "say": "A white rock off the Isthmus with yellowtail and calico round it." },
+    { "id": "ship-rock", "name": "Ship Rock", "kind": "point", "circle": [-17810, -9650, 650], "say": "A pinnacle in deep water: yellowtail and bonito on top, whitefish down the sides." },
+    { "id": "isthmus-cove", "name": "Isthmus Cove", "kind": "cove", "circle": [-18250, -11650, 700], "depth": [3, 30], "say": "Sand between the moorings: halibut." },
+    { "id": "cat-harbor", "name": "Catalina Harbor", "kind": "cove", "circle": [-19350, -13900, 900], "depth": [3, 30], "say": "Mud and sand on the back side: halibut and bass." },
+    { "id": "whites", "name": "White's Landing", "kind": "cove", "circle": [-6500, -17750, 700], "depth": [3, 30], "say": "A long sand beach: halibut on the flat off it." },
+    { "id": "far-side", "name": "the far side of the channel", "kind": "offshore", "box": [-22000, -24000, 14000, -3000], "depth": [100, 9999], "say": "Blue water under the island: the tuna and the marlin, when they are in." }
+  ],
+  "platforms": [
+    { "id": "eureka", "name": "Platform Eureka", "kind": "platform", "x": 17005, "y": 1530, "keepOff": 100, "reach": 480, "provisional": true },
+    { "id": "ellen", "name": "Platforms Ellen and Elly", "kind": "platform", "x": 15930, "y": 3570, "keepOff": 100, "reach": 480, "provisional": true },
+    { "id": "edith", "name": "Platform Edith", "kind": "platform", "x": 14770, "y": 5080, "keepOff": 100, "reach": 480, "provisional": true },
+    { "id": "eva", "name": "Platform Eva", "kind": "platform", "x": 22175, "y": 12315, "keepOff": 100, "reach": 420, "provisional": true },
+    { "id": "emmy", "name": "Platform Emmy", "kind": "platform", "x": 23750, "y": 12425, "keepOff": 100, "reach": 420, "provisional": true },
+    { "id": "grissom", "name": "Island Grissom", "kind": "island", "x": 11135, "y": 23035, "keepOff": 90, "reach": 380, "provisional": true },
+    { "id": "white", "name": "Island White", "kind": "island", "x": 13045, "y": 22490, "keepOff": 90, "reach": 380, "provisional": true },
+    { "id": "chaffee", "name": "Island Chaffee", "kind": "island", "x": 15030, "y": 21145, "keepOff": 90, "reach": 380, "provisional": true },
+    { "id": "freeman", "name": "Island Freeman", "kind": "island", "x": 12830, "y": 21345, "keepOff": 90, "reach": 380, "provisional": true }
+  ],
+  "platformsNote": "Provisional: approximate positions from memory, kept here until the scenery's own table of the oil islands and platforms lands. Reconcile at merge and delete whichever is the copy.",
+  "paddies": { "area": [-13000, -11000, 17000, 12000], "count": 7, "hours": 3, "holding": 0.6, "driftKt": 0.25 },
+  "schools": [
+    { "id": "gate", "area": [6500, 13800, 16000, 18300], "count": 2, "minutes": 25, "odds": 0.6, "kinds": { "boil": 1 } },
+    { "id": "channel", "area": [-11000, -9000, 17000, 11500], "count": 4, "minutes": 25, "odds": 0.5, "kinds": { "boil": 0.62, "yellows": 0.3, "foamer": 0.08 } },
+    { "id": "front", "area": [-16000, -21000, 6000, -9000], "count": 3, "minutes": 25, "odds": 0.45, "kinds": { "boil": 0.5, "yellows": 0.3, "foamer": 0.2 } }
+  ],
+  "refs": [
+    { "name": "Queens Gate", "x": 10510, "y": 19050 },
+    { "name": "Platform Eureka", "x": 17005, "y": 1530 },
+    { "name": "Long Point", "x": -6050, "y": -15850 },
+    { "name": "Avalon", "x": -2250, "y": -22700 },
+    { "name": "the Isthmus", "x": -18250, "y": -11750 }
+  ],
+  "callers": ["Pelican Too", "Second Wind", "Reel Tide", "Miss Avalon", "Dos Hermanos"],
+  "species": [
+    {
+      "id": "calico", "name": "calico bass", "size": [25, 52], "trophyCm": 68, "kgPerCm3": 1.6e-5, "minCm": 36, "bag": 5, "worth": 300,
+      "limit": "14 inches to keep, five bass a day",
+      "habitat": { "kelp": 1, "rocks": 0.8, "reef": 0.6, "platform": 0.7, "point": 0.7, "paddy": 0.1 },
+      "ways": { "bait": 1, "iron": 0.35, "squid": 0.3 },
+      "light": 0.55, "night": 0.3,
+      "fight": { "power": 0.3, "stamina": 0.16, "dives": 0.8 },
+      "hint": "Calico live in the kelp and on the rocks and platform legs. A live sardine at the edge of the kelp is the way."
+    },
+    {
+      "id": "sandbass", "name": "sand bass", "size": [25, 50], "trophyCm": 64, "kgPerCm3": 1.6e-5, "minCm": 36, "bag": 5, "worth": 250,
+      "limit": "14 inches to keep, five bass a day",
+      "habitat": { "flats": 0.7, "reef": 1, "rocks": 0.6, "harbor": 0.3 },
+      "depth": [4, 8, 40, 60],
+      "ways": { "bait": 1, "iron": 0.3, "squid": 0.6 },
+      "light": 0.6, "night": 0.8,
+      "fight": { "power": 0.25, "stamina": 0.14, "dives": 0.6 },
+      "hint": "Sand bass sit on low reef and hard sand in 10 to 40 m and bite into the evening."
+    },
+    {
+      "id": "spotty", "name": "spotted bay bass", "size": [18, 36], "trophyCm": 46, "kgPerCm3": 1.7e-5, "minCm": 36, "bag": 5, "worth": 220,
+      "limit": "14 inches to keep, so nearly all of them go back",
+      "habitat": { "harbor": 1 },
+      "ways": { "bait": 0.8, "iron": 0.9, "squid": 0.6 },
+      "light": 0.7, "night": 0.5, "tide": "moving",
+      "fight": { "power": 0.15, "stamina": 0.08, "dives": 0.4 },
+      "hint": "Spotted bay bass live inside the bay round docks and eelgrass, and bite best on a moving tide."
+    },
+    {
+      "id": "halibut", "name": "California halibut", "size": [40, 95], "trophyCm": 125, "kgPerCm3": 1.0e-5, "minCm": 56, "bag": 5, "worth": 600,
+      "limit": "22 inches to keep, five a day",
+      "habitat": { "flats": 1, "cove": 1, "harbor": 0.5 },
+      "depth": [2, 3, 20, 30],
+      "ways": { "bait": 1, "squid": 0.35 },
+      "light": 0.8, "night": 0.3, "tide": "moving", "driftOnly": true,
+      "fight": { "power": 0.35, "stamina": 0.2, "dives": 0.9 },
+      "hint": "Halibut lie on sand in 3 to 20 m and want a live bait drifted slowly over them on a moving tide."
+    },
+    {
+      "id": "croaker", "name": "yellowfin croaker", "size": [20, 38], "trophyCm": 48, "kgPerCm3": 1.3e-5, "bag": 10, "worth": 110,
+      "limit": "no size limit, ten a day",
+      "habitat": { "flats": 0.8, "harbor": 0.7, "cove": 0.3 },
+      "depth": [1, 2, 10, 16],
+      "ways": { "bait": 0.5, "squid": 1 },
+      "light": 0.45, "night": 0.9,
+      "fight": { "power": 0.1, "stamina": 0.06, "dives": 0.3 },
+      "hint": "Croaker feed on the shallow sand, best early, late and after dark, on a bit of squid."
+    },
+    {
+      "id": "mackerel", "name": "Pacific mackerel", "size": [24, 40], "trophyCm": 48, "kgPerCm3": 1.1e-5, "worth": 50,
+      "limit": "no limit",
+      "habitat": { "rocks": 0.5, "reef": 0.5, "harbor": 0.4, "boil": 0.5, "platform": 0.5, "kelp": 0.3 },
+      "ways": { "bait": 0.5, "iron": 0.5, "squid": 0.7 },
+      "troll": { "kt": [2.5, 3.5, 6, 7.5], "lures": { "feather": 0.5 } },
+      "light": 0.8, "night": 0.5,
+      "fight": { "power": 0.1, "stamina": 0.05, "dives": 0.2 },
+      "hint": "Mackerel are everywhere there is bait, and take anything small."
+    },
+    {
+      "id": "bonito", "name": "Pacific bonito", "size": [35, 66], "trophyCm": 84, "kgPerCm3": 1.35e-5, "bag": 10, "worth": 250,
+      "limit": "ten a day",
+      "habitat": { "boil": 1, "channel": 0.22, "rocks": 0.3, "reef": 0.3, "point": 0.5, "platform": 0.6, "paddy": 0.2 },
+      "ways": { "bait": 1, "iron": 0.8 },
+      "troll": { "kt": [4, 5, 7, 8.5], "lures": { "feather": 1, "plug": 0.4 } },
+      "light": 0.6, "night": 0,
+      "fight": { "power": 0.4, "stamina": 0.25, "dives": 0.2 },
+      "hint": "Bonito chase bait outside the gate and round the platforms. Troll feathers at 5 to 7 kt or cast to the birds."
+    },
+    {
+      "id": "barracuda", "name": "Pacific barracuda", "size": [55, 98], "trophyCm": 116, "kgPerCm3": 4.5e-6, "minCm": 71, "bag": 10, "worth": 300,
+      "limit": "28 inches to keep, ten a day",
+      "habitat": { "boil": 0.7, "channel": 0.16, "reef": 0.7, "kelp": 0.25, "point": 0.4 },
+      "ways": { "bait": 1, "iron": 0.8 },
+      "troll": { "kt": [4, 5, 7, 8.5], "lures": { "feather": 1, "plug": 0.5 } },
+      "light": 0.5, "night": 0,
+      "fight": { "power": 0.35, "stamina": 0.2, "dives": 0.1 },
+      "hint": "Barracuda run over the reefs and along the kelp in summer. Feathers at 5 to 7 kt, or an iron."
+    },
+    {
+      "id": "yellowtail", "name": "yellowtail", "size": [55, 105], "trophyCm": 135, "kgPerCm3": 1.5e-5, "minCm": 61, "bag": 10, "worth": 900,
+      "limit": "24 inches to keep, ten a day",
+      "habitat": { "yellows": 1, "paddy": 0.75, "point": 0.6, "platform": 0.45, "kelp": 0.12, "channel": 0.05 },
+      "ways": { "bait": 1, "iron": 0.5 },
+      "troll": { "kt": [5, 6, 8, 9.5], "lures": { "plug": 1, "feather": 0.3 } },
+      "light": 0.5, "night": 0,
+      "fight": { "power": 0.7, "stamina": 0.55, "dives": 0.7 },
+      "hint": "Yellowtail hold off the island's points, round the platforms and under kelp paddies. A live bait, or a plug at 6 to 8 kt."
+    },
+    {
+      "id": "dorado", "name": "dorado", "size": [50, 100], "trophyCm": 140, "kgPerCm3": 9e-6, "bag": 10, "worth": 1000,
+      "limit": "no size limit, ten a day",
+      "habitat": { "paddy": 1, "channel": 0.035, "offshore": 0.08 },
+      "ways": { "bait": 1, "iron": 0.35 },
+      "troll": { "kt": [6, 7, 9, 10.5], "lures": { "plug": 1, "marlin": 0.4, "feather": 0.3 } },
+      "months": [7, 8, 9, 10],
+      "light": 0.7, "night": 0,
+      "fight": { "power": 0.6, "stamina": 0.4, "dives": 0.1 },
+      "hint": "Dorado come up the coast in warm water and live under floating kelp paddies. Find a paddy, stop short of it and cast, or troll past its edge at 7 to 9 kt."
+    },
+    {
+      "id": "skipjack", "name": "skipjack tuna", "size": [40, 64], "trophyCm": 80, "kgPerCm3": 1.9e-5, "bag": 10, "worth": 450,
+      "limit": "ten a day",
+      "habitat": { "boil": 0.35, "foamer": 0.5, "channel": 0.05, "offshore": 0.12 },
+      "ways": { "bait": 0.8, "iron": 0.6 },
+      "troll": { "kt": [5.5, 6.5, 9, 10.5], "lures": { "feather": 1, "plug": 0.8 } },
+      "months": [7, 8, 9, 10],
+      "light": 0.6, "night": 0,
+      "fight": { "power": 0.5, "stamina": 0.3, "dives": 0.3 },
+      "hint": "Skipjack run with the warm water in the open channel and take small lures trolled fast."
+    },
+    {
+      "id": "yellowfin", "name": "yellowfin tuna", "size": [60, 105], "trophyCm": 150, "kgPerCm3": 1.9e-5, "bag": 10, "worth": 2000,
+      "limit": "ten tuna a day",
+      "habitat": { "foamer": 1, "offshore": 0.035, "paddy": 0.12 },
+      "ways": { "bait": 1, "iron": 0.4 },
+      "troll": { "kt": [6, 7, 9, 10.5], "lures": { "plug": 1, "marlin": 0.5 } },
+      "months": [7, 8, 9, 10],
+      "light": 0.5, "night": 0,
+      "fight": { "power": 0.85, "stamina": 0.75, "dives": 0.9 },
+      "hint": "Yellowfin show as foamers: white water and diving birds on the far side of the channel. Get ahead of them, stop, and cast, or troll a plug past the edge at 7 to 9 kt."
+    },
+    {
+      "id": "bluefin", "name": "bluefin tuna", "size": [70, 135], "trophyCm": 200, "kgPerCm3": 1.9e-5, "bag": 2, "worth": 3000,
+      "limit": "two a day",
+      "habitat": { "foamer": 0.45, "offshore": 0.012 },
+      "ways": { "bait": 1, "iron": 0.3 },
+      "troll": { "kt": [6, 7, 9, 10.5], "lures": { "plug": 0.8, "marlin": 0.5 } },
+      "light": 0.35, "night": 0,
+      "fight": { "power": 1, "stamina": 1, "dives": 1 },
+      "hint": "Bluefin are the trip-maker: foamers at dawn and dusk on the far side. They are line-shy and they do not stop."
+    },
+    {
+      "id": "marlin", "name": "striped marlin", "size": [160, 225], "trophyCm": 270, "kgPerCm3": 7.5e-6, "bag": 1, "worth": 4000,
+      "limit": "one a day, and most are let go",
+      "measure": "from the jaw to the fork",
+      "habitat": { "offshore": 0.03, "point": 0.008 },
+      "ways": {},
+      "troll": { "kt": [6, 7, 9, 10.5], "lures": { "marlin": 1 } },
+      "months": [7, 8, 9, 10],
+      "light": 0.7, "night": 0,
+      "fight": { "power": 0.95, "stamina": 0.9, "dives": 0.2 },
+      "hint": "A striped marlin is a late-summer fish of the far side and the East End: a big lure at 7 to 9 kt, and a lot of empty miles."
+    },
+    {
+      "id": "sheephead", "name": "sheephead", "size": [25, 52], "trophyCm": 75, "kgPerCm3": 2.2e-5, "minCm": 31, "bag": 2, "worth": 380,
+      "limit": "12 inches to keep, two a day",
+      "habitat": { "kelp": 0.8, "platform": 0.6, "reef": 0.5, "rocks": 0.4, "point": 0.6 },
+      "ways": { "squid": 1, "bait": 0.25 },
+      "light": 0.9, "night": 0,
+      "fight": { "power": 0.4, "stamina": 0.2, "dives": 1 },
+      "hint": "Sheephead crunch mussels off the rocks and the platform legs by day. Squid on the bottom."
+    },
+    {
+      "id": "whitefish", "name": "ocean whitefish", "size": [25, 48], "trophyCm": 64, "kgPerCm3": 1.5e-5, "bag": 10, "worth": 200,
+      "limit": "ten a day",
+      "habitat": { "kelp": 0.7, "point": 0.8, "reef": 0.4 },
+      "depth": [10, 18, 80, 110],
+      "ways": { "squid": 1, "bait": 0.4 },
+      "light": 0.9, "night": 0.1,
+      "fight": { "power": 0.25, "stamina": 0.12, "dives": 0.8 },
+      "hint": "Whitefish are on the island's rocky bottom outside the kelp, in 20 m and more, on squid."
+    },
+    {
+      "id": "seabass", "name": "white seabass", "size": [60, 115], "trophyCm": 150, "kgPerCm3": 1.0e-5, "minCm": 71, "bag": 3, "worth": 1400,
+      "limit": "28 inches to keep, three a day",
+      "habitat": { "kelp": 0.5, "cove": 0.15 },
+      "ways": { "bait": 1, "squid": 0.3 },
+      "light": 0.04, "night": 0.4,
+      "fight": { "power": 0.65, "stamina": 0.45, "dives": 0.6 },
+      "hint": "White seabass ghost along the kelp at grey light and are gone when the sun is on the water. Be on the kelp line before dawn with a live bait."
+    },
+    {
+      "id": "opaleye", "name": "opaleye", "size": [20, 38], "trophyCm": 50, "kgPerCm3": 2.2e-5, "bag": 10, "worth": 120,
+      "limit": "ten a day",
+      "habitat": { "kelp": 0.5, "rocks": 0.4, "cove": 0.3 },
+      "depth": [1, 2, 10, 16],
+      "ways": { "squid": 0.6 },
+      "light": 1, "night": 0,
+      "fight": { "power": 0.2, "stamina": 0.08, "dives": 0.6 },
+      "hint": "Opaleye graze the shallow rocks and take a small bait by day."
+    },
+    {
+      "id": "rockfish", "name": "rockfish", "size": [25, 48], "trophyCm": 62, "kgPerCm3": 1.9e-5, "bag": 10, "worth": 220,
+      "limit": "ten a day in all",
+      "habitat": { "platform": 1, "reef": 0.5, "point": 0.4 },
+      "depth": [30, 45, 9999, 99999],
+      "ways": { "squid": 1, "bait": 0.6, "iron": 0.5 },
+      "light": 1, "night": 0.6,
+      "fight": { "power": 0.2, "stamina": 0.1, "dives": 0.3 },
+      "hint": "Rockfish stack up deep under the platforms, in 45 m and more. Squid or a heavy iron on the bottom."
+    },
+    {
+      "id": "sculpin", "name": "sculpin", "size": [20, 34], "trophyCm": 43, "kgPerCm3": 2.2e-5, "minCm": 25, "bag": 5, "worth": 170,
+      "limit": "10 inches to keep, five a day, and mind the spines",
+      "habitat": { "platform": 0.6, "reef": 1, "rocks": 0.3 },
+      "depth": [12, 20, 9999, 99999],
+      "ways": { "squid": 1, "bait": 0.3 },
+      "light": 0.6, "night": 1,
+      "fight": { "power": 0.1, "stamina": 0.05, "dives": 0.3 },
+      "hint": "Sculpin sit on hard bottom in 20 m and more and bite best in the evening and after dark."
+    },
+    {
+      "id": "giantseabass", "name": "giant sea bass", "size": [90, 175], "trophyCm": 220, "kgPerCm3": 2.0e-5, "worth": 1800,
+      "protected": "Giant sea bass are protected and none may be kept: let her go at the rail",
+      "limit": "protected: always let go",
+      "habitat": { "kelp": 0.035, "platform": 0.05, "reef": 0.03 },
+      "ways": { "bait": 1, "squid": 0.5 },
+      "light": 0.8, "night": 0.5,
+      "fight": { "power": 0.9, "stamina": 0.8, "dives": 1 },
+      "hint": "Giant sea bass, as long as a man, live in the kelp and under the platforms. They are protected: a fish to meet, not to keep."
+    }
+  ],
+  "rivals": [
+    { "id": "calico", "w": 5 }, { "id": "sandbass", "w": 4 }, { "id": "mackerel", "w": 3 }, { "id": "bonito", "w": 4 }, { "id": "barracuda", "w": 3 },
+    { "id": "halibut", "w": 1.5 }, { "id": "sheephead", "w": 2 }, { "id": "whitefish", "w": 2 }, { "id": "rockfish", "w": 2 }, { "id": "sculpin", "w": 1.5 },
+    { "id": "yellowtail", "w": 1.4 }, { "id": "dorado", "w": 0.5 }, { "id": "seabass", "w": 0.15 }, { "id": "yellowfin", "w": 0.12 }
+  ]
+}

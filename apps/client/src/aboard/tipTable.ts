@@ -245,7 +245,7 @@ export const TIPS: Tip[] = [
   {
     id: 'catch', icon: 'fish', title: 'Catch supper', keys: ['L', 'K'], priority: 15, hold: 20, cooldown: 3 * DAY, max: 2,
     text: 'L puts a fishing line over: when the crew shout "Fish on", press L again quickly. K drops a crab pot with a buoy: come back in about an hour and press K beside it.',
-    when: (s) => !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
+    when: (s) => !s.fishing && !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
     done: ['KeyL', 'KeyK'],
   },
   {
@@ -253,6 +253,38 @@ export const TIPS: Tip[] = [
     text: '5 puts you in the water with a mask, fins and a speargun, from the boat at anchor or from the tender. The arrow keys are your fins: up kicks, down puts your head down to dive. You have one breath, so kick, glide, and rest on the float between dives.',
     when: (s) => !s.tender && !s.racing && !s.night && s.hold !== 'none' && s.heldFor > 150 && s.depth > 2 && s.depth < 30,
     done: ['Digit5'],
+  },
+
+  // ---- fishing, on a water with its own fishing (`s.fishing` is there) ---------------------------------------
+  {
+    id: 'fish-troll', icon: 'fish', title: 'Tow a lure', keys: ['L'], priority: 16, hold: 25, cooldown: 2 * DAY, max: 3,
+    text: (s) => `She is making ${s.speedKt.toFixed(0)} knots over fishing water. L puts a lure out astern: feathers fish at 5 to 7 knots, plugs at 6 to 9. When the reel goes off, slow down.`,
+    when: (s) => !!s.fishing && !s.fishing.out && s.fishing.trollWater && !s.tender && !s.racing && s.hold === 'none' && s.t > 240 && s.speedKt > 4.5 && s.speedKt < 9.5 && !s.night,
+    done: ['KeyL'],
+  },
+  {
+    id: 'fish-fight', icon: 'fish', title: 'Fish on', keys: ['L'], priority: 88, urgent: true, max: 3, cooldown: 600, secs: 14,
+    text: 'Hold L to wind while the fish rests, and let go while it runs: the drag tires it for you. Slow the boat, or the line parts. Winding against a run breaks it too.',
+    when: (s) => !!s.fishing?.fighting,
+    doneWhen: (s) => (s.fishing?.landed ?? 0) >= 3,
+  },
+  {
+    id: 'fish-card', icon: 'fish', title: 'The fishing card', keys: ['Shift', '+', 'L'], priority: 14, hold: 40, cooldown: 2 * DAY, max: 2,
+    text: 'Shift+L opens the fishing card: what is biting here and why, the lure or the bait, the day\'s catch, and tournaments against the club or your friends. The chart (M) has a fishing layer.',
+    when: (s) => !!s.fishing?.out && !s.fishing.fighting && !s.racing,
+    done: ['Shift+KeyL'],
+  },
+  {
+    id: 'fish-bait', icon: 'fish', title: 'The bait barge', keys: [], priority: 15, hold: 10, cooldown: 2 * DAY, max: 2,
+    text: 'The bait barge is close by. Stop beside it, under a knot and a half, and the crew take a scoop of live sardines: nearly everything eats one, and it is the only way for halibut.',
+    when: (s) => !!s.fishing?.bargeNear && s.fishing.bait === 0 && !s.racing && !s.tender,
+    doneWhen: (s) => (s.fishing?.bait ?? 0) > 0,
+  },
+  {
+    id: 'fish-derby', icon: 'flag', title: 'A fishing tournament', keys: ['Shift', '+', 'L'], priority: 45, hold: 4, cooldown: 1800, max: 4,
+    text: 'A fishing tournament has been called on this water. Shift+L, then Join: fish anywhere you like until the lines come out, and the leaderboard is on the card.',
+    when: (s) => !!s.fishing?.offered && !s.racing,
+    ack: ['Shift+KeyL'],
   },
 
   // ---- the board -------------------------------------------------------------------------------------

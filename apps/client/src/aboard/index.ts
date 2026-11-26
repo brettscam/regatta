@@ -7,6 +7,8 @@ import { Dockside } from './dock';
 import { Engine } from './engine';
 import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
+import { Angling } from './angling';
+import { tableOf } from '../fishing/table';
 import { FlowView } from './flow';
 import { Mooring } from './mooring';
 import { Pilotage } from './pilotage';
@@ -41,7 +43,9 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),
-    new Fishing(ctx),
+    // A water with its own fishing table (`courses/<id>/fishing.json`) fishes by it: trolling, bait, the fight, tournaments.
+    // The others keep the game's first fishing. Both answer to L and are the feature called 'fishing'.
+    ((table) => (table ? new Angling(ctx, table) : new Fishing(ctx)))(tableOf(ctx.stage.course.id)),
     new Mooring(ctx),
     // A powerboat's own: it says what she is doing before the engine does, and takes no keys. Nothing aboard a boat with sails.
     new Powerboat(ctx),
