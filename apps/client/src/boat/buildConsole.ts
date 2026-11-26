@@ -125,7 +125,7 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
   const leg = new THREE.MeshStandardMaterial({ color: 0x2b2f34, roughness: 0.45, metalness: 0.3 });
   const cushion = new THREE.MeshStandardMaterial({ color: 0xe8e4d6, roughness: 0.9 });
   const piping = new THREE.MeshStandardMaterial({ color: 0x29476b, roughness: 0.85 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0x6f8793, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x24323b, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
   const canvas = new THREE.MeshStandardMaterial({ color: darkHull ? new THREE.Color(topsides) : new THREE.Color(0x1f3a5c), roughness: 0.9, side: THREE.DoubleSide });
   const cork = new THREE.MeshStandardMaterial({ color: 0xa9825a, roughness: 0.8 });
   const graphite = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.4, metalness: 0.2 });
@@ -204,7 +204,10 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
   // ---- hull ------------------------------------------------------------------------------------------
   const hullGroup = add('hull', new THREE.Group());
   const deckGroup = add('deck', new THREE.Group());
-  solids.push(hullGroup, deckGroup);
+  // What is slender (the T-top and its legs, the leaning post, the rails, the rods) is kept apart from what is solid:
+  // the camera stays out of the hull and the console, and only steps across the rest.
+  const fittings = add('fittings', new THREE.Group());
+  solids.push(hullGroup, deckGroup, fittings);
   const NS = 44;
   const stations = Array.from({ length: NS + 1 }, (_, i) => {
     // Closer together at the bow, where the shape changes fastest.
@@ -409,12 +412,26 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
 
     // The windscreen: tinted acrylic raked back, inside a stainless grab rail.
     const wy0 = CON_TOP + 0.01;
-    const wy1 = CON_TOP + 0.44;
+    const wy1 = CON_TOP + 0.33;
     const wz0 = CON_Z0 + 0.06;
     const wz1 = CON_Z0 + 0.2;
-    face([V(-CON_W + 0.03, wy0, wz0), V(CON_W - 0.03, wy0, wz0), V(CON_W - 0.09, wy1, wz1), V(-CON_W + 0.09, wy1, wz1)], glass, consoleGroup).castShadow = false;
-    for (const s of [-1, 1]) face([V(s * (CON_W - 0.03), wy0, wz0), V(s * (CON_W - 0.01), wy0, wz0 + 0.3), V(s * (CON_W - 0.07), wy1 - 0.1, wz1 + 0.24), V(s * (CON_W - 0.09), wy1, wz1)], glass, consoleGroup).castShadow = false;
-    tube([V(-CON_W, CON_TOP - 0.02, wz0 + 0.36), V(-CON_W + 0.01, wy0 + 0.06, wz0 + 0.3), V(-CON_W + 0.08, wy1 + 0.03, wz1 + 0.02), V(0, wy1 + 0.05, wz1 - 0.01), V(CON_W - 0.08, wy1 + 0.03, wz1 + 0.02), V(CON_W - 0.01, wy0 + 0.06, wz0 + 0.3), V(CON_W, CON_TOP - 0.02, wz0 + 0.36)], 0.014, steel, consoleGroup);
+    {
+      // One sheet bent round the front of the console: the foot follows the console's edge, the top leans back.
+      const N = 10;
+      const foot = (u: number) => {
+        const a = (u - 0.5) * Math.PI * 0.86;
+        return V(Math.sin(a) * (CON_W - 0.03), wy0, wz0 + (1 - Math.cos(a)) * 0.34);
+      };
+      const rows = [0, 1].map((k) => Array.from({ length: N + 1 }, (_, i) => {
+        const q = foot(i / N);
+        return k === 0 ? q : V(q.x * 0.92, wy1 - 0.14 * Math.pow(Math.abs(i / N - 0.5) * 2, 2), q.z + (wz1 - wz0) + 0.02);
+      }));
+      const screen = skin(rows, glass, fittings);
+      screen.castShadow = false;
+      screen.receiveShadow = false;
+      // The grab rail round its top edge, down to the console at each side.
+      tube([V(-CON_W, CON_TOP - 0.02, wz0 + 0.42), ...rows[1].map((q) => q.clone().add(V(0, 0.035, 0))), V(CON_W, CON_TOP - 0.02, wz0 + 0.42)], 0.014, steel, fittings);
+    }
 
     // The seat on the front of the console, a cooler under its cushion.
     block(-0.36, SOLE, CON_Z0 - 0.46, 0.36, SOLE + 0.42, CON_Z0 - 0.02, gel, consoleGroup);
@@ -429,7 +446,7 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
   const TOP_W = 0.78;
   {
     const top = new THREE.Group();
-    deckGroup.add(top);
+    fittings.add(top);
     // Four legs from the sole beside the console, leaning in to the frame, with a brace each side at head height.
     for (const s of [-1, 1]) {
       const x0 = s * (CON_W + 0.06);
@@ -493,7 +510,7 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
   const postZ = CON_Z1 + 0.82;
   {
     const post = new THREE.Group();
-    deckGroup.add(post);
+    fittings.add(post);
     const y = SOLE + 0.84;
     for (const s of [-1, 1]) tube([V(s * 0.4, SOLE, postZ - 0.14), V(s * 0.4, y - 0.05, postZ - 0.1), V(s * 0.4, y + 0.3, postZ + 0.16), V(s * 0.4, y - 0.05, postZ + 0.2), V(s * 0.4, SOLE, postZ + 0.24)], 0.02, alloy, post);
     block(-0.45, y - 0.04, postZ - 0.16, 0.45, y + 0.06, postZ + 0.16, cushion, post);
@@ -535,7 +552,7 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
     // Flush holders in the gunwale cap, two a side aft, raked outboard and aft as trolling rods are carried.
     const holders: Array<[string, number, number, boolean]> = [['rod_port', 0.86, -1, true], ['rod_stbd', 0.86, 1, true], ['rod_port_fwd', 0.74, -1, false], ['rod_stbd_fwd', 0.74, 1, false]];
     for (const [name, t, s, stocked] of holders) {
-      const holder = add(name, new THREE.Group(), deckGroup);
+      const holder = add(name, new THREE.Group(), fittings);
       holder.position.set(s * (innerX(t) + CAP * 0.5), capY(t), zAt(t));
       holder.quaternion.setFromUnitVectors(UP, V(s * 0.42, 0.82, 0.38).normalize());
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 6, 12), steel);
@@ -556,8 +573,8 @@ export function buildConsole(spec: BoatSpec, livery: Livery = {}): SloopModel {
     };
     const high = (t: number) => 0.3 * smooth(0.46, 0.4, t) * (0.75 + 0.25 * smooth(0.05, 0.2, t));
     const pts = [...railT.slice().reverse().map((t) => railAt(t, -1).add(V(0, high(t), 0))), V(0, capY(0.02) + 0.24, zAt(0.02) + rake(0.02, capY(0.02)) + 0.06), ...railT.map((t) => railAt(t, 1).add(V(0, high(t), 0)))];
-    tube(pts, 0.014, steel, deckGroup);
-    for (const s of [-1, 1]) for (const t of [0.08, 0.2, 0.32]) rod(railAt(t, s), railAt(t, s).add(V(0, high(t), 0)), 0.011, steel, deckGroup);
+    tube(pts, 0.014, steel, fittings);
+    for (const s of [-1, 1]) for (const t of [0.08, 0.2, 0.32]) rod(railAt(t, s), railAt(t, s).add(V(0, high(t), 0)), 0.011, steel, fittings);
     const cleat = (p: THREE.Vector3, along: number): void => {
       const c = new THREE.Group();
       c.position.copy(p);

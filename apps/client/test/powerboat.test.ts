@@ -159,11 +159,11 @@ describe('the sea, as her skipper is told it', () => {
     const easy = running(env(0, chop), 10);
     easy.setHelm('heading', 0);
     easy.advance(10);
-    expect(comfortNote(p, easy.state, easy.out)).toBe('this sea is good for 16 kt on this heading');
+    expect(comfortNote(p, easy.state, easy.out)).toBe('the sea allows 16 kt');
     const hard = running(env(0, chop), 30);
     hard.setHelm('heading', 0);
     hard.advance(3);
-    expect(comfortNote(p, hard.state, hard.out)).toBe('too fast for this sea: 16 kt is comfortable');
+    expect(comfortNote(p, hard.state, hard.out)).toBe('too fast: the sea allows 16 kt');
     // Out of gear there is nothing to advise.
     hard.setThrottle(0);
     expect(comfortNote(p, hard.state, hard.out)).toBe('');

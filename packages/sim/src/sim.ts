@@ -1,6 +1,6 @@
 import { D2R, R2D, KT, clamp, lerp, wrapPi, wrapTau, smoothstep, approach, interp1 } from './math';
 import { polarSpeed } from './polar';
-import { comfortSpeed, fitOut, leverBurn, leverFor, leverRpm, leverSnap, leverSpeed, planing, topSpeed, waveG, waveSpan } from './power';
+import { comfortSpeed, faceLength, fitOut, leverBurn, leverFor, leverRpm, leverSnap, leverSpeed, planing, topSpeed, waveG, waveSpan } from './power';
 import type { BoatFile, BoatSpec, ControlName, EngineSpec, Environment, HelmMode, PowerSpec, SailReport, SeaSample, SimOutputs, SimState } from './types';
 
 /** Fixed step. The sim never takes any other step size. */
@@ -1261,8 +1261,7 @@ export class Sim {
     const d = this.boat.dimensions;
     const rel = wrapPi(sea.dir - s.heading);
     const cos = Math.cos(rel);
-    const span = waveSpan(p, d.lwl, sea.length);
-    const felt = sea.height * span;
+    const felt = sea.height * waveSpan(p, d.lwl, faceLength(p, sea));
     const k = (Math.PI * 2) / sea.length;
     const waveSpeed = Math.sqrt(9.81 / k);
     // How fast she closes with the crests: negative when she is overtaking them.
@@ -1475,7 +1474,7 @@ export class Sim {
     s.boomAngle = approach(s.boomAngle, 0, BOOM_SLEW * 0.2 * dt);
     s.jibAngle = approach(s.jibAngle, 0, JIB_SLEW * 0.2 * dt);
     // Bare poles: a few degrees of roll from the wind on the rig, no more.
-    const lean = -(o.awa >= 0 ? 1 : -1) * Math.min(4, (o.aws / KT) * 0.12) * D2R * Math.abs(Math.sin(o.awa));
+    const lean = this.boat.power ? 0 : -(o.awa >= 0 ? 1 : -1) * Math.min(4, (o.aws / KT) * 0.12) * D2R * Math.abs(Math.sin(o.awa));
     s.heel += (lean - s.heel) * (1 - Math.exp(-dt / 2));
     Object.assign(o.main, emptySail());
     Object.assign(o.jib, emptySail());
@@ -1485,6 +1484,16 @@ export class Sim {
     o.heelLoad = 0;
     o.heelPenalty = 1;
     o.targetSpeed = 0;
+    // A powerboat lying to her anchor is off the plane, sitting as she floats, with nothing left of her last landing.
+    const power = this.boat.power;
+    if (power) {
+      o.plane = 0;
+      o.trim = power.trim.deg[0] * D2R;
+      o.comfort = topSpeed(power);
+      o.impact = 0;
+      o.air = 0;
+      o.seaLoss = 0;
+    }
     o.weatherHelm = 0;
     o.rudderGrip = 1;
     o.knockedDown = false;

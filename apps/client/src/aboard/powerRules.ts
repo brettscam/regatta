@@ -100,6 +100,6 @@ export function comfortNote(p: PowerSpec, s: Pick<SimState, 'speed' | 'throttle'
   const comfortKt = o.comfort / KT;
   if (!s.engineOn || s.throttle <= 0 || comfortKt >= top - 0.5) return '';
   const kt = s.speed / KT;
-  if (kt > comfortKt + 1.5) return `too fast for this sea: ${Math.floor(comfortKt)} kt is comfortable`;
-  return `this sea is good for ${Math.floor(comfortKt)} kt on this heading`;
+  if (kt > comfortKt + 1.5) return `too fast: the sea allows ${Math.floor(comfortKt)} kt`;
+  return `the sea allows ${Math.floor(comfortKt)} kt`;
 }

@@ -61,7 +61,7 @@ const fragment = /* glsl */ `
 `;
 
 /** What she is doing, as far as her lights go. */
-export type LightsFor = 'sail' | 'power' | 'ship' | 'anchor';
+export type LightsFor = 'sail' | 'power' | 'ship' | 'anchor' | 'launch';
 
 export class NavLights {
   readonly points: THREE.Points;
@@ -111,8 +111,10 @@ export class NavLights {
    * The lights of one vessel. Scene coordinates.
    * @param y height of her waterline now
    * @param mast height of her masthead above the water, for the lights carried there
+   * @param side for a `launch`, a small open powerboat: how high her sidelights are. She shows them and one white light
+   *   seen all round at `mast`, as a power-driven vessel under 12 m may, in place of a masthead light and a sternlight.
    */
-  vessel(x: number, y: number, z: number, heading: number, length: number, beam: number, mast: number, what: LightsFor): void {
+  vessel(x: number, y: number, z: number, heading: number, length: number, beam: number, mast: number, what: LightsFor, side = 1.5): void {
     const fx = Math.sin(heading);
     const fz = -Math.cos(heading);
     const sx = -fz;
@@ -121,14 +123,22 @@ export class NavLights {
       this.add(x, y + mast, z, fx, fz, 0, 4, WHITE, 1);
       return;
     }
+    if (what === 'launch') {
+      const at = length * 0.08;
+      const out = beam * 0.3;
+      this.add(x + fx * at + sx * out, y + side, z + fz * at + sz * out, fx, fz, SIDE, SIDE, GREEN, 1);
+      this.add(x + fx * at - sx * out, y + side, z + fz * at - sz * out, fx, fz, -SIDE, SIDE, RED, 1);
+      this.add(x - fx * length * 0.2, y + mast, z - fz * length * 0.2, fx, fz, 0, 4, WHITE, 1.2);
+      return;
+    }
     const big = what === 'ship' ? 1.5 : what === 'power' ? 1.2 : 1;
     const bow = length * 0.44;
     const deck = what === 'ship' ? length * 0.055 + 3 : what === 'power' ? 3.2 : 1.5;
-    const side = beam * (what === 'sail' ? 0.22 : 0.45);
+    const wide = beam * (what === 'sail' ? 0.22 : 0.45);
     // On a yacht the sidelights are on the pulpit. On a ship they are on the bridge wings, well aft.
     const at = what === 'ship' ? -length * 0.3 : what === 'power' ? length * 0.2 : bow;
-    this.add(x + fx * at + sx * side, y + deck, z + fz * at + sz * side, fx, fz, SIDE, SIDE, GREEN, big);
-    this.add(x + fx * at - sx * side, y + deck, z + fz * at - sz * side, fx, fz, -SIDE, SIDE, RED, big);
+    this.add(x + fx * at + sx * wide, y + deck, z + fz * at + sz * wide, fx, fz, SIDE, SIDE, GREEN, big);
+    this.add(x + fx * at - sx * wide, y + deck, z + fz * at - sz * wide, fx, fz, -SIDE, SIDE, RED, big);
     this.add(x - fx * length * 0.49, y + deck * 0.9, z - fz * length * 0.49, fx, fz, Math.PI, STERN_HALF, WHITE, big);
     if (what === 'power') this.add(x + fx * length * 0.15, y + mast, z + fz * length * 0.15, fx, fz, 0, MAST_HALF, WHITE, 1.3);
     if (what === 'ship') {

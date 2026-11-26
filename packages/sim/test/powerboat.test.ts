@@ -276,13 +276,27 @@ describe('the sea decides how fast she can go', () => {
     expect(comfortSpeed(boat, sea, 90 * D2R)).toBeGreaterThan(comfortSpeed(boat, sea, 45 * D2R) * 1.2);
     expect(comfortSpeed(boat, sea, 90 * D2R) / KT).toBeLessThan(34);
     expect(comfortSpeed(boat, sea, 180 * D2R) / KT).toBeGreaterThan(35);
-    // The easy afternoon sea of the channel leaves her free abeam.
-    expect(comfortSpeed(boat, chop(0.65, 23), 90 * D2R)).toBeCloseTo(topSpeed(p), 6);
+    // The easy afternoon sea of the channel leaves her nearly free abeam.
+    expect(comfortSpeed(boat, chop(0.65, 23), 90 * D2R) / KT).toBeGreaterThan(34);
   });
 
-  it('a longer sea of the same height lets her go faster, and a steeper one slower', () => {
-    expect(head(chop(1, 30))).toBeGreaterThan(head(chop(1, 20)) + 6);
-    expect(head(chop(1, 15))).toBeLessThan(head(chop(1, 20)));
+  it('higher is slower all the way up: 25, 20, 17, 12 and under 10 kt for half a metre to two', () => {
+    const table = [0.5, 0.65, 0.75, 1, 1.5, 2].map((h) => head(chop(h, h * 20)));
+    for (let i = 1; i < table.length; i++) expect(table[i], `row ${i}`).toBeLessThan(table[i - 1]);
+    expect(table[1]).toBeGreaterThan(18);
+    expect(table[1]).toBeLessThan(23);
+    expect(table[4]).toBeGreaterThan(10);
+    expect(table[4]).toBeLessThan(14);
+    expect(table[5]).toBeLessThan(10.5);
+    expect(table[5]).toBeGreaterThan(7);
+  });
+
+  it('a steeper sea of the same height is harder, and a long swell of the same height is no trouble at all', () => {
+    expect(head(chop(1, 14))).toBeLessThan(head(chop(1, 20)) - 1);
+    // A wind sea is met by its steep faces, whatever its average: the channel's 1 m at 35 m is no kinder than 1 m at 20.
+    expect(head(chop(1, 35))).toBeCloseTo(head(chop(1, 20)), 6);
+    expect(head(chop(1, 200))).toBeGreaterThan(35);
+    expect(head(chop(0.8, 225))).toBeCloseTo(topSpeed(p) / KT, 6);
   });
 
   it('at her comfortable speed she does not slam, and is not hurt', () => {

@@ -11,6 +11,8 @@ export interface YardBoat extends BoatSpec {
   model?: string;
   /** Working views of her own, by name (helm, mast, foredeck, drone), where a sloop's would look at the wrong place. */
   views?: Record<string, import('../camera/drone').ViewPreset>;
+  /** A small open powerboat's navigation lights, metres above the water: the one white light seen all round, and her sidelights. */
+  lights?: { allRound: number; side: number };
   defaultName?: string;
   homePort?: string;
   topsides?: string;

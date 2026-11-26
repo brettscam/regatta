@@ -185,7 +185,7 @@ export class Session {
     // Under power she is planned at her cruising speed whatever the wind, with nothing taken off for a crew's sailing.
     this.passage.planOptions = opts.spec.power ? POWER_PLAN : undefined;
     this.passage.setRoute(opts.route, this.sim.state, this.sim.state.t);
-    this.hud.setPower(opts.spec.power && opts.spec.engine ? { tankL: opts.spec.engine.tankL, topRpm: opts.spec.power.curve.rpm[opts.spec.power.curve.rpm.length - 1] } : null);
+    this.hud.setPower(!!opts.spec.power);
     this.chart = new Chart({
       world,
       passage: this.passage,
@@ -350,7 +350,7 @@ export class Session {
     this.identity.boat = spec.id;
     this.passage.planOptions = spec.power ? POWER_PLAN : undefined;
     this.passage.setPolar(spec.polar, sim.state, sim.state.t);
-    this.hud.setPower(spec.power && spec.engine ? { tankL: spec.engine.tankL, topRpm: spec.power.curve.rpm[spec.power.curve.rpm.length - 1] } : null);
+    this.hud.setPower(!!spec.power);
     // The old model goes, with everything made for it.
     stage.scene.remove(old.root);
     old.root.traverse((o) => {
@@ -701,7 +701,7 @@ export class Session {
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
     this.sound.update(o.aws / KT, sim.state.speed / KT + motion.surf * 3, loose, paused);
 
-    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower || !!this.spec.power, held: sim.state.hold !== 'none' }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower || !!this.spec.power, held: sim.state.hold !== 'none', launch: this.spec.lights, plane: sim.out.plane }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
 
   /** A short account of the boat and the conditions, for attaching to feedback. */

@@ -35,6 +35,16 @@ export interface StageBoat {
   /** Under engine and in gear, or lying to an anchor or a mooring: for the lights she shows at night. */
   power?: boolean;
   held?: boolean;
+  /**
+   * A small open powerboat's lights: the height of the one white light she shows all round, and of her sidelights,
+   * metres above the water. Given, she is lit as a launch whenever she is not held. See `NavLights.vessel`.
+   */
+  launch?: { allRound: number; side: number };
+  /**
+   * 0 to 1, how far a planing hull is up on the plane. Her stem is clear of the water then, so the spray that a
+   * displacement bow throws at that speed is not thrown: what she does throw comes off her chines (`aboard/powerboat.ts`).
+   */
+  plane?: number;
   /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
   hulls?: number;
 }
@@ -76,7 +86,8 @@ export class Stage {
   /** Small craft afloat this frame (the tenders, `aboard/kayak.ts`), drawn in the same wakes and spray as every vessel. Filled and emptied by their owners. */
   readonly craft: WakeVessel[] = [];
   private readonly afloat: WakeVessel[] = [];
-  private readonly white = new THREE.Color();
+  /** What white water looks like in this light: bright by day, warm at sunset, a grey ghost at night. Set each frame. */
+  readonly white = new THREE.Color(1, 1, 1);
   private readonly tint = new THREE.Color();
   private readonly seaAt = (x: number, z: number, count: number) => waveHeight(this.waves, x, z, this.seaTime, count);
   private seaTime = 0;
@@ -261,7 +272,8 @@ export class Stage {
     lights.begin(1 - THREE.MathUtils.smoothstep(this.sky.elevation, -0.1, 0.02), camera, this.renderer.domElement.height, this.weather.see);
     if (lights.lit) {
       const len = boat.length ?? 11.6;
-      lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
+      if (boat.launch) lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, boat.launch.allRound, boat.held ? 'anchor' : 'launch', boat.launch.side);
+      else lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
       for (const s of ships) {
         const y = this.seaAt(s.x, -s.y, 4);
         if (s.kind === 'sail') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 1.4, s.sog < 0.25 ? 'anchor' : 'sail');
@@ -319,7 +331,8 @@ export class Stage {
       const dx = v.x - camera.position.x;
       const dz = v.z - camera.position.z;
       if (dx * dx + dz * dz > 220 * 220 + v.length * v.length * 9) continue;
-      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
+      const drives = v.id === 'own' ? 1 - 0.65 * (boat.plane ?? 0) : 1;
+      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed * drives, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
     }
     // White water takes the colour of the light: bright by day, warm at sunset, a grey ghost at night.
     this.white.copy(this.haze.color).multiplyScalar(0.3).add(this.tint.copy(this.sky.sunColor).multiplyScalar(0.62 * day + 0.05));

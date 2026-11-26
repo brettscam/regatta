@@ -100,12 +100,12 @@ export class Hud {
   }
 
   /**
-   * Fit the readout to the boat. A powerboat (anything given here) reads revs, fuel and the range that fuel gives at
-   * this moment's speed and burn, where a sailing boat reads the apparent and true wind. The wind is still on the dial
-   * and in the line under it. Null puts the sailing cells back.
+   * Fit the readout to the boat. A powerboat reads revs, fuel and the range that fuel gives at this moment's speed and
+   * burn, where a sailing boat reads the apparent and true wind. The wind is still on the dial and in the line under it.
+   * @param on true for a boat with no sails; false puts the sailing cells back
    */
-  setPower(info: { tankL: number; topRpm: number } | null): void {
-    this.power = info !== null;
+  setPower(on: boolean): void {
+    this.power = on;
     const swap: Record<string, [string, string]> = { awa: ['Revs', 'rpm'], aws: ['Fuel', 'L'], tws: ['Range', 'nm'] };
     for (const [key, c] of this.captions) {
       const to = this.power && swap[key] ? swap[key] : [c.label, c.unitText];

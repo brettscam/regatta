@@ -121,14 +121,31 @@ export function meeting(p: PowerSpec, rel: number): number {
 }
 
 /**
- * The g a significant wave top throws her up with at a speed, m/s: half the height she feels times the square of how
- * fast she meets the waves. `rel` is where the waves come from off her bow, radians: 0 a head sea, pi dead astern.
+ * The length of the waves she lands on, metres. A wind sea is met as waves of at least `faceSteep` (see `PowerSpec`),
+ * so its faces are shorter than the train's own length; a swell, steepness under about 0.01, keeps its length.
+ */
+export function faceLength(p: PowerSpec, sea: SeaSample): number {
+  const steep = sea.steepness > 0 ? sea.steepness : sea.height / sea.length;
+  const windSea = smoothstep(0.008, 0.02, steep);
+  return sea.height / (steep + (Math.max(steep, p.sea.faceSteep) - steep) * windSea);
+}
+
+/** How much more a throw counts for in a high sea, where she has further to fall: 1 up to `dropRef` metres. */
+function fall(p: PowerSpec, height: number): number {
+  return Math.max(1, Math.pow(height / p.sea.dropRef, p.sea.dropPow));
+}
+
+/**
+ * How hard a significant wave top throws her at a speed, m/s, in g: half the height she feels times the square of
+ * how fast she meets the faces, and more again in a high sea (`fall`). At `comfortG` she is on the edge of leaving the
+ * water. `rel` is where the waves come from off her bow, radians: 0 a head sea, pi dead astern.
  */
 export function waveG(p: PowerSpec, lwl: number, sea: SeaSample, rel: number, speed: number): number {
-  const k = (Math.PI * 2) / sea.length;
+  const length = faceLength(p, sea);
+  const k = (Math.PI * 2) / length;
   const c = Math.sqrt(G / k);
   const met = k * (c + speed * meeting(p, rel));
-  return (0.5 * sea.height * waveSpan(p, lwl, sea.length) * met * met) / G;
+  return ((0.5 * sea.height * waveSpan(p, lwl, length) * met * met) / G) * fall(p, sea.height);
 }
 
 /**
@@ -141,12 +158,13 @@ export function comfortSpeed(boat: BoatSpec, sea: SeaSample | null | undefined, 
   if (!p) return 0;
   const top = topSpeed(p);
   if (!sea || !(sea.height > 0.05) || !(sea.length > 0.5)) return top;
-  const felt = sea.height * waveSpan(p, boat.dimensions.lwl, sea.length);
+  const length = faceLength(p, sea);
+  const felt = sea.height * waveSpan(p, boat.dimensions.lwl, length);
   if (felt < 0.02) return top;
-  const k = (Math.PI * 2) / sea.length;
+  const k = (Math.PI * 2) / length;
   const c = Math.sqrt(G / k);
-  // The closing speed with the crests at which half the felt height, shaken at that rate, is `comfortG`.
-  const closing = Math.sqrt((2 * G * p.sea.comfortG) / felt) / k;
+  // The closing speed with the faces at which half the felt height, shaken at that rate, is `comfortG`.
+  const closing = Math.sqrt((2 * G * p.sea.comfortG) / (felt * fall(p, sea.height))) / k;
   const share = meeting(p, sea.dir - heading);
   if (share > 0.05) return clamp((closing - c) / share, 0, top);
   // Running with it she has to overtake the waves that fast before they throw her.

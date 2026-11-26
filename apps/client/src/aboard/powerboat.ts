@@ -100,7 +100,8 @@ export class Powerboat implements Feature {
 
     if (!this.welcomed && this.clock > 2.5) {
       this.welcomed = true;
-      ctx.say('The engine is running, out of gear. The full stop key opens the throttle a step and the comma key closes it: hold either. A and D turn the wheel. I stops the engine', 12);
+      // Only if she is still as she started: someone who has already found the throttle needs no telling.
+      if (s.engineOn && s.throttle === 0 && s.hold === 'none') ctx.say('The engine is running, out of gear. The full stop key opens the throttle a step and the comma key closes it: hold either. A and D turn the wheel. I stops the engine', 12);
     }
 
     // The outboard: revs from the lever, load from how hard it is pushing, and lighter while she is in the air.
@@ -115,6 +116,7 @@ export class Powerboat implements Feature {
     m.plane = o.plane; m.throttle = share; m.hop = o.air > 0.6 ? 0.3 : 0;
     m.length = sim.boat.dimensions.loa; m.halfBeam = sim.boat.dimensions.beam * 0.42;
     m.jet = o.plane > 0.9 && share > 0.4;
+    this.wake?.tint(ctx.stage.white);
     this.wake?.update(running && s.hold === 'none' ? m : null, running ? dt : 0, seaTime);
 
     // She has buried her bow in the back of a wave.
@@ -155,11 +157,6 @@ export class Powerboat implements Feature {
     const p = sim.boat.power;
     if (!p || sim.state.hold !== 'none') return '';
     return runningWords(p, sim.state, sim.out, this.pounding);
-  }
-
-  /** How she is running goes out with her position: tenths on the plane, for whoever draws her. */
-  wire(): Record<string, unknown> {
-    return this.ctx.sim.boat.power ? { pl: Math.round(this.ctx.sim.out.plane * 10) } : {};
   }
 
   reboat(): void {

@@ -209,6 +209,19 @@ export interface PowerSpec {
     spanFrom: number;
     spanFull: number;
     /**
+     * The sea the world gives is one tidy wave train, and a wind sea is not tidy: among waves whose average steepness
+     * is 0.03 are faces of 0.05 and more, and those are the ones she lands on. So a wind sea (steepness over about
+     * 0.02) is met as if its waves were at least this steep, which makes them shorter than the train's own length.
+     * A swell, long and low, is left as it is.
+     */
+    faceSteep: number;
+    /**
+     * The higher the wave that throws her, the further she falls: for a sea higher than `dropRef` metres the throw
+     * counts for more, by (height / dropRef) to the power `dropPow`. It is what makes a two metre sea a crawl.
+     */
+    dropRef: number;
+    dropPow: number;
+    /**
      * A real sea is short-crested: even beam on, a fast boat runs onto the shoulders of the waves. This is the share of
      * her speed she is taken to meet a beam sea with. A head sea she meets with all of it; it fades out abaft the beam.
      */

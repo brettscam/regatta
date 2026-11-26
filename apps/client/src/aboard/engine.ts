@@ -332,6 +332,8 @@ export class Engine implements Feature {
       p.mesh.scale.set(size, 1, size);
       p.mesh.position.set(p.x, stage.seaLevel(p.x, p.z, seaTime, 4) + 0.05, p.z);
       p.mat.opacity = 0.5 * (1 - k) * Math.min(1, p.age * 6);
+      // White water is only as white as the light on it: at night it must not glow.
+      p.mat.color.copy(stage.white);
     }
   }
 
