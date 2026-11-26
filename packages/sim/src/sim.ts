@@ -1,6 +1,7 @@
 import { D2R, R2D, KT, clamp, lerp, wrapPi, wrapTau, smoothstep, approach, interp1 } from './math';
 import { polarSpeed } from './polar';
-import type { BoatSpec, ControlName, EngineSpec, Environment, HelmMode, SailReport, SeaSample, SimOutputs, SimState } from './types';
+import { comfortSpeed, fitOut, leverBurn, leverRpm, leverSnap, leverSpeed, planing, topSpeed, waveG, waveSpan } from './power';
+import type { BoatFile, BoatSpec, ControlName, EngineSpec, Environment, HelmMode, PowerSpec, SailReport, SeaSample, SimOutputs, SimState } from './types';
 
 /** Fixed step. The sim never takes any other step size. */
 export const SIM_DT = 1 / 60;
@@ -234,6 +235,7 @@ export function initialState(init: InitialConditions = {}): SimState {
     seaPhase: 0,
     seaCount: 0,
     slams: 0,
+    stuffs: 0,
     maneuver: null,
   };
 }
@@ -260,24 +262,51 @@ export class Sim {
   out: SimOutputs;
   /** How much sooner the boom comes across by the lee for her rolling in a following sea, radians. Set afresh every step; 0 in flat water. */
   private rollLee = 0;
+  boat: BoatSpec;
 
+  /** @param boat a boat file. A powerboat's, which has no rig, is completed with `fitOut`; a sailing boat's is used as it is. */
   constructor(
-    public boat: BoatSpec,
+    boat: BoatFile,
     public env: Environment,
     init: InitialConditions | SimState = {},
   ) {
+    this.boat = fitOut(boat);
     this.state = 'tick' in init ? structuredCloneState(init) : initialState(init);
     this.out = this.blankOutputs();
+    if (this.boat.power) this.noSails();
     this.settleSails();
+  }
+
+  /** A boat with no sails has none set, nobody trimming them and no wind angle for a pilot to hold. */
+  private noSails(): void {
+    const s = this.state;
+    s.furl = 0;
+    s.reef = 0;
+    s.crewTrim = false;
+    s.spin = false;
+    s.spinHoist = 0;
+    s.maneuver = null;
+    s.knock = 0;
+    s.knockHold = 0;
+    s.boomAngle = 0;
+    s.jibAngle = 0;
+    if (s.helmMode === 'wind') { s.helmMode = 'heading'; s.helmTarget = s.heading; }
+    const p = this.boat.power;
+    s.throttle = p && s.engineOn ? leverSnap(p, s.throttle) : 0;
   }
 
   /**
    * Put her in a different boat without stopping: a race sailed in one class. Where she is and how she is moving carry over.
    * Anything set beyond what the new boat allows comes inside her limits.
    */
-  setBoat(boat: BoatSpec): void {
+  setBoat(file: BoatFile): void {
+    const boat = fitOut(file);
+    const hadSails = !this.boat.power;
     this.boat = boat;
     const s = this.state;
+    // Out of a boat with no sails and into one that has them: the jib is unrolled and the throttle is on a notch again.
+    if (!hadSails && !boat.power) { s.furl = 1; s.throttle = Math.round(s.throttle); }
+    if (boat.power) this.noSails();
     s.reef = clamp(s.reef, 0, boat.sails.main.reefs.length - 1);
     for (const name of ['mainsheet', 'jibsheet_port', 'jibsheet_stbd'] as const) this.setControl(name, this.getControl(name));
     const maxRudder = boat.helm.maxRudderDeg * D2R;
@@ -338,7 +367,9 @@ export class Sim {
       s.throttle = 0;
       return 'held';
     }
-    s.throttle = clamp(Math.round(notch), THROTTLE_MIN, THROTTLE_MAX);
+    // A powerboat's throttle is a lever with finer steps than the four notches of an auxiliary.
+    const p = this.boat.power;
+    s.throttle = p ? leverSnap(p, notch) : clamp(Math.round(notch), THROTTLE_MIN, THROTTLE_MAX);
     this.engineReadout();
     return 'ok';
   }
@@ -365,6 +396,13 @@ export class Sim {
     o.fuel = this.fuel;
     o.battery = this.battery;
     o.underPower = this.underPower;
+    const p = this.boat.power;
+    if (p) {
+      // Thrown clear of the water the propeller lets go and the revs flare.
+      o.engineRpm = s.engineOn ? Math.round(leverRpm(p, s.throttle) * (1 + 0.12 * o.air * (s.throttle !== 0 ? 1 : 0))) : s.engineCrank > 0 ? 250 : 0;
+      o.burnLph = s.engineOn ? leverBurn(p, s.throttle) : 0;
+      return;
+    }
     o.engineRpm = s.engineOn ? this.notch().rpm : s.engineCrank > 0 ? 250 : 0;
   }
 
@@ -374,7 +412,8 @@ export class Sim {
     const dt = this.dt;
     let amps = 0;
     // The instruments and the pilot run off the battery while she is under way. Made fast, everything is switched off.
-    if (s.hold === 'none') amps -= INSTRUMENT_AMPS + (s.helmMode !== 'hand' ? PILOT_AMPS : 0);
+    const power = this.boat.power;
+    if (s.hold === 'none') amps -= (power?.houseAmps ?? INSTRUMENT_AMPS) + (s.helmMode !== 'hand' ? PILOT_AMPS : 0);
     if (s.engineCrank > 0) {
       amps -= CRANK_AMPS;
       s.engineCrank -= dt;
@@ -384,11 +423,18 @@ export class Sim {
         s.throttle = 0;
       }
     }
-    if (s.engineOn) {
+    if (s.engineOn && power) {
+      // An outboard burns by its revs, whatever speed the sea lets her make of them.
+      s.fuelUsed += (leverBurn(power, s.throttle) * dt) / 3600;
+      const revs = power.curve.rpm;
+      amps += e.alternatorA * clamp(leverRpm(power, s.throttle) / (0.45 * revs[revs.length - 1]), 0.45, 1);
+    } else if (s.engineOn) {
       const n = this.notch();
       s.fuelUsed += (e.burnLph * n.burn * dt) / 3600;
       // The alternator gives about half its output at idle and all of it at cruising revs.
       amps += e.alternatorA * clamp(n.rpm / 2600, 0.45, 1);
+    }
+    if (s.engineOn) {
       if (s.fuelUsed >= e.tankL) {
         s.fuelUsed = e.tankL;
         s.engineOn = false;
@@ -433,7 +479,8 @@ export class Sim {
       case 'mainsheet': return { min: b.sails.main.sheetMinDeg * D2R, max: b.sails.main.sheetMaxDeg * D2R };
       case 'jibsheet_port':
       case 'jibsheet_stbd': return { min: 0, max: b.sails.jib.sheetMaxSlackDeg * D2R };
-      case 'furl': return { min: 0, max: 1 };
+      // A boat with no sails has no jib to unroll.
+      case 'furl': return { min: 0, max: b.power ? 0 : 1 };
       case 'reef': return { min: 0, max: b.sails.main.reefs.length - 1 };
       case 'pilot': return { min: -Math.PI * 2, max: Math.PI * 4 };
       case 'spinsheet': return { min: (b.sails.spinnaker?.sheetMinDeg ?? 22) * D2R, max: (b.sails.spinnaker?.sheetMaxDeg ?? 88) * D2R };
@@ -531,6 +578,8 @@ export class Sim {
   /** Hand the helm to the pilot, holding the current heading or wind angle unless a target is given. */
   setHelm(mode: HelmMode, target?: number): void {
     const s = this.state;
+    // With no sails there is no wind angle worth holding: asked for one, the pilot holds her heading.
+    if (mode === 'wind' && this.boat.power) { mode = 'heading'; target = undefined; }
     s.maneuver = null;
     s.helmMode = mode;
     s.helmIntegral = 0;
@@ -559,7 +608,8 @@ export class Sim {
 
   /** Turn the crew's sail trimming on or off. With the pilot steering, this is the boat sailing herself. */
   setCrewTrim(on: boolean): void {
-    this.state.crewTrim = on;
+    // No sails, nothing to trim.
+    this.state.crewTrim = on && !this.boat.power;
   }
 
   /** Begin a turn through the wind to a new heading, with the crew handling the sheets. */
@@ -666,9 +716,11 @@ export class Sim {
   /**
    * Tack or gybe to the mirror-image wind angle. The crew swaps the jib sheets as the wind crosses the bow or stern.
    * Returns which one it was. With the spinnaker up there is no tacking: it has to come down first, and `spinnaker` says so.
+   * A boat with no sails has nothing to tack: `none`, and nothing happens.
    */
-  tack(): 'tack' | 'gybe' | 'spinnaker' {
+  tack(): 'tack' | 'gybe' | 'spinnaker' | 'none' {
     const s = this.state;
+    if (this.boat.power) return 'none';
     const twa = this.out.twa;
     const kind = Math.abs(twa) < Math.PI / 2 ? 'tack' : 'gybe';
     if (kind === 'tack' && this.spinnakerUp) return 'spinnaker';
@@ -737,6 +789,8 @@ export class Sim {
     this.computeWind();
     if (b.engine) this.stepEngine(b.engine);
     if (s.hold !== 'none') return this.stepHeld();
+    // A powerboat is not a sailing boat with the sails left off: she has a model of her own.
+    if (b.power) return this.stepPower(b.power);
     // The sea, where the world gives one. Without it `seaway` is null and nothing below differs from flat water.
     const seaway = this.seaway(this.env.sea?.(s.x, s.y, s.t));
     const windSide = o.awa >= 0 ? 1 : -1;
@@ -1002,6 +1056,246 @@ export class Sim {
     s.t = s.tick * dt;
   }
 
+  // ---- under power alone: a planing hull ----------------------------------------------------------
+
+  /**
+   * One step of a powerboat (`boat.power`): a planing hull and an outboard, no sails. The lever sets the revs and the
+   * revs a speed in flat calm; she climbs to it over the hump, the sea and a hard turn take from it, and the engine
+   * swung by the wheel is what steers her, so out of gear she has little steerage. She banks into her turns.
+   * Nothing in here runs for a boat with sails.
+   */
+  private stepPower(p: PowerSpec): void {
+    const s = this.state;
+    const o = this.out;
+    const b = this.boat;
+    const dt = this.dt;
+    const lever = s.engineOn ? s.throttle : 0;
+    const inGear = lever !== 0;
+    s.maneuver = null;
+    s.crewTrim = false;
+    s.knock = 0;
+
+    const sea = this.powerSeaway(p, this.env.sea?.(s.x, s.y, s.t));
+    const pl = planing(p, s.speed);
+    o.plane = pl;
+
+    // --- speed ---------------------------------------------------------------------------------
+    // What the wind does to a hull with no way on: she drifts off before it.
+    const windAhead = o.tws * Math.cos(o.twa);
+    let target = -p.drift * windAhead * (1 - pl);
+    if (inGear) {
+      target = leverSpeed(p, lever);
+      // Windage: a head wind takes a little off her, a following one gives back less.
+      const wind = p.windage * windAhead * (lever > 0 ? 1 : -1);
+      const lost = wind > 0 ? wind : wind * 0.35;
+      target = Math.sign(target) * Math.max(0.3 * Math.abs(target), Math.abs(target) - lost);
+      if (lever > 0) target *= (1 - sea.loss) * (1 + sea.gain);
+    }
+    // A hard turn scrubs speed off: the hull is dragged sideways through the water.
+    const lateralG = Math.abs(s.speed * s.yawRate) / 9.81;
+    const turning = clamp(lateralG / p.steer.lateralG, 0, 1);
+    target *= 1 - p.steer.turnDrag * turning * turning;
+    if (s.damage > 0) target *= damageSpeed(s.damage);
+    o.targetSpeed = target;
+    const gathering = Math.abs(target) > Math.abs(s.speed) && target * s.speed >= 0;
+    let rate: number;
+    if (gathering) {
+      // Climbing over her own bow wave she is all drag: the bow goes up and the speed hangs before she breaks free.
+      const kt = Math.abs(s.speed) / KT;
+      const mid = (p.humpKt + p.planeKt) / 2;
+      const onHump = smoothstep(p.humpKt * 0.6, p.humpKt, kt) * (1 - smoothstep(mid, p.planeKt, kt));
+      rate = ((target - s.speed) / p.accelS) * (1 - (1 - p.humpPush) * onHump);
+    } else {
+      // Off the throttle a planing hull sits down at once; a displacement one carries her way a little.
+      rate = (target - s.speed) / (s.damage >= 1 ? 1.5 : lerp(p.coastS, p.slowS, pl));
+    }
+    s.speed += rate * dt;
+    if (!inGear && Math.abs(s.speed) < 0.005 && Math.abs(target) < 0.005) s.speed = 0;
+    // Running trim: what the hull does by itself at this speed, and the squat of the stern as she is driven harder.
+    o.trim = (interp1(p.trim.kt, p.trim.deg, Math.abs(s.speed) / KT) + clamp(rate * 1.2, -1.5, 2.5) * (1 - 0.5 * pl)) * D2R;
+
+    // --- helm ----------------------------------------------------------------------------------
+    const maxRudder = b.helm.maxRudderDeg * D2R;
+    // Which way the wheel turns her: astern the engine pulls her stern the way it points, so her head goes the other way.
+    const sense = inGear ? (lever < 0 ? -1 : 1) : s.speed < -0.05 ? -1 : 1;
+    let rudderRate = HAND_RUDDER_RATE;
+    o.pilotBeating = false;
+    if (s.helmMode !== 'hand') {
+      rudderRate = PILOT_RUDDER_RATE;
+      let err: number;
+      if (s.helmMode === 'route') {
+        // Straight for the mark, crabbing across whatever sets her off the line.
+        if (o.sog > 1) s.routeCrab += (clamp(wrapPi(s.heading - o.cog), -0.5, 0.5) - s.routeCrab) * (1 - Math.exp(-dt / 8));
+        err = wrapPi(Math.atan2(s.routeX - s.x, s.routeY - s.y) + s.routeCrab - s.heading);
+      } else err = wrapPi(s.helmTarget - s.heading);
+      if (Math.abs(err) < 15 * D2R) s.helmIntegral = clamp(s.helmIntegral + err * dt, -1.5, 1.5);
+      // The faster she goes the less wheel a given turn needs.
+      const gain = lerp(1.3, 0.55, pl);
+      s.rudderCmd = sense * clamp(gain * err - 1.5 * s.yawRate + 0.2 * s.helmIntegral, -maxRudder, maxRudder);
+    }
+    s.rudder = approach(s.rudder, s.rudderCmd, rudderRate * dt);
+
+    // --- yaw -----------------------------------------------------------------------------------
+    // The engine steers by pointing its thrust. In gear there is always a race past the lower unit; out of gear only
+    // her own way, and the skeg makes a poor rudder of that.
+    const st = p.steer;
+    const revs = p.curve.rpm;
+    const push = inGear ? (leverRpm(p, lever) - revs[0]) / (revs[revs.length - 1] - revs[0]) : 0;
+    const flow = Math.abs(s.speed) * (inGear ? 1 : st.coast) + (inGear ? st.washMs * (0.35 + 0.65 * push) : 0);
+    const bite = clamp(flow / st.biteMs, 0, 1);
+    o.rudderGrip = bite;
+    let most = st.maxDegS * D2R * bite;
+    // At speed it is the sideways g that limits her, not the engine.
+    if (Math.abs(s.speed) > 1) most = Math.min(most, (st.lateralG * 9.81) / Math.abs(s.speed));
+    let yawTarget = sense * (s.rudder / maxRudder) * most;
+    // With no way on, the wind takes her bow and she lies beam on or stern to it.
+    const slow = 1 - clamp(flow / 2, 0, 1);
+    yawTarget -= Math.sign(o.twa) * Math.sin(Math.abs(o.twa)) * st.blowOffDegS * D2R * clamp(o.tws / (12 * KT), 0, 1.5) * slow;
+    yawTarget += sea.yaw;
+    s.yawRate += (yawTarget - s.yawRate) * (1 - Math.exp(-dt / 0.45));
+    s.heading = wrapTau(s.heading + s.yawRate * dt);
+
+    // --- bank and roll -------------------------------------------------------------------------
+    // A vee hull leans into her turn, the opposite of a keelboat's heel: turning to starboard she leans to starboard.
+    const bankMax = st.bankMaxDeg * D2R;
+    const bank = clamp(Math.atan((s.speed * s.yawRate) / 9.81) * lerp(st.bankSlow, st.bankPlane, pl), -bankMax, bankMax);
+    s.heel += (bank + sea.roll - s.heel) * (1 - Math.exp(-dt / 0.45));
+    o.heelLoad = 0;
+    o.heelPenalty = 1;
+    o.weatherHelm = 0;
+    o.overpower = 0;
+    o.press = 0;
+    o.knockedDown = false;
+    o.inIrons = false;
+    o.roundingUp = false;
+    o.polarSpeed = 0;
+
+    // --- sideways ------------------------------------------------------------------------------
+    // She skids outward in a turn, and with little way on the wind sets her bodily to leeward.
+    const skid = clamp(-st.skidS * s.speed * s.yawRate, -0.3 * Math.abs(s.speed), 0.3 * Math.abs(s.speed));
+    const blown = -p.drift * o.tws * Math.sin(o.twa) * (1 - pl);
+    s.lateral += (skid + blown - s.lateral) * (1 - Math.exp(-dt / 0.6));
+
+    // --- move ----------------------------------------------------------------------------------
+    const env = this.env.sample(s.x, s.y, s.t);
+    const sinH = Math.sin(s.heading);
+    const cosH = Math.cos(s.heading);
+    let vx = s.speed * sinH + s.lateral * cosH + env.currentX;
+    let vy = s.speed * cosH - s.lateral * sinH + env.currentY;
+    const draft = b.dimensions.draft;
+    const wasAground = o.aground;
+    o.underKeel = env.depth === undefined ? null : env.depth - draft;
+    o.aground = false;
+    let moveX = vx * dt;
+    let moveY = vy * dt;
+    if (env.depth !== undefined && env.depth < draft + 0.05) {
+      o.aground = true;
+    } else if (env.depth !== undefined) {
+      const ahead = this.env.sample(s.x + moveX, s.y + moveY, s.t).depth;
+      if (ahead !== undefined && ahead < draft) o.aground = true;
+    }
+    if (o.aground) {
+      // Running onto the bottom at speed is a hard stop, and it costs her: the lower unit and the hull take it.
+      const kt = Math.hypot(vx, vy) / KT;
+      if (!wasAground && kt > p.ground.fromKt) {
+        s.damage = Math.min(1, s.damage + Math.min(p.ground.most, p.ground.perKt * (kt - p.ground.fromKt)));
+        o.impact = Math.max(o.impact, 1 + kt / 10);
+      }
+      const here = env.depth ?? 0;
+      const there = this.env.sample(s.x + moveX, s.y + moveY, s.t).depth ?? 0;
+      if (there <= here || there < draft * 0.6) {
+        moveX = 0;
+        moveY = 0;
+        s.speed *= Math.exp(-dt / 0.12);
+        s.lateral *= Math.exp(-dt / 0.12);
+      }
+    }
+    s.x += moveX;
+    s.y += moveY;
+    vx = moveX / dt;
+    vy = moveY / dt;
+    o.sog = Math.hypot(vx, vy);
+    o.cog = o.sog > 0.01 ? wrapTau(Math.atan2(vx, vy)) : s.heading;
+
+    s.tick += 1;
+    s.t = s.tick * dt;
+  }
+
+  /**
+   * What the sea does to a powerboat this step. Meeting the waves at speed, each crest throws her up with a g that
+   * goes with the square of how fast she closes with them (`waveG`). Past `slamG` she is clear of the water and lands:
+   * a slam, which takes speed, and past `damageG` hurts the hull. So into a sea she has to slow down. Running with
+   * it there is little of that, but going faster than the waves she can bury her bow in the back of one.
+   */
+  private powerSeaway(p: PowerSpec, sea: SeaSample | null | undefined): { loss: number; gain: number; yaw: number; roll: number } {
+    const o = this.out;
+    const s = this.state;
+    const dt = this.dt;
+    o.impact *= Math.exp(-dt / 0.8);
+    o.air = Math.max(0, o.air - dt / 0.45);
+    o.surf = 0;
+    this.rollLee = 0;
+    if (!sea || !(sea.height > SEAWAY.minHeight) || !(sea.length > 0.5)) {
+      o.seaLoss = 0;
+      o.comfort = topSpeed(p);
+      return { loss: 0, gain: 0, yaw: 0, roll: 0 };
+    }
+    const ps = p.sea;
+    const d = this.boat.dimensions;
+    const rel = wrapPi(sea.dir - s.heading);
+    const cos = Math.cos(rel);
+    const span = waveSpan(p, d.lwl, sea.length);
+    const felt = sea.height * span;
+    const k = (Math.PI * 2) / sea.length;
+    const waveSpeed = Math.sqrt(9.81 / k);
+    // How fast she closes with the crests: negative when she is overtaking them.
+    const closing = waveSpeed + s.speed * cos;
+    const before = Math.floor(s.seaPhase / (Math.PI * 2));
+    s.seaPhase += k * closing * dt;
+    const crest = Math.floor(s.seaPhase / (Math.PI * 2)) !== before;
+    if (Math.abs(s.seaPhase) > 1e4) s.seaPhase -= Math.round(s.seaPhase / (Math.PI * 2)) * Math.PI * 2;
+    o.comfort = comfortSpeed(this.boat, sea, s.heading);
+
+    if (crest) {
+      s.seaCount++;
+      // No two waves are the same height. Which ones are the big ones is settled by the count, not by chance.
+      const size = lerp(ps.waveLow, ps.waveHigh, waveHash(s.seaCount));
+      if (closing > 0) {
+        const g = size * waveG(p, d.lwl, sea, rel, s.speed);
+        if (g >= ps.slamG && s.speed > 2) {
+          s.slams++;
+          s.speed *= 1 - Math.min(ps.lossCap, ps.lossBase + ps.lossPerG * (g - ps.slamG));
+          o.impact = Math.max(o.impact, g);
+          o.air = clamp(g - ps.slamG + 0.35, 0.35, 1);
+          if (g > ps.damageG) s.damage = Math.min(1, s.damage + Math.min(ps.damageCap, ps.damagePerG2 * (g - ps.damageG) * (g - ps.damageG)));
+        }
+      } else {
+        // Overtaking the waves down sea: now and then the bow goes into the back of the one ahead.
+        const chance = ps.stuffChance * clamp((-closing - ps.stuffFromMs) / 6, 0, 1) * clamp((sea.steepness * size - ps.stuffSteep) / 0.03, 0, 1) * clamp((felt / d.lwl - ps.stuffFromHl) / 0.08, 0, 1);
+        if (chance > 0 && waveHash(s.seaCount + 0.5) < chance) {
+          s.stuffs++;
+          s.speed *= 1 - ps.stuffLoss;
+          o.impact = Math.max(o.impact, 1.5);
+        }
+      }
+    }
+
+    const head = Math.max(0, cos);
+    const loss = Math.min(0.3, ps.resist * felt * head);
+    o.seaLoss = loss;
+    // Down sea the faces give her a little back.
+    const gain = 0.03 * Math.max(0, -cos) * clamp(felt / 0.8, 0, 1);
+    const face = Math.sin(s.seaPhase);
+    const pl = planing(p, s.speed);
+    // On the quarter each wave slews her stern; on the bow it only nudges her.
+    const quarter = Math.abs(rel) > Math.PI / 2 ? -Math.sin(2 * rel) : 0.25 * Math.sin(2 * rel);
+    const yaw = ps.yaw * (felt / d.lwl) * quarter * face * (1 - 0.5 * pl);
+    // Abeam she rolls to the slope of each wave, less when she is up and running on her chines.
+    const slope = (Math.PI * sea.height) / sea.length;
+    const roll = ps.roll * slope * smoothstep(1, 4, sea.length / d.beam) * Math.sin(rel) * face * (1 - ps.rollPlaneCut * pl);
+    return { loss, gain, yaw, roll };
+  }
+
   // ---- in a seaway ------------------------------------------------------------------------------
 
   /**
@@ -1101,6 +1395,13 @@ export class Sim {
     const s = this.state;
     if (s.hold === 'none') return;
     s.hold = 'none';
+    // A powerboat is let go and lies there, engine running or not, until her skipper does something.
+    if (this.boat.power) {
+      s.speed = 0;
+      s.lateral = 0;
+      s.helmMode = 'hand';
+      return;
+    }
     // With the engine running she leaves under power: let go, in neutral, the wheel in hand and the sheets left alone.
     if (s.engineOn) {
       s.speed = 0;
@@ -1446,6 +1747,13 @@ export class Sim {
   /** Put the sails and outputs where the current wind would have them, with no swing-in time. */
   private settleSails(): void {
     this.computeWind();
+    if (this.boat.power) {
+      this.out.sog = Math.abs(this.state.speed);
+      this.out.cog = this.state.heading;
+      this.out.polarSpeed = 0;
+      this.out.comfort = topSpeed(this.boat.power);
+      return;
+    }
     const windSide = this.out.awa >= 0 ? 1 : -1;
     this.state.mainSide = -windSide;
     this.computeSails(windSide, Math.abs(this.out.awa), false);
@@ -1459,6 +1767,7 @@ export class Sim {
   trimForWind(): void {
     const s = this.state;
     const b = this.boat;
+    if (b.power) return;
     this.computeWind();
     const awaDeg = Math.abs(this.out.awa) * R2D;
     const slackMax = b.sails.jib.sheetMaxSlackDeg * D2R;
@@ -1488,6 +1797,11 @@ export class Sim {
     if (!this.boat.engine) { this.state.engineOn = false; this.state.engineCrank = 0; }
     this.state.damage = clamp(this.state.damage, 0, 1);
     this.state.throttle = this.state.engineOn ? clamp(Math.round(this.state.throttle), THROTTLE_MIN, THROTTLE_MAX) : 0;
+    if (this.boat.power) {
+      // Her lever has finer steps than that, and she has no sails for the saved state to have left set.
+      this.state.throttle = state.engineOn && this.state.engineOn && Number.isFinite(state.throttle) ? state.throttle : 0;
+      this.noSails();
+    }
     this.engineReadout();
   }
 
@@ -1499,6 +1813,7 @@ export class Sim {
       inIrons: false, roundingUp: false, pilotBeating: false, knockedDown: false, underKeel: null, aground: false,
       engineRpm: 0, fuel: this.fuel, battery: this.battery, underPower: this.underPower,
       seaLoss: 0, surf: 0,
+      plane: 0, trim: 0, comfort: 0, burnLph: 0, impact: 0, air: 0,
     };
   }
 }

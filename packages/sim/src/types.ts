@@ -151,6 +151,107 @@ export interface HandlingSpec {
   pilotRestS?: number;
 }
 
+/**
+ * A planing hull driven by an outboard: a powerboat. A boat file that carries this has no sails, polar or heel law (see
+ * `fitOut`), and the sim steps her by `Sim.stepPower`, not by the sailing model. Every number that makes her what she
+ * is lives here, so another powerboat is another file.
+ * Her throttle is a lever, not four notches: `SimState.throttle` runs from -2 to 4 in steps of `leverStep`, the first
+ * step either side of 0 being in gear at idle and 4 wide open.
+ */
+export interface PowerSpec {
+  /** Flat-water speed (knots) and fuel burn (litres an hour) at steady revs, from in gear at idle to wide open. */
+  curve: { rpm: number[]; kt: number[]; lph: number[] };
+  /** Revs and burn ticking over out of gear. */
+  idleRpm: number;
+  idleLph: number;
+  /** How far one press moves the lever. 0.25 gives sixteen positions ahead. */
+  leverStep: number;
+  /** The most she makes astern, knots. */
+  asternKt: number;
+  /** The speed she is quoted at for a passage, knots: what the chart plans with. */
+  cruiseKt: number;
+  /** Below `humpKt` she is a displacement hull, above `planeKt` she is planing, and between them she is climbing over her own bow wave. */
+  humpKt: number;
+  planeKt: number;
+  /** Seconds to gather speed (a time constant), the share of that push left on the hump, and seconds to lose speed planing and at displacement speed. */
+  accelS: number;
+  humpPush: number;
+  slowS: number;
+  coastS: number;
+  /** Running trim, bow up, degrees by speed in knots: little at rest, most on the hump, a few degrees planing. */
+  trim: { kt: number[]; deg: number[] };
+  /** Knots of speed a knot of wind from ahead takes off her. Wind from astern gives back a third of that. */
+  windage: number;
+  /** Share of the wind's speed she drifts at with no way on. */
+  drift: number;
+  steer: {
+    /** The fastest she turns, degrees a second, with the engine hard over and plenty of water going past it. */
+    maxDegS: number;
+    /** Sideways g she will not turn harder than, which is what limits her turn at speed. */
+    lateralG: number;
+    /** Water past the lower unit, m/s, at which the engine has its full bite; the propeller's race in gear; and the share of her own way that still steers her out of gear. */
+    biteMs: number;
+    washMs: number;
+    coast: number;
+    /** She banks into a turn: share of the angle that would balance the turn, at displacement speed and planing, and the most, degrees. */
+    bankSlow: number;
+    bankPlane: number;
+    bankMaxDeg: number;
+    /** Share of her speed a turn at the full `lateralG` takes. */
+    turnDrag: number;
+    /** Seconds of sideslip: she skids outward at this times her speed times her rate of turn. */
+    skidS: number;
+    /** How fast the wind blows her bow off with no way on, degrees a second in 12 kt. */
+    blowOffDegS: number;
+  };
+  sea: {
+    /** Waves shorter than `spanFrom` waterline lengths she bridges; by `spanFull` she feels all of their height. */
+    spanFrom: number;
+    spanFull: number;
+    /** Each wave is this much of the significant height, lowest to highest, settled by the count of waves met. */
+    waveLow: number;
+    waveHigh: number;
+    /** The g a wave top throws her up with: the speed at which a significant wave reaches `comfortG` is her comfortable speed for that sea. */
+    comfortG: number;
+    /** At `slamG` she leaves the water and lands: a slam. Past `damageG` the landing hurts the hull. */
+    slamG: number;
+    damageG: number;
+    /** Share of her speed a slam takes: `lossBase + lossPerG` for each g over `slamG`, capped. */
+    lossBase: number;
+    lossPerG: number;
+    lossCap: number;
+    /** Hull damage from one landing: `damagePerG2` times the square of the g over `damageG`, capped. */
+    damagePerG2: number;
+    damageCap: number;
+    /** Share of her speed a metre of head sea takes, slams apart. */
+    resist: number;
+    /** Running down a sea faster than the waves, she can bury her bow in the back of one. `stuffFromMs` is how much faster, m/s, before it can happen. */
+    stuffFromMs: number;
+    /** Steepness and height over waterline length below which she never does, the most likely she is to on any one wave, and the share of her speed it takes. */
+    stuffSteep: number;
+    stuffFromHl: number;
+    stuffChance: number;
+    stuffLoss: number;
+    /** Share of the wave's slope she rolls to with the sea abeam, and how much of that planing takes away. */
+    roll: number;
+    rollPlaneCut: number;
+    /** Yaw a quartering sea puts on her, radians a second for each unit of height over waterline length. */
+    yaw: number;
+  };
+  ground: {
+    /** Touching bottom faster than this, knots, damages her: `perKt` for each knot over it, `most` at the worst. */
+    fromKt: number;
+    perKt: number;
+    most: number;
+  };
+  /** Amps her electronics draw whenever she is not made fast: plotter, sounder, radio, pumps. */
+  houseAmps: number;
+}
+
+/**
+ * A boat as the sim and the game use her. A sailing boat's file is one of these as it stands. A powerboat's file leaves
+ * out the rig (`polar`, `sails`, `heel`, `rightingCurve` and the rig's dimensions) and `fitOut` completes it.
+ */
 export interface BoatSpec {
   id: string;
   name: string;
@@ -198,8 +299,15 @@ export interface BoatSpec {
   /** Left out, she heels to her sail like any monohull. */
   pressed?: PressedSpec;
   handling?: HandlingSpec;
+  /** Given, she is a powerboat with no sails at all: see `PowerSpec`. */
+  power?: PowerSpec;
   controls: ControlBinding[];
 }
+
+/** What a boat file on disk may be: a whole `BoatSpec`, or a powerboat's, which has `power` and no rig. See `fitOut`. */
+export type BoatFile = Omit<BoatSpec, 'polar' | 'sails' | 'heel' | 'rightingCurve' | 'dimensions'> & Partial<Pick<BoatSpec, 'polar' | 'sails' | 'heel' | 'rightingCurve'>> & {
+  dimensions: Pick<BoatSpec['dimensions'], 'loa' | 'lwl' | 'beam' | 'draft' | 'freeboard' | 'displacementKg'> & Partial<BoatSpec['dimensions']>;
+};
 
 export type ControlName = 'rudder' | 'mainsheet' | 'jibsheet_port' | 'jibsheet_stbd' | 'furl' | 'reef' | 'pilot' | 'spinsheet';
 
@@ -341,6 +449,8 @@ export interface SimState {
   seaCount: number;
   /** How many times she has fallen off a wave going to windward and slammed. */
   slams: number;
+  /** How many times she has run her bow into the back of a wave going down sea. Only a boat with `power` does. */
+  stuffs: number;
   maneuver: Maneuver | null;
 }
 
@@ -420,4 +530,16 @@ export interface SimOutputs {
   seaLoss: number;
   /** 0 to 1, how much she is surfing: running in a sea big enough to carry her. */
   surf: number;
+  /** A boat with `power`: 0 at displacement speed to 1 planing. 0 for any other boat. */
+  plane: number;
+  /** A boat with `power`: her running trim, bow up, radians. 0 for any other boat. */
+  trim: number;
+  /** A boat with `power`: the fastest she can go on this heading in this sea before the wave tops throw her clear, m/s. Her top speed in flat water. 0 for any other boat. */
+  comfort: number;
+  /** A boat with `power`: fuel being burned now, litres an hour. 0 for any other boat. */
+  burnLph: number;
+  /** A boat with `power`: the g of her last landing or buried bow, fading over a second or two. */
+  impact: number;
+  /** A boat with `power`: 0 to 1, how far out of the water she is just now, off the top of a wave. */
+  air: number;
 }
