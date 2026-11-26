@@ -449,6 +449,13 @@ export class Chart {
         ctx.setLineDash([3, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
+      } else if (a.kind === 'keepclear') {
+        // The ring round something built in the sea: a plain red circle to stay outside of.
+        ctx.strokeStyle = 'rgba(192, 57, 43, 0.9)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
       } else if (a.kind === 'hazard') {
         ctx.fillStyle = 'rgba(192, 57, 43, 0.13)';
         ctx.fill();
@@ -468,12 +475,57 @@ export class Chart {
       if (!labels || a.kind === 'separation' || a.kind === 'lane') continue;
       const big = v.scale > 0.012;
       ctx.font = `italic 600 ${a.kind === 'hazard' ? 11.5 : 10.5}px ui-serif, Georgia, serif`;
-      ctx.fillStyle = a.kind === 'hazard' ? '#a5281c' : a.kind === 'refuge' ? '#1f6a45' : MAGENTA;
+      // A ring's name is only worth its room once the chart is drawn large enough to tell one ring from the next.
+      if (a.kind === 'keepclear' && v.scale < 0.02) continue;
+      ctx.fillStyle = a.kind === 'hazard' || a.kind === 'keepclear' ? '#a5281c' : a.kind === 'refuge' ? '#1f6a45' : MAGENTA;
       const at = a.kind === 'precaution' && a.circle ? mid.cy - a.circle.r * v.scale * 0.62 : a.circle ? mid.cy + a.circle.r * v.scale + 12 : mid.cy;
       ctx.fillText(a.name, mid.cx, at);
       if (big && a.say) {
         ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
         ctx.fillText(a.kind === 'hazard' && a.least !== undefined ? `${a.say}. Least depth ${a.least} m` : a.say, mid.cx, at + 13);
+      }
+    }
+    // What is built in the sea (added with Long Beach to Catalina): a breakwater or a pier as a heavy line, a platform
+    // as a small square with a dot in it, as a chart marks one. The oil islands are land on the chart already.
+    for (const st of f.structures ?? []) {
+      if (st.line) {
+        ctx.strokeStyle = st.kind === 'pier' ? 'rgba(60, 60, 60, 0.9)' : 'rgba(70, 62, 50, 0.95)';
+        ctx.lineWidth = Math.max(st.kind === 'pier' ? 1.2 : 2, (st.kind === 'pier' ? 9 : 16) * v.scale);
+        ctx.beginPath();
+        st.line.forEach(([x, y], i) => {
+          const [px, py] = this.screen(w, h, v, x, y);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        if (labels && v.scale > 0.02) {
+          const mid = st.line[Math.floor(st.line.length / 2)];
+          const [mx, my] = this.screen(w, h, v, mid[0], mid[1]);
+          ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
+          ctx.fillStyle = INK;
+          ctx.fillText(st.name, mx, my + 13);
+        }
+      } else if (st.kind === 'platform' && st.x !== undefined && st.y !== undefined) {
+        const [px, py] = this.screen(w, h, v, st.x, st.y);
+        if (px < -20 || py < -20 || px > w + 20 || py > h + 20) continue;
+        const r = Math.max(3, 25 * v.scale);
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(px - r, py - r, r * 2, r * 2);
+        ctx.fillStyle = INK;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+        if (labels && v.scale > 0.006 && v.scale < 0.02) {
+          ctx.font = 'italic 600 9.5px ui-serif, Georgia, serif';
+          ctx.fillStyle = '#a5281c';
+          ctx.fillText(st.name.replace('Platform ', ''), px, py - r - 7);
+        }
+      } else if (st.kind === 'island' && labels && v.scale > 0.012 && st.x !== undefined && st.y !== undefined) {
+        const [px, py] = this.screen(w, h, v, st.x, st.y);
+        ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
+        ctx.fillStyle = INK;
+        ctx.fillText(st.name, px, py + (st.r ?? 100) * v.scale + 10);
       }
     }
     // Lights: a magenta flare with the light's character, as a chart shows them.

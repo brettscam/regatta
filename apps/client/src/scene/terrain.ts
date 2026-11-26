@@ -96,6 +96,20 @@ function gulfUse(x: number, y: number, z: number, slope: number, north: number):
 }
 // ---- end of the ocean coast ------------------------------------------------------------------------
 
+// ---- Southern California: Long Beach to Catalina (`socal`) ------------------------------------------
+/**
+ * Ground cover for the San Pedro Channel. The mainland is city to the water's edge, with the houses of Palos Verdes
+ * on the hill to the west. Santa Catalina is dry: golden grass and brown chaparral, darker scrub and a few trees
+ * only where a canyon faces away from the sun, and one small town in the valley behind Avalon Bay.
+ */
+function socalUse(x: number, y: number, z: number, slope: number, north: number): LandUse {
+  if (y > 14000) return x < 1500 && z > 80 ? (z > 330 ? 'open' : 'town') : 'city';
+  if (inBox(x, y, -2760, -1880, -23650, -22780) && z < 95) return 'town';
+  if (inBox(x, y, -18560, -18220, -12240, -12020) && z < 16) return 'town';
+  return z > 40 && north > 0.16 && slope > 0.22 && smoothNoise(x / 310, y / 310) > 0.42 ? 'forest' : 'open';
+}
+// ---- end of Southern California ------------------------------------------------------------------
+
 /** One grid of a course's land heights: the main grid, or one of its finer insets. */
 export interface LandPart {
   grid: GridSpec;
@@ -107,7 +121,7 @@ export interface LandPart {
 /**
  * The land around the course, from real elevation data.
  * Sim coordinates are metres east (x) and north (y). In the scene that is X east and Z south.
- * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen`, `gulf` or `tropic`
+ * @param cover which built-in ground cover to colour it with: `sf-bay` (the default), `evergreen`, `gulf`, `tropic` or `socal`
  * @param part draw one grid of a course whose land has insets, with `heights` that grid's own cells. Left out, the whole of a plain course
  */
 export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 'sf-bay', part?: LandPart): THREE.Mesh {
@@ -121,6 +135,8 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const coral = new THREE.Color(0.9, 0.86, 0.72);
   const boulder = new THREE.Color(0.46, 0.43, 0.39);
   const gulf = cover === 'gulf';
+  // Southern California: see `socalUse`. Dry all year, so nothing is kept green by fog.
+  const socal = cover === 'socal';
   const g = part ? { ...course.terrain, ...part.grid } : course.terrain;
   const { nx, ny, dx } = g;
   const pos = new Float32Array(nx * ny * 3);
@@ -187,9 +203,9 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       // Ground that falls away to the north or east keeps its moisture: more scrub, less dry grass.
       const sheltered = THREE.MathUtils.clamp(0.5 - (e + n) * 2.2, 0, 1);
       // Near the open ocean the fog keeps the hills green-grey. Inland they dry to gold by July.
-      const oceanward = bay ? 1 - THREE.MathUtils.smoothstep(x, -9500, -3200) : 0.5;
+      const oceanward = socal ? 0.1 : bay ? 1 - THREE.MathUtils.smoothstep(x, -9500, -3200) : 0.5;
 
-      const use = gulf ? gulfUse(x, y, z, slope, n) : bay ? landUse(x, y, z) : evergreenUse(x, y, z, slope, n);
+      const use = socal ? socalUse(x, y, z, slope, n) : gulf ? gulfUse(x, y, z, slope, n) : bay ? landUse(x, y, z) : evergreenUse(x, y, z, slope, n);
       if (use === 'forest') {
         c.copy(forest).lerp(scrub, patch * 0.55).lerp(gold, Math.max(0, patch - 0.72) * 1.2);
       } else {
@@ -208,7 +224,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
           c.offsetHSL(0, 0, (hash(bi + 17, bj - 5) - 0.5) * 0.07);
         } else if (use === 'town') {
           c.lerp(scrub, 0.35).lerp(town, 0.22 + 0.2 * hash(Math.floor(x / 110), Math.floor(y / 110)));
-        } else if (bay && z < 12 && slope < 0.05 && y < -2250 && (!gulf || y > -9000)) {
+        } else if (bay && !socal && z < 12 && slope < 0.05 && y < -2250 && (!gulf || y > -9000)) {
           c.lerp(lawn, 0.5);
         }
       }
@@ -290,6 +306,38 @@ export function landHeight(course: CourseData, heights: Uint8Array): (x: number,
     const v = fy - j;
     const at = (ii: number, jj: number) => (heights[start + jj * g.nx + ii] / 255) ** 2 * max;
     return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  };
+}
+
+/**
+ * Height of the land as it is drawn, read from the finest grid that covers a place: the same as `landHeight` on dry
+ * ground, but water cells sit 6 m under the sea, as `buildTerrain` draws them, so the shoreline falls where the drawn
+ * one does and the sea reads as below zero. This is what anything that builds on the shore of a water with insets
+ * needs (`scene/venue.ts` looks for water as ground below zero). Added for Long Beach to Catalina.
+ */
+export function drawnLandHeight(course: CourseData, heights: Uint8Array): (x: number, y: number) => number {
+  const parts = landParts(course);
+  const max = course.terrain.max;
+  return (x, y) => {
+    let k = 0;
+    for (let n = parts.length - 1; n > 0; n--) {
+      const g = parts[n].grid;
+      if (x >= g.x0 && y >= g.y0 && x <= g.x0 + (g.nx - 1) * g.dx && y <= g.y0 + (g.ny - 1) * g.dx) { k = n; break; }
+    }
+    const { grid: g, start } = parts[k];
+    const fx = Math.min(g.nx - 1.001, Math.max(0, (x - g.x0) / g.dx));
+    const fy = Math.min(g.ny - 1.001, Math.max(0, (y - g.y0) / g.dx));
+    const i = Math.floor(fx);
+    const j = Math.floor(fy);
+    const u = fx - i;
+    const v = fy - j;
+    const at = (ii: number, jj: number) => { const z = (heights[start + jj * g.nx + ii] / 255) ** 2 * max; return z > 0.4 ? z : -6; };
+    // The two triangles of the cell, as the mesh splits it (see the index order in `buildTerrain`).
+    const a = at(i, j);
+    const b = at(i + 1, j);
+    const d = at(i, j + 1);
+    const e = at(i + 1, j + 1);
+    return u + v <= 1 ? a + (b - a) * u + (d - a) * v : e + (d - e) * (1 - u) + (b - e) * (1 - v);
   };
 }
 

@@ -23,6 +23,11 @@ export interface VenuePlace {
     tables?: number;
     /** `white` for a deck of white sunshades. Otherwise they are coloured by the place's hash. */
     umbrellas?: string;
+    /**
+     * The place is part of a town (a water's `towns.json`, `scene/town.ts`): no venue of its own is built, and the
+     * town's layout stands for it in `stage.shore`.
+     */
+    town?: string;
   };
 }
 
@@ -66,7 +71,8 @@ export interface VenuePlan {
 /** One named spot on a venue, in course metres. `face` is the compass heading, radians, of someone using it. */
 export interface VenueSpot {
   name: string;
-  kind: 'door' | 'table' | 'seat' | 'bar' | 'rail' | 'dance' | 'fire' | 'dock';
+  /** The last four are a town's (`scene/town.ts`): a bench to sit on, something to stand and look at, the head of a flight of steps, a shop door. */
+  kind: 'door' | 'table' | 'seat' | 'bar' | 'rail' | 'dance' | 'fire' | 'dock' | 'bench' | 'sight' | 'steps' | 'shop';
   x: number;
   y: number;
   face: number;
@@ -99,7 +105,8 @@ const BERTH_DEPTH = 3.5;
 
 /** Where a place's venue stands and everything on it. Null where there is no shore within reach of the place. */
 export function planVenue(place: VenuePlace, g: VenueGround): VenuePlan | null {
-  if (!place.ashore) return null;
+  // A place in a town has the town for its venue.
+  if (!place.ashore || place.ashore.town) return null;
   const from = place.ashore.site ?? [place.x, place.y];
   const edge = siteFor(from[0], from[1], g);
   if (!edge) return null;

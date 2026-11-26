@@ -4,6 +4,7 @@ import type { TrafficSpec } from '../scene/traffic';
 import type { Place } from '../session';
 import type { StartSpot, StartTime } from '../ui/join';
 import type { CourseFeatures } from './features';
+import type { TownSpec } from '../scene/town';
 
 // The waters there are to sail. A course is a folder under `courses/`: adding one adds data, not code.
 // Each folder's small `about.json` is read up front, so the join screen can offer every water. Everything else
@@ -28,7 +29,7 @@ export interface CourseAbout {
    */
   sea?: SeaSpec;
   scenery?: {
-    /** Which built-in ground cover colours the land: `sf-bay`, `evergreen`, `gulf` or `tropic`. */
+    /** Which built-in ground cover colours the land: `sf-bay`, `evergreen`, `gulf`, `tropic` or `socal`. */
     landCover?: string;
     /** Which built-in water: left out for the Bay's green-grey, `clear` for blue water whose shoals show turquoise. */
     water?: string;
@@ -36,6 +37,9 @@ export interface CourseAbout {
      * Built-in pieces to place: `golden-gate-bridge`, `san-francisco`, `marine-layer`, and for the tropics `palms`,
      * `mooring-fields` (yachts lying off every place with moorings) and `virgin-islands` (the Baths' boulders, Road Town).
      * `marine-layer` also brings the fog bank in through the Golden Gate; `morning-haze` is haze among islands at dawn.
+     * For the San Pedro Channel: `long-beach` (the harbor's skyline, the Queen Mary, the port's cranes, the marinas) and
+     * `catalina-island` (Avalon and its Casino, Two Harbors, the coves' moorings, trees in the canyons).
+     * Breakwaters, platforms, oil islands, kelp and towns need no piece: they are drawn wherever a water's data has them.
      */
     pieces?: string[];
   };
@@ -56,6 +60,8 @@ export interface LoadedCourse extends ReplayData {
   traffic: TrafficSpec;
   /** Hazards, traffic lanes, refuges and lights, where the water has a `features.json`. */
   features?: CourseFeatures;
+  /** Towns to walk about in, where the water has a `towns.json`. See `scene/town.ts`. */
+  towns?: TownSpec[];
 }
 
 const ROOT = '../../../../courses/';
@@ -67,8 +73,8 @@ const ready = <T>(all: Record<string, T>): Record<string, () => Promise<T>> => O
 // The single-file build has no network to fetch from, and inlining load-on-demand modules into one script leaves them
 // defined after the code that waits for them. So there everything is loaded up front; on the web each water is fetched when chosen.
 const json = __SINGLE__
-  ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features}.json', { import: 'default', eager: true }))
-  : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features}.json', { import: 'default' });
+  ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features,towns}.json', { import: 'default', eager: true }))
+  : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features,towns}.json', { import: 'default' });
 const binaries = __SINGLE__
   ? ready(import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default', eager: true }))
   : import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default' });
@@ -110,13 +116,14 @@ async function read(id: string): Promise<LoadedCourse> {
   const course = await file<CourseData>('course');
   const optional = <T>(name: string): Promise<T | undefined> => (json[`${ROOT}${id}/${name}.json`]?.() as Promise<T> | undefined) ?? Promise.resolve(undefined);
   const features = await optional<CourseFeatures>('features');
+  const towns = await optional<TownSpec[]>('towns');
   const [current, depth, terrain, starts, times, places, races, traffic] = await Promise.all([
     binary(course.current.file), binary(course.depth.file), binary(course.terrain.file),
     file<StartSpot[]>('starts'), file<StartTime[]>('times'), file<Place[]>('places', []), file<RaceCourse[]>('races', []),
     // A water with no traffic file simply has none.
     file<TrafficSpec>('traffic', { referenceHours: 0, routes: [] }),
   ]);
-  return { about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic, features };
+  return { about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic, features, towns };
 }
 
 /** A course and everything that goes with it. Asking twice for the same one fetches it once. */

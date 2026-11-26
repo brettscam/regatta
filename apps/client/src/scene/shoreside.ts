@@ -43,8 +43,8 @@ const SKIN = [C(0.86, 0.66, 0.52), C(0.62, 0.44, 0.32), C(0.94, 0.78, 0.66), C(0
 const BURGEES: Array<[THREE.Color, THREE.Color]> = [[C(0.85, 0.1, 0.1), C(1, 1, 1)], [C(0.08, 0.2, 0.6), C(1, 0.82, 0.1)], [C(1, 1, 1), C(0.08, 0.2, 0.6)], [C(0.05, 0.42, 0.3), C(1, 1, 1)], [C(1, 0.8, 0.08), C(0.08, 0.1, 0.3)]];
 
 /** What a flag or a light looks like when it is too far off to draw as a thing: see `beacons`. */
-const SHAPE = { burgee: 0, flag: 1, glow: 2 } as const;
-interface Light { p: P3; a: THREE.Color; b: THREE.Color; shape: number; size: number; min: number }
+export const SHAPE = { burgee: 0, flag: 1, glow: 2 } as const;
+export interface Light { p: P3; a: THREE.Color; b: THREE.Color; shape: number; size: number; min: number }
 interface Board { text: string; at: P3; w: number; h: number; ux: number; uy: number }
 
 /**
@@ -450,8 +450,9 @@ function lettering(boards: Board[]): THREE.Mesh {
  * The flags and the lights as points. Close to, each is the size it really is. Far off it stops shrinking at a few
  * pixels, which is how a burgee or a lit window is found across two miles of water. Flags show by day and dim at
  * night, when the lights come up with the shore's (`cityNight`). One draw call, nothing to update each frame.
+ * @param reach how much further than a venue's lights these carry: an oil platform's are seen across the channel
  */
-function beacons(list: Light[]): THREE.Points {
+export function beacons(list: Light[], reach = 1, name = 'shoreside_lights'): THREE.Points {
   const n = list.length;
   const pos = new Float32Array(n * 3);
   const colA = new Float32Array(n * 3);
@@ -468,7 +469,7 @@ function beacons(list: Light[]): THREE.Points {
   geom.setAttribute('aColor', new THREE.BufferAttribute(colA, 3));
   geom.setAttribute('aColor2', new THREE.BufferAttribute(colB, 3));
   geom.setAttribute('aSpec', new THREE.BufferAttribute(spec, 3));
-  const uniforms = { uNight: { value: cityNight.value }, uScale: { value: 800 }, uPx: { value: 1 }, uWidth: { value: 1280 } };
+  const uniforms = { uNight: { value: cityNight.value }, uScale: { value: 800 }, uPx: { value: 1 }, uWidth: { value: 1280 }, uReach: { value: reach } };
   const mat = new THREE.ShaderMaterial({
     uniforms,
     transparent: true,
@@ -481,6 +482,7 @@ function beacons(list: Light[]): THREE.Points {
       uniform float uScale;
       uniform float uPx;
       uniform float uWidth;
+      uniform float uReach;
       varying vec3 vA;
       varying vec3 vB;
       varying float vShape;
@@ -493,7 +495,7 @@ function beacons(list: Light[]): THREE.Points {
         vA = aColor;
         vB = aColor2;
         // Lights only after dark. Everything goes into the haze well before the far shore.
-        vFade = (aSpec.x > 1.5 ? uNight : 1.0) * (1.0 - smoothstep(7000.0, 12000.0, dist));
+        vFade = (aSpec.x > 1.5 ? uNight : 1.0) * (1.0 - smoothstep(7000.0 * uReach, 12000.0 * uReach, dist));
         gl_Position = projectionMatrix * mv;
         // A flag flies from its hoist: move the square half its width to one side of the staff.
         if (aSpec.x < 1.5) gl_Position.x += size / uWidth * gl_Position.w;
@@ -538,7 +540,7 @@ function beacons(list: Light[]): THREE.Points {
   });
   onCityNight((night) => { uniforms.uNight.value = night; });
   const points = new THREE.Points(geom, mat);
-  points.name = 'shoreside_lights';
+  points.name = name;
   points.frustumCulled = false;
   points.renderOrder = 2;
   const sizeOf = new THREE.Vector2();

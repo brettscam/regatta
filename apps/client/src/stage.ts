@@ -3,7 +3,7 @@ import { KT } from '@slack-tide/sim';
 import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildLand, landHeight } from './scene/terrain';
+import { Buoy, buildBridge, buildLand, drawnLandHeight, landHeight } from './scene/terrain';
 import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
@@ -21,6 +21,12 @@ import { NavLights } from './scene/navLights';
 import { Rain } from './scene/rain';
 import { SF_FOG_PATH, cloudCover, fogAt, fogReach, morningHaze, pathPoint, rainAt, solarHour, squallsAt, visibility, type FogPath, type Squall } from './scene/weatherRules';
 import type { LoadedCourse } from './world/loadCourse';
+// Long Beach to Catalina: what is built in the sea, kelp, towns to walk in, and the two shores' own scenery.
+import { buildStructures } from './scene/structures';
+import { buildKelp, kelpCanopy } from './scene/kelp';
+import { planTown, townLayouts } from './scene/town';
+import { buildLongBeach, type Detail } from './scene/longBeach';
+import { buildCatalina } from './scene/catalinaIsland';
 
 export interface StageBoat {
   /** Scene coordinates: X east, Z south. */
@@ -99,6 +105,10 @@ export class Stage {
   readonly sea: Sea = emptySea();
   /** The venue standing on the shore at each place there is to go ashore: where it is, and its deck, dock and named spots. */
   shore: ShoreSpot[] = [];
+  /** Scenery that is only worth drawing from near by, each with where it is and how far off it is hidden. See `frame`. */
+  private detail: Detail[] = [];
+  /** What the water's own scenery came to, for the curious and for tests: counts of things, and triangles. */
+  readonly built: Record<string, number> = {};
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
@@ -177,7 +187,8 @@ export class Stage {
     const t = this.course.terrain;
     const heightAt = terrain instanceof THREE.Mesh
       ? ((drawn: HeightGrid) => (x: number, y: number) => groundHeight(drawn, x, y))({ x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: terrain.geometry.getAttribute('position').array, stride: 3, offset: 1 })
-      : landHeight(this.course, data.terrain);
+      // Land with insets: the finest grid at each place, with the sea below zero as it is drawn, so a shoreline can be found on it.
+      : drawnLandHeight(this.course, data.terrain);
     const shore = buildShoreside(this.course.depth, data.depth, heightAt, (x, y) => world.chartDepth(x, y), data.places, scenery.landCover);
     land.add(shore.group);
     this.shore = shore.spots;
@@ -194,6 +205,57 @@ export class Stage {
     if (pieces.has('palms')) land.add(buildPalms(this.course, data.terrain));
     if (pieces.has('mooring-fields')) land.add(buildMooringFields(this.course, data.terrain, data.depth, data.places, approaches));
     if (pieces.has('virgin-islands')) land.add(buildVirginIslands(this.course, data.terrain));
+    // ---- added for Long Beach to Catalina; each part is drawn on any water whose data has it -----------------
+    this.detail = [];
+    for (const k of Object.keys(this.built)) delete this.built[k];
+    const tally = (name: string, counts: Record<string, number>, triangles: number) => {
+      this.built[`${name}Triangles`] = triangles;
+      for (const [k, v] of Object.entries(counts)) this.built[k] = v;
+    };
+    const sceneGround = { height: heightAt, depth: (x: number, y: number) => world.chartDepth(x, y) };
+    // What is built in the sea: breakwaters, platforms, oil islands (`features.json` structures). Solid through the chart's depth.
+    if (data.features?.structures?.length) {
+      const built = buildStructures(data.features.structures);
+      land.add(built.group);
+      tally('structures', { structures: built.placed.length }, built.triangles);
+    }
+    // Kelp at the surface, a mesh to each bed so a bed far off is not drawn.
+    if (data.features?.kelp?.length) {
+      const patches = kelpCanopy(data.features.kelp, sceneGround.depth);
+      for (const bed of data.features.kelp) {
+        const own = patches.filter((p) => p.bed === bed.id);
+        if (!own.length) continue;
+        const mesh = buildKelp(own);
+        land.add(mesh);
+        const mid = bed.line[Math.floor(bed.line.length / 2)];
+        const span = Math.hypot(bed.line[0][0] - bed.line[bed.line.length - 1][0], bed.line[0][1] - bed.line[bed.line.length - 1][1]);
+        this.detail.push({ object: mesh, x: mid[0], y: mid[1], far: 5000 + span });
+      }
+      tally('kelp', { kelpPatches: patches.length }, patches.length * 8);
+    }
+    // Towns to walk about in (`towns.json`). Each landing of a town is an entry of `shore` under its place's id, with
+    // the whole town as its layout: see `TownLayout` in `scene/town.ts`. The ground itself is drawn with the town.
+    const townGround = { ...sceneGround, sailable: () => true };
+    const plans = (data.towns ?? []).map((t) => planTown(t, townGround));
+    for (const plan of plans) {
+      townLayouts(plan, townGround).forEach(({ place, layout }, n) => {
+        const at = n === 0 || !layout.dock ? layout : layout.dock;
+        this.shore.push({ id: place, kind: layout.kind, x: at.x, y: at.y, top: layout.floor + (n === 0 ? 16 : 9), layout });
+      });
+    }
+    if (pieces.has('long-beach')) {
+      const built = buildLongBeach(this.course, sceneGround, data.places.map((p): [number, number, number] => [p.x, p.y, 90]));
+      land.add(built.group);
+      this.detail.push(...built.detail);
+      tally('longBeach', built.counts, built.triangles);
+    }
+    if (pieces.has('catalina-island')) {
+      const built = buildCatalina(sceneGround, plans, data.places);
+      land.add(built.group);
+      this.detail.push(...built.detail);
+      tally('catalina', built.counts, built.triangles);
+    }
+    // ---- end of the Long Beach to Catalina additions ----------------------------------------------------
     // The water itself. Clear tropical water is blue where it is deep and shows its bottom where it is not.
     if (scenery.water === 'clear') {
       const shoals = shoalMap(this.course, data.depth);
@@ -453,6 +515,13 @@ export class Stage {
     const toward = hourly.dir + Math.PI;
     this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));
 
+    // Scenery that is only worth drawing from near by is hidden when the eye is far from it.
+    for (let i = 0; i < this.detail.length; i++) {
+      const d = this.detail[i];
+      const dx = camera.position.x - d.x;
+      const dz = camera.position.z + d.y;
+      d.object.visible = dx * dx + dz * dz < d.far * d.far;
+    }
     this.frameCount++;
     if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);
   }
