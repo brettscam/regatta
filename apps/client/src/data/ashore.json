@@ -29,7 +29,7 @@
     "san-juans": { "first": ["chowder"], "not": ["rum-punch"] }
   },
   "places": {
-    "isthmus": { "first": ["buffalo-milk"] },
-    "avalon": { "first": ["buffalo-milk"] }
+    "isthmus": { "first": ["buffalo-milk", "beer"] },
+    "avalon": { "first": ["buffalo-milk", "ice-cream", "fish-tacos"] }
   }
 }

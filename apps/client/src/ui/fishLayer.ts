@@ -97,11 +97,15 @@ export function fishingLayer(table: FishTable, reserves: readonly Reserve[], sea
           ctx.fill();
         }
         ctx.setLineDash([]);
-        if (p.scale > 0.012 && at[0] > -80 && at[1] > -20 && at[0] < p.w + 80 && at[1] < p.h + 20) label(ctx, barge ? 'Bait barge' : g.name.replace(/^the /, ''), at[0], at[1], barge ? BROWN : GREEN);
+        // A ground the chart names already (a mark of the course) is not named twice.
+        if (!g.charted && p.scale > 0.012 && at[0] > -80 && at[1] > -20 && at[0] < p.w + 80 && at[1] < p.h + 20) label(ctx, barge ? 'Bait barge' : g.name.replace(/^the /, ''), at[0], at[1], barge ? BROWN : GREEN);
       }
       for (const pl of table.platforms) {
         const [sx, sy] = p.to(pl.x, pl.y);
         if (sx < -60 || sy < -30 || sx > p.w + 60 || sy > p.h + 30) continue;
+        // A platform from the water's own features is drawn, ringed and named by the chart itself. Its island has no
+        // ring there, so that is still drawn here, without a second name.
+        if (pl.charted && pl.kind === 'platform') continue;
         ctx.beginPath();
         ctx.arc(sx, sy, Math.max(5, pl.keepOff * p.scale), 0, Math.PI * 2);
         ctx.strokeStyle = RED;
@@ -109,6 +113,7 @@ export function fishingLayer(table: FishTable, reserves: readonly Reserve[], sea
         ctx.setLineDash([3, 3]);
         ctx.stroke();
         ctx.setLineDash([]);
+        if (pl.charted) continue;
         ctx.fillStyle = INK;
         if (pl.kind === 'platform') ctx.fillRect(sx - 3, sy - 3, 6, 6);
         else { ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, Math.PI * 2); ctx.fill(); }

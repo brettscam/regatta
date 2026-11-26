@@ -18,11 +18,15 @@ export interface Reserve {
 interface ZoneFile { zones?: Array<{ id: string; name: string; x: number; y: number; r: number }> }
 
 const files = import.meta.glob<ZoneFile>('../../../../courses/*/dives.json', { eager: true, import: 'default' });
+/** A water's chart features: its areas marked `noTake` are its reserves, and come before any list in `dives.json`. */
+const charts = import.meta.glob<{ areas?: Array<{ id: string; name: string; noTake?: boolean; circle?: { x: number; y: number; r: number } }> }>('../../../../courses/*/features.json', { eager: true, import: 'default' });
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** The reserves of a water. A water with no list has none. */
 export function reservesOf(courseId: string): Reserve[] {
-  const zones = files[`../../../../courses/${courseId}/dives.json`]?.zones;
+  // One list: the chart's own no-take areas where the water has them (`features.json`), the dive file's where it has not.
+  const charted = charts[`../../../../courses/${courseId}/features.json`]?.areas?.filter((a) => a.noTake && a.circle);
+  const zones = charted?.length ? charted.map((a) => ({ id: a.id, name: a.name, x: a.circle!.x, y: a.circle!.y, r: a.circle!.r })) : files[`../../../../courses/${courseId}/dives.json`]?.zones;
   if (!Array.isArray(zones)) return [];
   return zones
     .filter((z) => z && typeof z.id === 'string' && typeof z.name === 'string' && finite(z.x) && finite(z.y) && finite(z.r) && z.r > 0)

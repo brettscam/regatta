@@ -48,6 +48,14 @@ export interface WalkRoof { ring: Pt[]; z: number }
  */
 export type SpotKind = 'door' | 'table' | 'seat' | 'bar' | 'rail' | 'dance' | 'fire' | 'dock' | 'bench' | 'view' | 'counter';
 
+/**
+ * What a layout's spot is to somebody walking. A town (`scene/town.ts`) has three kinds of its own: something to stand
+ * and look at and the head of a flight of steps are both a place to stand and look, and a shop door is a door.
+ */
+export function walkKind(kind: string): SpotKind {
+  return kind === 'sight' || kind === 'steps' ? 'view' : kind === 'shop' ? 'door' : (kind as SpotKind);
+}
+
 export interface WalkSpot {
   name: string;
   kind: SpotKind;

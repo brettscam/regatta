@@ -16,6 +16,8 @@ import {
 } from './actions';
 import { AshoreCard } from './card';
 import { groundOfVenue } from './fromVenue';
+import { groundOfTown } from './fromTown';
+import { isTown } from '../scene/town';
 import { areaAt, ceilingAt, clearTo, floorAt, floorUnder, standNear, toCourse, toLocal, walkStep, type Footing, type WalkGround } from './ground';
 import { Walker } from './people';
 import { EMOTE_SECONDS, JOG, WALK, stride } from './pose';
@@ -163,7 +165,8 @@ export class Ashore implements Feature {
     let site = this.sites.get(id);
     if (site !== undefined) return site;
     const spot = this.ctx.stage.shore.find((s) => s.id === id);
-    const ground = spot?.layout ? groundOfVenue(spot.layout) : null;
+    // A place in a town (`scene/town.ts`) has the whole town for its ground; any other has its venue's deck.
+    const ground = !spot?.layout ? null : isTown(spot.layout) ? groundOfTown(spot.layout) : groundOfVenue(spot.layout);
     site = ground && spot ? { ground, kind: spot.kind, top: spot.top } : null;
     this.sites.set(id, site);
     return site;
@@ -253,7 +256,9 @@ export class Ashore implements Feature {
 
   /** Where she is put down: on the guest float if the place has one, else the nearest thing to stand on. */
   private spawn(g: WalkGround, x: number, y: number, reach: number): Footing | null {
-    const dock = g.spots.find((s) => s.kind === 'dock');
+    // A town has a float at each of its landings: the one nearest where she came in.
+    let dock: WalkGround['spots'][number] | undefined;
+    for (const s of g.spots) if (s.kind === 'dock' && (!dock || Math.hypot(s.x - x, s.y - y) < Math.hypot(dock.x - x, dock.y - y))) dock = s;
     if (dock && Math.hypot(dock.x - x, dock.y - y) <= reach) {
       const area = areaAt(g, dock.x, dock.y);
       if (area >= 0) return { x: dock.x, y: dock.y, area };

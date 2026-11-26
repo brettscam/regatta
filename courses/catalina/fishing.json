@@ -1,5 +1,5 @@
 {
-  "note": "Fishing on the San Pedro Channel: what lives where, what it takes, how big it runs and what may be kept. All of it is from general knowledge of Southern California sport fishing, not from a survey or the current regulations booklet: sizes, limits and positions are approximate. No-take reserves are not listed here: they are the `zones` of this water's dives.json, read through fishing/zones.ts, so fishing and diving obey one list. Read by apps/client/src/fishing/table.ts; the rules that use it are in fishing/grounds.ts and fishing/bites.ts. Lengths in centimetres, positions in flat metres east and north of the course origin.",
+  "note": "Fishing on the San Pedro Channel: what lives where, what it takes, how big it runs and what may be kept. All of it is from general knowledge of Southern California sport fishing, not from a survey or the current regulations booklet: sizes, limits and positions are approximate. No-take reserves are not listed here, nor the oil platforms and islands: both come from this water's features.json (its `noTake` areas through fishing/zones.ts, its `structures` through fishing/table.ts), so there is one list of each. Read by apps/client/src/fishing/table.ts; the rules that use it are in fishing/grounds.ts and fishing/bites.ts. Lengths in centimetres, positions in flat metres east and north of the course origin.",
   "name": "Southern California",
   "jackpot": "yellowtail",
   "bait": { "name": "live sardines", "scoop": 12, "most": 24 },
@@ -7,10 +7,10 @@
     { "id": "alamitos", "name": "Alamitos Bay", "kind": "harbor", "circle": [17000, 22300, 1500], "depth": [1, 9], "say": "Spotted bay bass round the docks and the eelgrass, halibut on the sand in the entrance." },
     { "id": "bait-barge", "name": "the bait barge", "kind": "barge", "circle": [16900, 21550, 520], "say": "Stop here for a scoop of live sardines." },
     { "id": "flats", "name": "the harbor flats", "kind": "flats", "box": [3500, 17300, 21500, 24600], "depth": [3, 22], "say": "Sand inside the breakwater: halibut on a drifted bait, sand bass and croaker." },
-    { "id": "sp-breakwater", "name": "the San Pedro breakwater", "kind": "rocks", "line": [[1900, 17450], [4100, 17500]], "width": 280, "say": "Calico and sand bass tight to the rocks." },
-    { "id": "mid-breakwater", "name": "the middle breakwater", "kind": "rocks", "line": [[4900, 17700], [10100, 18950]], "width": 280, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
-    { "id": "lb-breakwater", "name": "the Long Beach breakwater", "kind": "rocks", "line": [[10900, 19100], [15100, 19200]], "width": 280, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
-    { "id": "horseshoe", "name": "Horseshoe Kelp", "kind": "reef", "circle": [7400, 13300, 1700], "say": "A low reef three miles out: sand bass, calico, sculpin, and barracuda over the top of it." },
+    { "id": "sp-breakwater", "name": "the San Pedro breakwater", "kind": "rocks", "line": [[1720, 17770], [2500, 17380], [4450, 17600]], "width": 160, "say": "Calico and sand bass tight to the rocks." },
+    { "id": "mid-breakwater", "name": "the middle breakwater", "kind": "rocks", "line": [[5210, 17900], [5840, 18160], [6550, 18420], [7740, 18890], [8640, 19235], [9840, 19258], [10430, 19260]], "width": 160, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
+    { "id": "lb-breakwater", "name": "the Long Beach breakwater", "kind": "rocks", "line": [[11070, 19260], [12320, 19270], [14640, 19278], [15150, 19290]], "width": 160, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
+    { "id": "horseshoe", "name": "Horseshoe Kelp", "charted": true, "kind": "reef", "circle": [7400, 13300, 1700], "say": "A low reef three miles out: sand bass, calico, sculpin, and barracuda over the top of it." },
     { "id": "kelp-line", "name": "the island kelp line", "kind": "kelp", "box": [-24500, -30500, 4500, -7500], "depth": [4, 30], "say": "The kelp along the island's front side: calico, sheephead, whitefish, and white seabass at first light." },
     { "id": "hen-rock", "name": "Hen Rock", "kind": "point", "circle": [-6150, -16750, 550], "say": "The reef just outside the Long Point reserve: yellowtail come round the corner along the kelp." },
     { "id": "east-end", "name": "the East End", "kind": "point", "circle": [-460, -27070, 1300], "say": "Yellowtail off the corner of the island, and the first place a marlin is seen." },
@@ -21,18 +21,6 @@
     { "id": "whites", "name": "White's Landing", "kind": "cove", "circle": [-6500, -17750, 700], "depth": [3, 30], "say": "A long sand beach: halibut on the flat off it." },
     { "id": "far-side", "name": "the far side of the channel", "kind": "offshore", "box": [-22000, -24000, 14000, -3000], "depth": [100, 9999], "say": "Blue water under the island: the tuna and the marlin, when they are in." }
   ],
-  "platforms": [
-    { "id": "eureka", "name": "Platform Eureka", "kind": "platform", "x": 17005, "y": 1530, "keepOff": 100, "reach": 480, "provisional": true },
-    { "id": "ellen", "name": "Platforms Ellen and Elly", "kind": "platform", "x": 15930, "y": 3570, "keepOff": 100, "reach": 480, "provisional": true },
-    { "id": "edith", "name": "Platform Edith", "kind": "platform", "x": 14770, "y": 5080, "keepOff": 100, "reach": 480, "provisional": true },
-    { "id": "eva", "name": "Platform Eva", "kind": "platform", "x": 22175, "y": 12315, "keepOff": 100, "reach": 420, "provisional": true },
-    { "id": "emmy", "name": "Platform Emmy", "kind": "platform", "x": 23750, "y": 12425, "keepOff": 100, "reach": 420, "provisional": true },
-    { "id": "grissom", "name": "Island Grissom", "kind": "island", "x": 11135, "y": 23035, "keepOff": 90, "reach": 380, "provisional": true },
-    { "id": "white", "name": "Island White", "kind": "island", "x": 13045, "y": 22490, "keepOff": 90, "reach": 380, "provisional": true },
-    { "id": "chaffee", "name": "Island Chaffee", "kind": "island", "x": 15030, "y": 21145, "keepOff": 90, "reach": 380, "provisional": true },
-    { "id": "freeman", "name": "Island Freeman", "kind": "island", "x": 12830, "y": 21345, "keepOff": 90, "reach": 380, "provisional": true }
-  ],
-  "platformsNote": "Provisional: approximate positions from memory, kept here until the scenery's own table of the oil islands and platforms lands. Reconcile at merge and delete whichever is the copy.",
   "paddies": { "area": [-13000, -11000, 17000, 12000], "count": 7, "hours": 3, "holding": 0.6, "driftKt": 0.25 },
   "schools": [
     { "id": "gate", "area": [6500, 13800, 16000, 18300], "count": 2, "minutes": 25, "odds": 0.6, "kinds": { "boil": 1 } },

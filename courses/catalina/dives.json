@@ -41,8 +41,8 @@
     { "id": "seal", "name": "harbor seal", "habitat": "open", "shape": "seal", "pattern": "spotted", "colour": "#8a8d90", "size": [ 120, 170 ], "kgPerCm3": 1.6e-05, "wary": 0.3, "speed": 2.0, "common": 1, "chance": 0.4, "curious": true, "protected": "Seals and sea lions are protected by the Marine Mammal Protection Act", "say": "A harbor seal, come to see what you are. It will buzz past, look you in the mask, and steal a fish off your stringer if it can. Protected" }
   ],
   "zones": [
-    { "id": "casino-point", "name": "Casino Point Dive Park", "x": -2270, "y": -22280, "r": 260, "say": "Casino Point is a no-take reserve: nothing may be taken here, by spear or by hand" },
-    { "id": "lovers-cove", "name": "Lover's Cove", "x": -1650, "y": -23020, "r": 330, "say": "Lover's Cove is a marine reserve: no spearfishing and no lobster here" },
+    { "id": "casino-point", "name": "Casino Point Dive Park", "x": -2250, "y": -22300, "r": 160, "say": "Casino Point is a no-take reserve: nothing may be taken here, by spear or by hand" },
+    { "id": "lovers-cove", "name": "Lover's Cove", "x": -1760, "y": -22980, "r": 200, "say": "Lover's Cove is a marine reserve: no spearfishing and no lobster here" },
     { "id": "long-point", "name": "Long Point reserve", "x": -6900, "y": -15450, "r": 1150, "say": "The Long Point State Marine Reserve runs along this shore: nothing may be taken" },
     { "id": "blue-cavern", "name": "Blue Cavern reserve", "x": -16400, "y": -11450, "r": 600, "say": "Blue Cavern is a no-take reserve, kept for the marine science station: nothing may be taken" }
   ],

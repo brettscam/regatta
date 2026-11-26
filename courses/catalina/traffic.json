@@ -1,0 +1,563 @@
+{
+ "note": "Written by hand, with made-up names. Ships keep to the lanes of features.json and use the two gates; each is one passage in and one out a day. The Catalina boats are fast catamarans, about an hour each way. A phase is seconds into the vessel's cycle at referenceHours into the season, which starts at 05:00 PDT.",
+ "referenceHours": 0,
+ "station": "San Pedro Radio",
+ "routes": [
+  {
+   "id": "pacific-gaviota-in",
+   "name": "Pacific Gaviota",
+   "sign": "the motor vessel Pacific Gaviota",
+   "kind": "ship",
+   "model": "container",
+   "length": 335,
+   "beam": 46,
+   "speedKt": 15,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#14181c",
+   "phase": 85320,
+   "ends": [
+    "sea",
+    "Long Beach"
+   ],
+   "lane": "western approach",
+   "gate": {
+    "at": 13,
+    "name": "Queens Gate"
+   },
+   "points": [
+    [-36110, 21953],
+    [-34955, 21450],
+    [-31235, 19828],
+    [-26360, 17703],
+    [-21485, 15578],
+    [-16610, 13453],
+    [-11764, 12470],
+    [-7514, 11670],
+    [-3264, 10870],
+    [986, 10070],
+    [6500, 14900],
+    [9900, 17600],
+    [10338, 18455],
+    [10750, 19260],
+    [10380, 19600],
+    [9500, 19950],
+    [8900, 20350],
+    [8650, 20560]
+   ]
+  },
+  {
+   "id": "pacific-gaviota-out",
+   "name": "Pacific Gaviota",
+   "sign": "the motor vessel Pacific Gaviota",
+   "kind": "ship",
+   "model": "container",
+   "length": 335,
+   "beam": 46,
+   "speedKt": 15,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#14181c",
+   "phase": 41400,
+   "ends": [
+    "Long Beach",
+    "sea"
+   ],
+   "lane": "western approach",
+   "gate": {
+    "at": 4,
+    "name": "Queens Gate"
+   },
+   "points": [
+    [8650, 20560],
+    [8900, 20350],
+    [9500, 19950],
+    [10380, 19600],
+    [10750, 19260],
+    [10400, 17600],
+    [7000, 16400],
+    [4000, 16200],
+    [2014, 15530],
+    [-2236, 16330],
+    [-6486, 17130],
+    [-10736, 17930],
+    [-14986, 18730],
+    [-19265, 20672],
+    [-24140, 22797],
+    [-29015, 24922],
+    [-32735, 26544],
+    [-33890, 27047]
+   ]
+  },
+  {
+   "id": "kaohsiung-trader-in",
+   "name": "Kaohsiung Trader",
+   "sign": "the motor vessel Kaohsiung Trader",
+   "kind": "ship",
+   "model": "container",
+   "length": 300,
+   "beam": 43,
+   "speedKt": 14,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#1d3f6e",
+   "phase": 71280,
+   "ends": [
+    "sea",
+    "Los Angeles"
+   ],
+   "lane": "western approach",
+   "gate": {
+    "at": 12,
+    "name": "Angels Gate"
+   },
+   "points": [
+    [-36110, 21953],
+    [-34955, 21450],
+    [-31235, 19828],
+    [-26360, 17703],
+    [-21485, 15578],
+    [-16610, 13453],
+    [-11764, 12470],
+    [-7514, 11670],
+    [-3264, 10870],
+    [986, 10070],
+    [3900, 15300],
+    [4650, 16900],
+    [4830, 17750],
+    [5120, 18250],
+    [5300, 18700],
+    [4950, 19250]
+   ]
+  },
+  {
+   "id": "kaohsiung-trader-out",
+   "name": "Kaohsiung Trader",
+   "sign": "the motor vessel Kaohsiung Trader",
+   "kind": "ship",
+   "model": "container",
+   "length": 300,
+   "beam": 43,
+   "speedKt": 14,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#1d3f6e",
+   "phase": 30600,
+   "ends": [
+    "Los Angeles",
+    "sea"
+   ],
+   "lane": "southern approach",
+   "gate": {
+    "at": 3,
+    "name": "Angels Gate"
+   },
+   "points": [
+    [4950, 19250],
+    [5300, 18700],
+    [5120, 18250],
+    [4830, 17750],
+    [5200, 16500],
+    [7600, 12500],
+    [7625, 8008],
+    [9265, 3502],
+    [10905, -1004],
+    [12545, -5510],
+    [14185, -10016],
+    [15394, -13338],
+    [15825, -14522]
+   ]
+  },
+  {
+   "id": "cape-dume-in",
+   "name": "Cape Dume",
+   "sign": "the tanker Cape Dume",
+   "kind": "ship",
+   "model": "tanker",
+   "length": 250,
+   "beam": 44,
+   "speedKt": 12,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#5a1f1a",
+   "phase": 59400,
+   "ends": [
+    "sea",
+    "Long Beach"
+   ],
+   "lane": "southern approach",
+   "gate": {
+    "at": 10,
+    "name": "Queens Gate"
+   },
+   "points": [
+    [20175, -12938],
+    [19744, -11754],
+    [18535, -8432],
+    [16895, -3926],
+    [15255, 580],
+    [13615, 5086],
+    [11975, 9592],
+    [11200, 13500],
+    [10800, 17300],
+    [10773, 18356],
+    [10750, 19260],
+    [10380, 19600],
+    [9500, 19950],
+    [8900, 20350],
+    [8650, 20560]
+   ]
+  },
+  {
+   "id": "cape-dume-out",
+   "name": "Cape Dume",
+   "sign": "the tanker Cape Dume",
+   "kind": "ship",
+   "model": "tanker",
+   "length": 250,
+   "beam": 44,
+   "speedKt": 12,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#5a1f1a",
+   "phase": 12600,
+   "ends": [
+    "Long Beach",
+    "sea"
+   ],
+   "lane": "southern approach",
+   "gate": {
+    "at": 4,
+    "name": "Queens Gate"
+   },
+   "points": [
+    [8650, 20560],
+    [8900, 20350],
+    [9500, 19950],
+    [10380, 19600],
+    [10750, 19260],
+    [10506, 18389],
+    [10200, 17300],
+    [9000, 13000],
+    [7625, 8008],
+    [9265, 3502],
+    [10905, -1004],
+    [12545, -5510],
+    [14185, -10016],
+    [15394, -13338],
+    [15825, -14522]
+   ]
+  },
+  {
+   "id": "camellia-highway-in",
+   "name": "Camellia Highway",
+   "sign": "the car carrier Camellia Highway",
+   "kind": "ship",
+   "model": "carcarrier",
+   "length": 200,
+   "beam": 32,
+   "speedKt": 14,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#1f5fa8",
+   "phase": 77760,
+   "ends": [
+    "sea",
+    "Los Angeles"
+   ],
+   "lane": "southern approach",
+   "gate": {
+    "at": 9,
+    "name": "Angels Gate"
+   },
+   "points": [
+    [20175, -12938],
+    [19744, -11754],
+    [18535, -8432],
+    [16895, -3926],
+    [15255, 580],
+    [13615, 5086],
+    [11975, 9592],
+    [9500, 13500],
+    [5800, 16300],
+    [4830, 17750],
+    [5120, 18250],
+    [5300, 18700],
+    [4950, 19250]
+   ]
+  },
+  {
+   "id": "camellia-highway-out",
+   "name": "Camellia Highway",
+   "sign": "the car carrier Camellia Highway",
+   "kind": "ship",
+   "model": "carcarrier",
+   "length": 200,
+   "beam": 32,
+   "speedKt": 14,
+   "mode": "oneway",
+   "every": 86400,
+   "color": "#1f5fa8",
+   "phase": 51840,
+   "ends": [
+    "Los Angeles",
+    "sea"
+   ],
+   "lane": "western approach",
+   "gate": {
+    "at": 3,
+    "name": "Angels Gate"
+   },
+   "points": [
+    [4950, 19250],
+    [5300, 18700],
+    [5120, 18250],
+    [4830, 17750],
+    [4500, 16700],
+    [2600, 16300],
+    [2014, 15530],
+    [302, 15852],
+    [-2236, 16330],
+    [-6486, 17130],
+    [-10736, 17930],
+    [-14986, 18730],
+    [-19265, 20672],
+    [-24140, 22797],
+    [-29015, 24922],
+    [-32735, 26544],
+    [-33890, 27047]
+   ]
+  },
+  {
+   "id": "ferry-avalon",
+   "name": "Avalon Jet",
+   "sign": "the Catalina boat Avalon Jet",
+   "kind": "ferry",
+   "model": "catamaran",
+   "length": 44,
+   "beam": 12,
+   "speedKt": 29,
+   "mode": "shuttle",
+   "dwell": 2700,
+   "phase": 0,
+   "color": "#1c4f9c",
+   "ends": [
+    "Long Beach",
+    "Avalon"
+   ],
+   "gate": {
+    "at": 3,
+    "name": "Queens Gate"
+   },
+   "points": [
+    [10400, 22850],
+    [10560, 22300],
+    [10770, 20600],
+    [10750, 19260],
+    [10690, 18000],
+    [9993, 15839],
+    [8740, 11949],
+    [8157, 10140],
+    [6500, 5000],
+    [5035, -198],
+    [3679, -5010],
+    [3121, -6990],
+    [1765, -11802],
+    [300, -17000],
+    [-1242, -21150],
+    [-1650, -22250],
+    [-2012, -22792]
+   ]
+  },
+  {
+   "id": "ferry-isthmus",
+   "name": "Isthmus Express",
+   "sign": "the Catalina boat Isthmus Express",
+   "kind": "ferry",
+   "model": "catamaran",
+   "length": 38,
+   "beam": 11,
+   "speedKt": 27,
+   "mode": "shuttle",
+   "dwell": 7200,
+   "phase": 0,
+   "color": "#b5332a",
+   "ends": [
+    "San Pedro",
+    "Two Harbors"
+   ],
+   "gate": {
+    "at": 3,
+    "name": "Angels Gate"
+   },
+   "points": [
+    [4950, 19250],
+    [5300, 18700],
+    [5120, 18250],
+    [4830, 17750],
+    [4350, 16500],
+    [2906, 14570],
+    [306, 11097],
+    [-4764, 4323],
+    [-8000, 0],
+    [-11508, -4106],
+    [-14283, -7354],
+    [-16800, -10300],
+    [-18235, -11905]
+   ]
+  },
+  {
+   "id": "tug-point-fermin",
+   "name": "Point Fermin",
+   "sign": "the tug Point Fermin, with a barge in tow",
+   "kind": "ferry",
+   "model": "tug",
+   "length": 90,
+   "beam": 14,
+   "speedKt": 6.5,
+   "mode": "shuttle",
+   "dwell": 2400,
+   "hideAtEnds": true,
+   "phase": 900,
+   "color": "#b5332a",
+   "ends": [
+    "Los Angeles",
+    "Long Beach"
+   ],
+   "points": [
+    [5050, 19000],
+    [5900, 18950],
+    [8000, 19650],
+    [9700, 20150],
+    [10200, 20000]
+   ]
+  },
+  {
+   "id": "fish-horseshoe",
+   "name": "Morning Bite",
+   "sign": "the sportfisher Morning Bite",
+   "kind": "ferry",
+   "model": "trawler",
+   "length": 24,
+   "beam": 7,
+   "speedKt": 10,
+   "mode": "shuttle",
+   "dwell": 16200,
+   "dwellHome": 65557,
+   "hideAtEnds": "first",
+   "phase": 84240,
+   "color": "#e8e4d8",
+   "ends": [
+    "Alamitos Bay",
+    "the Horseshoe Kelp"
+   ],
+   "points": [
+    [15650, 20350],
+    [15750, 19900],
+    [15750, 19350],
+    [15095, 18608],
+    [13500, 16800],
+    [10297, 14811],
+    [8370, 13615],
+    [7300, 12950]
+   ]
+  },
+  {
+   "id": "fish-rigs",
+   "name": "Yellowtail Queen",
+   "sign": "the sportfisher Yellowtail Queen",
+   "kind": "ferry",
+   "model": "trawler",
+   "length": 24,
+   "beam": 7,
+   "speedKt": 11,
+   "mode": "shuttle",
+   "dwell": 18000,
+   "dwellHome": 61398,
+   "hideAtEnds": "first",
+   "phase": 85320,
+   "color": "#2f5f8a",
+   "ends": [
+    "Long Beach",
+    "the rigs"
+   ],
+   "points": [
+    [10450, 22750],
+    [10560, 22300],
+    [10770, 20600],
+    [10750, 19260],
+    [11300, 17500],
+    [12227, 14313],
+    [13123, 11234],
+    [14500, 6500],
+    [15040, 5123],
+    [15500, 3950]
+   ]
+  },
+  {
+   "id": "fish-island",
+   "name": "Calico Kid",
+   "sign": "the sportfisher Calico Kid",
+   "kind": "ferry",
+   "model": "trawler",
+   "length": 24,
+   "beam": 7,
+   "speedKt": 12,
+   "mode": "shuttle",
+   "dwell": 19800,
+   "dwellHome": 54923,
+   "hideAtEnds": "first",
+   "phase": 86040,
+   "color": "#b9b3a2",
+   "ends": [
+    "San Pedro",
+    "the island"
+   ],
+   "points": [
+    [4950, 19250],
+    [5300, 18700],
+    [5120, 18250],
+    [4830, 17750],
+    [4300, 16500],
+    [3613, 14155],
+    [2376, 9933],
+    [924, 4980],
+    [-482, 182],
+    [-2000, -5000],
+    [-3840, -11505],
+    [-4457, -13688],
+    [-4800, -14900]
+   ]
+  },
+  {
+   "id": "cruise-avalon",
+   "name": "Coral Empress",
+   "sign": "the cruise ship Coral Empress",
+   "kind": "ship",
+   "model": "cruise",
+   "length": 270,
+   "beam": 34,
+   "speedKt": 11,
+   "mode": "shuttle",
+   "dwell": 34200,
+   "dwellHome": 42683,
+   "hideAtEnds": "first",
+   "phase": 81360,
+   "color": "#f2f0ea",
+   "ends": [
+    "sea",
+    "the anchorage off Avalon"
+   ],
+   "points": [
+    [24000, -31000],
+    [22805, -30602],
+    [20653, -29884],
+    [17123, -28708],
+    [12000, -27000],
+    [3000, -23200],
+    [255, -22003],
+    [-900, -21500]
+   ]
+  }
+ ]
+}

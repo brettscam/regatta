@@ -10,7 +10,7 @@
       {
         "name": "Queens Gate",
         "x": 10750,
-        "y": 19250
+        "y": 19100
       },
       {
         "name": "Mid channel",
@@ -33,9 +33,14 @@
     "y": 20500,
     "route": [
       {
+        "name": "Inside the breakwater",
+        "x": 11250,
+        "y": 19850
+      },
+      {
         "name": "Queens Gate",
         "x": 10750,
-        "y": 19250
+        "y": 19100
       },
       {
         "name": "Horseshoe Kelp",
@@ -111,6 +116,36 @@
         "name": "Catalina Harbor",
         "x": -19350,
         "y": -13850
+      }
+    ]
+  },
+  {
+    "id": "rigs",
+    "name": "The oil platforms",
+    "where": "Between Platform Edith and Platform Ellen, eight miles out from Long Beach",
+    "teaches": "The rigs. Four steel platforms in deep water at the edge of the shipping lanes: sail round them close, mind the legs, and look for yellowtail in their shade.",
+    "x": 14600,
+    "y": 4300,
+    "route": [
+      {
+        "name": "West of Ellen",
+        "x": 15000,
+        "y": 3200
+      },
+      {
+        "name": "South of Eureka",
+        "x": 16700,
+        "y": 300
+      },
+      {
+        "name": "East of Eureka",
+        "x": 18000,
+        "y": 1400
+      },
+      {
+        "name": "East of Elly",
+        "x": 17000,
+        "y": 4300
       }
     ]
   }

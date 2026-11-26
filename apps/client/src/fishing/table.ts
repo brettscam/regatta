@@ -4,6 +4,7 @@
  * first table (`aboard/catch.ts`, written for San Francisco Bay). Adding a water's fishing is adding that file.
  * Lengths in centimetres, positions in flat metres (x east, y north), speeds in knots.
  */
+import type { Structure } from '../world/features';
 import tackleJson from '../data/tackle.json';
 
 /** What kind of water a fish lives in. A place can be several at once. */
@@ -60,6 +61,8 @@ export interface FishSpecies {
 }
 
 export interface Ground {
+  /** True where the chart names the place already (a mark of the course): the fishing layer does not name it again. */
+  charted?: boolean;
   id: string;
   name: string;
   kind: Habitat | 'barge';
@@ -84,6 +87,8 @@ export interface Platform {
   keepOff: number;
   /** How far out from it fish still hold, metres. */
   reach: number;
+  /** True when it comes from the water's `features.json`, so the chart itself already draws and names it. */
+  charted?: boolean;
 }
 
 export interface SchoolArea {
@@ -118,10 +123,34 @@ export interface FishTable {
 }
 
 const files = import.meta.glob<FishTable>('../../../../courses/*/fishing.json', { eager: true, import: 'default' });
+const features = import.meta.glob<{ structures?: Structure[] }>('../../../../courses/*/features.json', { eager: true, import: 'default' });
+
+/** How close anybody fishes or anchors to a platform's legs, metres: the ring the chart draws round it. */
+export const PLATFORM_RING = 100;
+
+/**
+ * The platforms and oil islands of a water, as fishing wants them, from the one list there is of them: the
+ * `structures` of the water's `features.json`, which is also what is drawn, charted and solid. A platform's ring is
+ * `PLATFORM_RING` from its middle; an island's stands 40 m off its rock. Null for a water with no such list.
+ */
+export function platformsOf(courseId: string): Platform[] | null {
+  const list = features[`../../../../courses/${courseId}/features.json`]?.structures;
+  if (!Array.isArray(list)) return null;
+  const out: Platform[] = [];
+  for (const s of list) {
+    if (s.x === undefined || s.y === undefined) continue;
+    if (s.kind === 'platform') out.push({ id: s.id, name: s.name, kind: 'platform', x: s.x, y: s.y, keepOff: PLATFORM_RING, reach: 480, charted: true });
+    else if (s.kind === 'island') out.push({ id: s.id, name: s.name, kind: 'island', x: s.x, y: s.y, keepOff: (s.r ?? 100) + 40, reach: (s.r ?? 100) + 300, charted: true });
+  }
+  return out;
+}
 
 /** A water's own fishing, or null when it keeps the game's first table. */
 export function tableOf(courseId: string): FishTable | null {
-  return files[`../../../../courses/${courseId}/fishing.json`] ?? null;
+  const file = files[`../../../../courses/${courseId}/fishing.json`];
+  if (!file) return null;
+  // The water's own structures where it has them; the fishing file's list only where it has not.
+  return { ...file, platforms: platformsOf(courseId) ?? file.platforms ?? [] };
 }
 
 /** Every water with its own fishing, by course id. */

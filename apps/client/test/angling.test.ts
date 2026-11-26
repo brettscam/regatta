@@ -145,8 +145,8 @@ describe('what kind of water she is in', () => {
     expect(whySlow(table, inside, tackle())).toMatch(/100 m ring round Platform Edith/);
     expect(whySlow(table, down, tackle({ rig: 'squid' }))).toMatch(/down-current side/);
     // An oil island is rock, not a platform.
-    const grissom = table.platforms.find((p) => p.id === 'grissom')!;
-    const rock = spotAt(table, reserves, { ...here(0, 0, east), x: grissom.x + 150, y: grissom.y, depth: 9 }, 10000);
+    const grissom = table.platforms.find((p) => p.id === 'island-grissom')!;
+    const rock = spotAt(table, reserves, { ...here(0, 0, east), x: grissom.x + grissom.keepOff + 40, y: grissom.y, depth: 9 }, 10000);
     expect(rock.hab.rocks!).toBeGreaterThan(0.4);
     expect(rock.hab.platform ?? 0).toBe(0);
   });

@@ -12,8 +12,9 @@ export interface ChartArea {
    * `separation`: the zone between two lanes. Nobody sails along it.
    * `precaution`: where lanes meet and ships turn: the pilot area.
    * `refuge`: an approach limit round a wildlife refuge. A courtesy line, with a word to the crew inside it.
+   * `keepclear`: the ring round something built in the sea (an oil platform): a red ring, and a word on the way in.
    */
-  kind: 'hazard' | 'lane' | 'separation' | 'precaution' | 'refuge';
+  kind: 'hazard' | 'lane' | 'separation' | 'precaution' | 'refuge' | 'keepclear';
   /** The outline, as corners in order. Left out for a round area, which gives `circle` instead. */
   points?: Array<[number, number]>;
   circle?: { x: number; y: number; r: number };
@@ -27,6 +28,54 @@ export interface ChartArea {
   least?: number;
   /** True where landing is forbidden: the tender stays aboard inside it. */
   noLanding?: boolean;
+  /** True in a marine reserve where nothing may be taken: no fishing, no pots, no lobster. For whoever fishes or dives. */
+  noTake?: boolean;
+}
+
+/**
+ * Something built in the sea that a boat cannot sail through: a breakwater, an oil platform, a man-made island, a pier.
+ * This is the record of where each one is. `scene/structures.ts` draws it from here, the chart marks it, and
+ * `scripts/stamp.ts` writes it into the water's baked depth as land cells, which is what makes it solid to every boat,
+ * pilot and script without any of them knowing about this list. Anything else that wants to know where the platforms
+ * are (fishing, diving) reads this.
+ */
+export interface Structure {
+  id: string;
+  name: string;
+  kind: 'breakwater' | 'platform' | 'island' | 'pier';
+  /** A breakwater or a pier: its centreline, end to end. */
+  line?: Array<[number, number]>;
+  /** A platform or an island: its centre. */
+  x?: number;
+  y?: number;
+  /** An island: its radius, metres. A platform: the size of its deck along and across, and the way its long side lies, degrees true. */
+  r?: number;
+  w?: number;
+  d?: number;
+  turn?: number;
+  /** Height of the top of a wall or the main deck of a platform above the sea, metres. */
+  height?: number;
+  /** Charted depth of water it stands in, metres, where that is more than the baked chart can say. */
+  depth?: number;
+  /** A platform joined to another by a footbridge: the other's id. */
+  bridgeTo?: string;
+  /** What dresses an island: `resort` is palms, a waterfall and towers that hide the drilling rigs. */
+  dress?: string;
+  say?: string;
+}
+
+/** A stretch of shore where giant kelp reaches the surface. `scene/kelp.ts` turns these into the canopy that is drawn. */
+export interface KelpBed {
+  id: string;
+  name: string;
+  /** The line the bed lies along, close to the shore. */
+  line: Array<[number, number]>;
+  /** How far either side of the line to look for water of the right depth, metres. */
+  reach: number;
+  /** The charted depths it grows in here, metres, where they are not the usual 3.5 to 24. */
+  depth?: [number, number];
+  /** Water inside the bed's reach that has none, as [x, y, radius]: a harbor's moorings, an anchorage's sand. */
+  clear?: Array<[number, number, number]>;
 }
 
 /** A lighthouse or lit mark: drawn on the land, labelled on the chart, and lit after dark with its own rhythm. */
@@ -56,6 +105,10 @@ export interface CourseFeatures {
   note?: string;
   areas: ChartArea[];
   lights: Light[];
+  /** What stands in the sea and is solid: breakwaters, platforms, islands. Left out, there is nothing. */
+  structures?: Structure[];
+  /** Where kelp grows to the surface. Left out, there is none. */
+  kelp?: KelpBed[];
   /** What this water wants of the weather that the game does not yet draw: read by whoever builds it. */
   fog?: { say: string; base: number; top: number; clearsBy: number; returnsBy: number; where: string };
   /** Where this water meets the next one: the line a boat would cross to pass between them. */

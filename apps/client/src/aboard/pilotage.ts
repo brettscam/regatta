@@ -2,6 +2,10 @@ import { KT } from '@slack-tide/sim';
 import type { AboardContext, Feature } from './feature';
 import { areasAt, barState, barWord, crossedEastward, entered, noLanding } from './pilotageRules';
 
+/** A platform's horn carries this far, metres, and sounds when the eye can see less than `THICK` metres. */
+const HORN_RANGE = 4000;
+const THICK = 14000;
+
 /**
  * The crew's local knowledge, on a water whose `features.json` marks its hazards, traffic lanes and refuges:
  * a word on sailing on to the bar, into a lane or inside a refuge's line, and a firm one when the ebb is running over a
@@ -16,6 +20,8 @@ export class Pilotage implements Feature {
   /** Seconds since each area's warning was last given: sailing along an edge must not repeat it every minute. */
   private readonly told = new Map<string, number>();
   private readonly handed = new Set<string>();
+  /** Seconds until the nearest platform's horn sounds again in thick weather. */
+  private horn = 8;
 
   constructor(private readonly ctx: AboardContext) {}
 
@@ -28,10 +34,28 @@ export class Pilotage implements Feature {
     return true;
   }
 
+  /**
+   * An oil platform sounds its horn in thick weather: one long blast every twenty seconds, louder the nearer she is.
+   * Real seconds, whatever the clock is doing. Added with Long Beach to Catalina; silent on a water with no platforms.
+   */
+  private foghorn(dt: number): void {
+    const list = this.ctx.features?.structures;
+    if (!list) return;
+    this.horn -= dt;
+    if (this.horn > 0) return;
+    this.horn = 20;
+    if (this.ctx.stage.weather.see > THICK) return;
+    const s = this.ctx.sim.state;
+    let near = HORN_RANGE;
+    for (const p of list) if (p.kind === 'platform' && p.x !== undefined && p.y !== undefined) near = Math.min(near, Math.hypot(p.x - s.x, p.y - s.y));
+    if (near < HORN_RANGE) this.ctx.sound.horn(1, Math.max(0.12, 1 - near / HORN_RANGE), true);
+  }
+
   update(dt: number): void {
     const f = this.ctx.features;
     if (!f) return;
     for (const [id, age] of this.told) this.told.set(id, age + dt);
+    this.foghorn(dt);
     this.clock -= dt;
     if (this.clock > 0) return;
     this.clock = 1;

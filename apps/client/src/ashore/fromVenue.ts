@@ -2,7 +2,7 @@
 // shape `ground.ts` asks for. Pure. A town drawn by other means needs its own small file like this one, or none at
 // all if its data is already a `WalkGround`.
 import type { VenueLayout } from '../scene/venue';
-import type { Pt, WalkArea, WalkBlock, WalkGround, WalkRoof, WalkSpot, WalkWall } from './ground';
+import { walkKind, type Pt, type WalkArea, type WalkBlock, type WalkGround, type WalkRoof, type WalkSpot, type WalkWall } from './ground';
 
 /** Half the width of a person, which everything standing on the floor is grown by. */
 export const BODY = 0.25;
@@ -27,7 +27,7 @@ export function groundOfVenue(layout: VenueLayout): WalkGround | null {
   const dot = (x: number, y: number, r: number) => blocks.push({ ax: x, ay: y, bx: x, by: y, r: r + BODY });
   const bars: WalkSpot[] = [];
   const spots: WalkSpot[] = layout.spots.map((s) => {
-    const out: WalkSpot = { name: s.name, kind: s.kind, x: s.x, y: s.y, face: s.face };
+    const out: WalkSpot = { name: s.name, kind: walkKind(s.kind), x: s.x, y: s.y, face: s.face };
     if (s.taken) out.taken = true;
     // "table-3-seat-2" is one of the seats of "table-3". The stools of the bar are together too.
     const table = /^(table-\d+)-seat-\d+$/.exec(s.name);

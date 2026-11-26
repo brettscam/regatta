@@ -1,0 +1,783 @@
+{
+ "note": "Written by hand from general knowledge of the charts, not from a chart: positions are approximate and wait to be checked against NOAA charts 18746, 18749 and 18757. The breakwaters follow the line of rocks the tide model and the elevation tiles already show; the oil islands are where the baked land has them; the Beta field platforms (Ellen, Elly, Eureka) and Edith are placed from memory to about half a mile. The traffic lanes are drawn simpler and narrower than the real scheme and are kept west of the platforms. Lights have the right colours and roughly the right rhythms. Structures are made solid by scripts/stamp.ts, which writes them into depth.bin. Kelp lines follow the baked coast: scene/kelp.ts turns them into the canopy. Not for navigation.",
+ "areas": [
+  {
+   "id": "west-out-1",
+   "name": "Western approach, outbound lane",
+   "kind": "lane",
+   "toward": 281,
+   "points": [
+    [1843, 14620],
+    [-15157, 17820],
+    [-14815, 19640],
+    [2185, 16440]
+   ],
+   "warn": "The outbound lane of the western approach. Ships leaving for the Santa Barbara Channel run north-west along it at 15 to 20 knots. Cross it square and do not loiter"
+  },
+  {
+   "id": "west-in-1",
+   "name": "Western approach, inbound lane",
+   "kind": "lane",
+   "toward": 101,
+   "points": [
+    [-15843, 14180],
+    [1157, 10980],
+    [815, 9160],
+    [-16185, 12360]
+   ],
+   "warn": "The inbound lane of the western approach. Ships for Los Angeles and Long Beach come down it from the north-west. Cross it square"
+  },
+  {
+   "id": "west-sep-1",
+   "name": "Western approach, separation zone",
+   "kind": "separation",
+   "points": [
+    [1157, 10980],
+    [-15843, 14180],
+    [-15157, 17820],
+    [1843, 14620]
+   ]
+  },
+  {
+   "id": "west-out-2",
+   "name": "Western approach, outbound lane",
+   "kind": "lane",
+   "toward": 294,
+   "points": [
+    [-14760, 17698],
+    [-34260, 26198],
+    [-33520, 27895],
+    [-14020, 19395]
+   ]
+  },
+  {
+   "id": "west-in-2",
+   "name": "Western approach, inbound lane",
+   "kind": "lane",
+   "toward": 114,
+   "points": [
+    [-35740, 22802],
+    [-16240, 14302],
+    [-16980, 12605],
+    [-36480, 21105]
+   ]
+  },
+  {
+   "id": "west-sep-2",
+   "name": "Western approach, separation zone",
+   "kind": "separation",
+   "points": [
+    [-16240, 14302],
+    [-35740, 22802],
+    [-34260, 26198],
+    [-14760, 17698]
+   ]
+  },
+  {
+   "id": "south-out-1",
+   "name": "Southern approach, outbound lane",
+   "kind": "lane",
+   "toward": 160,
+   "points": [
+    [8495, 8325],
+    [16695, -14205],
+    [14954, -14838],
+    [6754, 7692]
+   ],
+   "warn": "The southbound lane of the southern approach. Ships bound down the coast run along it. Cross it square"
+  },
+  {
+   "id": "south-in-1",
+   "name": "Southern approach, inbound lane",
+   "kind": "lane",
+   "toward": 340,
+   "points": [
+    [19305, -13255],
+    [11105, 9275],
+    [12846, 9908],
+    [21046, -12622]
+   ],
+   "warn": "The northbound lane of the southern approach. Ships come up it from the Gulf of Santa Catalina for the pilot station. Cross it square"
+  },
+  {
+   "id": "south-sep-1",
+   "name": "Southern approach, separation zone",
+   "kind": "separation",
+   "points": [
+    [11105, 9275],
+    [19305, -13255],
+    [16695, -14205],
+    [8495, 8325]
+   ]
+  },
+  {
+   "id": "precaution",
+   "name": "Precautionary Area",
+   "kind": "precaution",
+   "points": [
+    [1500, 16700],
+    [12600, 18700],
+    [14300, 12400],
+    [11400, 6900],
+    [1500, 9300]
+   ],
+   "say": "Where the lanes meet off the breakwater. Ships slow, turn and pick up their pilots",
+   "warn": "The precautionary area off the breakwater. The lanes meet here: ships turn for Queens Gate and Angels Gate and pick up their pilots. Keep a good lookout all round"
+  },
+  {
+   "id": "queens-gate",
+   "name": "Queens Gate",
+   "kind": "precaution",
+   "circle": {
+    "x": 10750,
+    "y": 19260,
+    "r": 420
+   },
+   "say": "The gap into Long Beach. 640 m wide",
+   "warn": "Queens Gate, the gap in the breakwater for Long Beach. Long Beach Light flashes white on the west side. Ships and the Catalina boats use it: keep to the edge if one is coming"
+  },
+  {
+   "id": "angels-gate",
+   "name": "Angels Gate",
+   "kind": "precaution",
+   "circle": {
+    "x": 4830,
+    "y": 17750,
+    "r": 430
+   },
+   "say": "The gap into Los Angeles. Angels Gate Light on its west side",
+   "warn": "Angels Gate, the gap in the breakwater for Los Angeles harbor. Angels Gate Light flashes green on the west side"
+  },
+  {
+   "id": "edith-ring",
+   "name": "Platform Edith",
+   "kind": "keepclear",
+   "circle": {
+    "x": 14750,
+    "y": 5100,
+    "r": 100
+   },
+   "say": "Oil platform. Nobody fishes or anchors inside the ring",
+   "warn": "Platform Edith. An oil platform on steel legs in 49 m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing"
+  },
+  {
+   "id": "ellen-ring",
+   "name": "Platform Ellen",
+   "kind": "keepclear",
+   "circle": {
+    "x": 15900,
+    "y": 3600,
+    "r": 100
+   },
+   "say": "Oil platform. Nobody fishes or anchors inside the ring",
+   "warn": "Platform Ellen. An oil platform on steel legs in 81 m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing"
+  },
+  {
+   "id": "elly-ring",
+   "name": "Platform Elly",
+   "kind": "keepclear",
+   "circle": {
+    "x": 16000,
+    "y": 3650,
+    "r": 100
+   },
+   "say": "Oil platform. Nobody fishes or anchors inside the ring",
+   "warn": "Platform Elly. An oil platform on steel legs in 78 m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing"
+  },
+  {
+   "id": "eureka-ring",
+   "name": "Platform Eureka",
+   "kind": "keepclear",
+   "circle": {
+    "x": 17000,
+    "y": 1500,
+    "r": 100
+   },
+   "say": "Oil platform. Nobody fishes or anchors inside the ring",
+   "warn": "Platform Eureka. An oil platform on steel legs in 213 m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing"
+  },
+  {
+   "id": "casino-point",
+   "name": "Casino Point Dive Park",
+   "kind": "refuge",
+   "noTake": true,
+   "circle": {
+    "x": -2250,
+    "y": -22300,
+    "r": 160
+   },
+   "say": "Underwater park. Divers down. Nothing may be taken",
+   "warn": "The dive park off Casino Point: a roped-off underwater park with divers down all day. No boats inside the buoys, and nothing may be taken"
+  },
+  {
+   "id": "lovers-cove",
+   "name": "Lover's Cove",
+   "kind": "refuge",
+   "noTake": true,
+   "circle": {
+    "x": -1760,
+    "y": -22980,
+    "r": 200
+   },
+   "say": "Marine reserve. Snorkelers. Nothing may be taken",
+   "warn": "Lover's Cove: a marine reserve just past the mole, full of snorkelers and bright orange garibaldi. No anchoring, and nothing may be taken"
+  },
+  {
+   "id": "long-point",
+   "name": "Long Point reserve",
+   "kind": "refuge",
+   "noTake": true,
+   "circle": {
+    "x": -6900,
+    "y": -15450,
+    "r": 1150
+   },
+   "say": "State marine reserve. Nothing may be taken",
+   "warn": "The marine reserve round Long Point. Sail through as you like, but nothing may be taken here: no lines, no pots, no lobster"
+  },
+  {
+   "id": "blue-cavern",
+   "name": "Blue Cavern reserve",
+   "kind": "refuge",
+   "noTake": true,
+   "circle": {
+    "x": -16400,
+    "y": -11450,
+    "r": 600
+   },
+   "say": "Marine conservation area off Blue Cavern Point. Nothing may be taken",
+   "warn": "Blue Cavern Point, east of the Isthmus: a conservation area off the marine science station. No anchoring and nothing may be taken"
+  }
+ ],
+ "lights": [
+  {
+   "id": "angels-gate-light",
+   "name": "Angels Gate Light",
+   "x": 4450,
+   "y": 17600,
+   "focal": 22,
+   "tower": 21,
+   "character": "Fl G 15s",
+   "period": 15,
+   "shows": 1.2,
+   "range": 18,
+   "colour": "#7dffa8",
+   "on": "land",
+   "say": "The lighthouse on the end of the San Pedro breakwater, since 1913. The west side of Angels Gate"
+  },
+  {
+   "id": "long-beach-light",
+   "name": "Long Beach Light",
+   "x": 10430,
+   "y": 19260,
+   "focal": 15,
+   "tower": 13,
+   "character": "Fl W 5s",
+   "period": 5,
+   "shows": 0.6,
+   "range": 20,
+   "on": "land",
+   "say": "The \"robot light\", a square tower on six columns on the end of the Middle Breakwater. The west side of Queens Gate"
+  },
+  {
+   "id": "queens-gate-east",
+   "name": "Queens Gate east",
+   "x": 11070,
+   "y": 19260,
+   "focal": 9,
+   "tower": 7,
+   "character": "Fl R 4s",
+   "period": 4,
+   "shows": 0.5,
+   "range": 6,
+   "colour": "#ff5a48",
+   "on": "land",
+   "say": "The west end of the Long Beach breakwater"
+  },
+  {
+   "id": "angels-gate-east",
+   "name": "Angels Gate east",
+   "x": 5210,
+   "y": 17900,
+   "focal": 9,
+   "tower": 7,
+   "character": "Fl R 2.5s",
+   "period": 2.5,
+   "shows": 0.4,
+   "range": 6,
+   "colour": "#ff5a48",
+   "on": "land",
+   "say": "The west end of the Middle Breakwater"
+  },
+  {
+   "id": "long-beach-east",
+   "name": "Breakwater east end",
+   "x": 15150,
+   "y": 19290,
+   "focal": 9,
+   "tower": 7,
+   "character": "Fl W 4s",
+   "period": 4,
+   "shows": 0.5,
+   "range": 6,
+   "on": "land",
+   "say": "The east end of the Long Beach breakwater. Round it for Alamitos Bay"
+  },
+  {
+   "id": "fermin",
+   "name": "Point Fermin",
+   "x": 584,
+   "y": 17280,
+   "focal": 37,
+   "tower": 8,
+   "character": "Fl W 10s",
+   "period": 10,
+   "shows": 0.8,
+   "range": 13,
+   "on": "land",
+   "say": "The bluff at the west end of the breakwater. The wooden lighthouse of 1874 stands in the park above"
+  },
+  {
+   "id": "vicente",
+   "name": "Point Vicente",
+   "x": -10259,
+   "y": 21338,
+   "focal": 56,
+   "tower": 20,
+   "character": "Fl (2) W 20s",
+   "period": 20,
+   "shows": 1.6,
+   "range": 24,
+   "on": "land",
+   "say": "The tall white tower on the cliffs of Palos Verdes, at the turn of the coast"
+  },
+  {
+   "id": "long-point",
+   "name": "Long Point",
+   "x": -6144,
+   "y": -15979,
+   "focal": 22,
+   "tower": 5,
+   "character": "Fl W 10s",
+   "period": 10,
+   "shows": 0.8,
+   "range": 11,
+   "on": "land",
+   "say": "The point of the island nearest the mainland"
+  },
+  {
+   "id": "east-end",
+   "name": "Catalina East End",
+   "x": -1575,
+   "y": -27576,
+   "focal": 65,
+   "tower": 5,
+   "character": "Fl W 10s",
+   "period": 10,
+   "shows": 0.8,
+   "range": 14,
+   "on": "land",
+   "say": "Seal Rocks lie under it"
+  },
+  {
+   "id": "west-end",
+   "name": "Catalina West End",
+   "x": -28172,
+   "y": -7895,
+   "focal": 23,
+   "tower": 5,
+   "character": "Fl W 10s",
+   "period": 10,
+   "shows": 0.8,
+   "range": 12,
+   "on": "land"
+  },
+  {
+   "id": "ship-rock",
+   "name": "Ship Rock",
+   "x": -17765,
+   "y": -9641,
+   "focal": 23,
+   "tower": 6,
+   "character": "Fl W 4s",
+   "period": 4,
+   "shows": 0.5,
+   "range": 6,
+   "on": "rock",
+   "say": "A rock like a ship under sail, a mile north of the Isthmus, white with birds. Foul ground reaches south of it"
+  },
+  {
+   "id": "casino-point-light",
+   "name": "Casino Point",
+   "x": -2302,
+   "y": -22375,
+   "focal": 9.5,
+   "tower": 3,
+   "character": "Fl G 4s",
+   "period": 4,
+   "shows": 0.5,
+   "range": 5,
+   "colour": "#7dffa8",
+   "on": "buoy",
+   "say": "On the sea wall under the Casino. The north side of the way in to Avalon"
+  },
+  {
+   "id": "cabrillo-mole-light",
+   "name": "Cabrillo Mole",
+   "x": -2056,
+   "y": -22764,
+   "focal": 8,
+   "tower": 3,
+   "character": "Fl R 4s",
+   "period": 4,
+   "shows": 0.5,
+   "range": 5,
+   "colour": "#ff5a48",
+   "on": "buoy",
+   "say": "The end of the ferry mole. The south side of the way in to Avalon"
+  }
+ ],
+ "structures": [
+  {
+   "id": "san-pedro-breakwater",
+   "name": "San Pedro Breakwater",
+   "kind": "breakwater",
+   "height": 4.3,
+   "line": [
+    [1720, 17770],
+    [2500, 17380],
+    [4450, 17600]
+   ],
+   "say": "Rock, 1899 to 1912. From Cabrillo Beach to Angels Gate Light"
+  },
+  {
+   "id": "middle-breakwater",
+   "name": "Middle Breakwater",
+   "kind": "breakwater",
+   "height": 4.3,
+   "line": [
+    [5210, 17900],
+    [5840, 18160],
+    [6550, 18420],
+    [7740, 18890],
+    [8640, 19235],
+    [9840, 19258],
+    [10430, 19260]
+   ],
+   "say": "Detached, three and a half miles from Angels Gate to Queens Gate"
+  },
+  {
+   "id": "long-beach-breakwater",
+   "name": "Long Beach Breakwater",
+   "kind": "breakwater",
+   "height": 4.3,
+   "line": [
+    [11070, 19260],
+    [12320, 19270],
+    [14640, 19278],
+    [15150, 19290]
+   ],
+   "say": "Detached, two and a half miles east from Queens Gate. Open water round its east end"
+  },
+  {
+   "id": "belmont-pier",
+   "name": "Belmont Pier",
+   "kind": "pier",
+   "height": 6,
+   "line": [
+    [13990, 23090],
+    [13990, 22640]
+   ],
+   "say": "The concrete pleasure pier at Belmont Shore, with a T at its end"
+  },
+  {
+   "id": "island-grissom",
+   "name": "Island Grissom",
+   "kind": "island",
+   "dress": "resort",
+   "x": 10980,
+   "y": 23290,
+   "r": 125,
+   "say": "The oil island nearest downtown"
+  },
+  {
+   "id": "island-white",
+   "name": "Island White",
+   "kind": "island",
+   "dress": "resort",
+   "x": 13050,
+   "y": 22560,
+   "r": 125,
+   "say": "Oil island off Belmont Shore"
+  },
+  {
+   "id": "island-chaffee",
+   "name": "Island Chaffee",
+   "kind": "island",
+   "dress": "resort",
+   "x": 14880,
+   "y": 21090,
+   "r": 120,
+   "say": "The easternmost oil island"
+  },
+  {
+   "id": "island-freeman",
+   "name": "Island Freeman",
+   "kind": "island",
+   "dress": "resort",
+   "x": 12750,
+   "y": 21290,
+   "r": 135,
+   "say": "The largest and furthest out of the four"
+  },
+  {
+   "id": "edith",
+   "name": "Platform Edith",
+   "kind": "platform",
+   "x": 14750,
+   "y": 5100,
+   "w": 46,
+   "d": 40,
+   "turn": 20,
+   "height": 21,
+   "depth": 49,
+   "say": "A drilling and production platform, the nearest to Long Beach"
+  },
+  {
+   "id": "ellen",
+   "name": "Platform Ellen",
+   "kind": "platform",
+   "x": 15900,
+   "y": 3600,
+   "w": 52,
+   "d": 40,
+   "turn": 35,
+   "height": 21,
+   "depth": 81,
+   "say": "The drilling platform of the Beta field, joined to Elly by a footbridge"
+  },
+  {
+   "id": "elly",
+   "name": "Platform Elly",
+   "kind": "platform",
+   "x": 16000,
+   "y": 3650,
+   "w": 52,
+   "d": 40,
+   "turn": 35,
+   "height": 21,
+   "depth": 78,
+   "bridgeTo": "ellen",
+   "say": "The processing platform of the Beta field: no wells, all pipes and vessels"
+  },
+  {
+   "id": "eureka",
+   "name": "Platform Eureka",
+   "kind": "platform",
+   "x": 17000,
+   "y": 1500,
+   "w": 52,
+   "d": 40,
+   "turn": 50,
+   "height": 21,
+   "depth": 213,
+   "say": "The deepest of the four, in over 200 m at the edge of the shelf"
+  }
+ ],
+ "kelp": [
+  {
+   "id": "east-end",
+   "name": "Seal Rocks to Pebbly Beach",
+   "reach": 300,
+   "line": [
+    [-366, -25540],
+    [-726, -24420],
+    [-966, -23820],
+    [-1366, -23260]
+   ]
+  },
+  {
+   "id": "avalon",
+   "name": "Lover's Cove and Casino Point",
+   "reach": 260,
+   "clear": [
+    [
+     -2270,
+     -22700,
+     340
+    ],
+    [
+     -2420,
+     -22180,
+     110
+    ]
+   ],
+   "line": [
+    [-1540, -23046],
+    [-1700, -23086],
+    [-1926, -23020],
+    [-2020, -22846],
+    [-2406, -22900],
+    [-2526, -22460],
+    [-2460, -22326],
+    [-2646, -21940]
+   ]
+  },
+  {
+   "id": "frog-rock",
+   "name": "Frog Rock to Long Point",
+   "reach": 300,
+   "line": [
+    [-2806, -21780],
+    [-2966, -21300],
+    [-3420, -20966],
+    [-3820, -20646],
+    [-4300, -20086],
+    [-4606, -19900],
+    [-5086, -19380],
+    [-5246, -19140],
+    [-5446, -18700],
+    [-5966, -18060],
+    [-6166, -16620]
+   ]
+  },
+  {
+   "id": "whites",
+   "name": "Long Point to White's Landing and Empire Landing",
+   "reach": 300,
+   "clear": [
+    [
+     -6350,
+     -17450,
+     230
+    ]
+   ],
+   "line": [
+    [-6326, -17900],
+    [-6486, -17620],
+    [-6446, -17260],
+    [-6446, -16900],
+    [-6286, -16380],
+    [-6406, -16140],
+    [-6580, -15646],
+    [-7580, -15606],
+    [-7806, -15300],
+    [-8166, -14860],
+    [-8380, -14766],
+    [-8780, -14886],
+    [-9086, -14780],
+    [-9300, -14606],
+    [-9700, -14486],
+    [-9780, -14286],
+    [-10460, -14206],
+    [-10780, -14046],
+    [-11300, -13686],
+    [-11860, -13606],
+    [-12340, -13766],
+    [-12620, -13526],
+    [-12780, -13526],
+    [-13140, -13566],
+    [-13700, -13326],
+    [-14100, -13046],
+    [-14300, -12966]
+   ]
+  },
+  {
+   "id": "blue-cavern",
+   "name": "Blue Cavern to the Isthmus",
+   "reach": 300,
+   "clear": [
+    [
+     -18150,
+     -11800,
+     470
+    ]
+   ],
+   "line": [
+    [-14620, -12646],
+    [-15100, -12206],
+    [-15460, -12046],
+    [-15980, -12006],
+    [-16406, -11340],
+    [-16580, -11366],
+    [-17100, -11486],
+    [-17034, -11740],
+    [-17420, -11686],
+    [-17580, -11766],
+    [-17940, -12126],
+    [-18460, -12006],
+    [-18406, -11700],
+    [-18646, -11420],
+    [-18486, -11180],
+    [-18846, -11060],
+    [-18686, -10780],
+    [-18860, -10806]
+   ]
+  },
+  {
+   "id": "emerald",
+   "name": "Emerald Bay to Arrow Point",
+   "reach": 300,
+   "clear": [
+    [
+     -20800,
+     -9200,
+     230
+    ]
+   ],
+   "line": [
+    [-19020, -10766],
+    [-19660, -10486],
+    [-19980, -10326],
+    [-20220, -10126],
+    [-20300, -9926],
+    [-20460, -9846],
+    [-20686, -9700],
+    [-20606, -9540],
+    [-20900, -9406],
+    [-21406, -9100],
+    [-21326, -8940],
+    [-21566, -8580],
+    [-21926, -8220],
+    [-22100, -8006],
+    [-22074, -8220],
+    [-22380, -8286],
+    [-22860, -8366],
+    [-23140, -8566],
+    [-23500, -8446],
+    [-23780, -8486],
+    [-23860, -8526],
+    [-24260, -8486]
+   ]
+  },
+  {
+   "id": "west-end",
+   "name": "Arrow Point to the West End",
+   "reach": 300,
+   "line": [
+    [-24740, -8486],
+    [-25060, -8326],
+    [-25540, -8406],
+    [-25660, -8446],
+    [-25940, -8326],
+    [-26180, -8406],
+    [-26700, -8326],
+    [-27500, -8086],
+    [-27980, -8086],
+    [-28180, -8006],
+    [-28354, -7900]
+   ]
+  },
+  {
+   "id": "horseshoe",
+   "name": "Horseshoe Kelp",
+   "reach": 380,
+   "depth": [14, 32],
+   "line": [
+    [6300, 13100],
+    [7000, 12600],
+    [7700, 13000]
+   ]
+  }
+ ]
+}

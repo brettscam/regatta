@@ -42,7 +42,11 @@ describe('the fishing layer of the chart', () => {
     const layer = fishingLayer(table, reserves, { depth: (x, y) => world.chartDepth(x, y) }, () => []);
     const c = fakeCanvas();
     layer.draw(c.ctx, whole);
-    for (const name of ['Horseshoe Kelp', 'Hen Rock', 'East End', 'Platform Eureka', 'Platform Edith', 'Island Grissom', 'Bait barge']) expect(c.words, name).toContain(name);
+    for (const name of ['Hen Rock', 'East End', 'Bait barge']) expect(c.words, name).toContain(name);
+    // What the chart itself draws and names from the water's features (the platforms, the oil islands) and the course's own
+    // mark at the Horseshoe Kelp are not named a second time by this layer.
+    for (const name of ['Horseshoe Kelp', 'Platform Eureka', 'Platform Edith', 'Island Grissom']) expect(c.words, name).not.toContain(name);
+    expect(table.platforms.every((p) => p.charted)).toBe(true);
     // Kelp: hundreds of dots along the island, none of them a label.
     expect(c.calls.arc).toBeGreaterThan(300);
     expect(c.calls.setLineDash).toBeGreaterThan(10);
