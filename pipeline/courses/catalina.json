@@ -32,13 +32,24 @@
   "landFrom": "model",
   "terrainMax": 820.0,
 
+  "insetsNote": "bake.py makes these insets; pipeline/catalina/land.py then re-makes the land and depth over the island and the mainland shore, with the depth insets listed here and its own land insets. scripts/stamp.ts adds any depth inset named here that the course lacks.",
   "insets": {
     "depth": [
-      { "name": "Long Beach harbor", "box": [4000.0, 16000.0, 20000.0, 25000.0], "dx": 50.0 },
-      { "name": "Avalon", "box": [-4500.0, -25000.0, -500.0, -21000.0], "dx": 50.0 },
-      { "name": "Two Harbors", "box": [-20500.0, -14500.0, -16000.0, -10000.0], "dx": 50.0 },
-      { "name": "San Pedro breakwater", "box": [1400.0, 17000.0, 4000.0, 18200.0], "dx": 50.0 },
-      { "name": "Beta field", "box": [14000.0, 500.0, 17800.0, 6000.0], "dx": 50.0 }
+      { "name": "Avalon pier and mole", "box": [-2400.0, -23050.0, -1950.0, -22750.0], "dx": 5.0 },
+      { "name": "Avalon harbor", "box": [-2700.0, -23200.0, -1700.0, -22100.0], "dx": 10.0 },
+      { "name": "Isthmus pier", "box": [-18400.0, -12100.0, -18200.0, -11900.0], "dx": 5.0 },
+      { "name": "Long Beach harbor", "box": [-1000.0, 16000.0, 21400.0, 25400.0], "dx": 50.0 },
+      { "name": "Beta field", "box": [14000.0, 500.0, 17800.0, 6000.0], "dx": 50.0 },
+      { "name": "Catalina 1", "box": [-29000.0, -11800.0, -26000.0, -7200.0], "dx": 50.0 },
+      { "name": "Catalina 2", "box": [-26000.0, -13800.0, -23000.0, -7600.0], "dx": 50.0 },
+      { "name": "Catalina 3", "box": [-23000.0, -14800.0, -20000.0, -7400.0], "dx": 50.0 },
+      { "name": "Catalina 4", "box": [-20000.0, -22800.0, -17200.0, -9000.0], "dx": 50.0 },
+      { "name": "Catalina 5", "box": [-17200.0, -26200.0, -14200.0, -10600.0], "dx": 50.0 },
+      { "name": "Catalina 6", "box": [-14200.0, -26600.0, -11400.0, -12200.0], "dx": 50.0 },
+      { "name": "Catalina 7", "box": [-11400.0, -26600.0, -8400.0, -13000.0], "dx": 50.0 },
+      { "name": "Catalina 8", "box": [-8400.0, -26800.0, -5400.0, -14000.0], "dx": 50.0 },
+      { "name": "Catalina 9", "box": [-5400.0, -28600.0, -2600.0, -18000.0], "dx": 50.0 },
+      { "name": "Catalina 10", "box": [-2600.0, -28600.0, 400.0, -21400.0], "dx": 50.0 }
     ],
     "terrain": [
       { "name": "Long Beach harbor", "box": [4000.0, 16000.0, 20000.0, 26000.0], "dx": 80.0 },

@@ -26,7 +26,8 @@ const vertex = /* glsl */ `
     // Thrown, then falling, and all the while carried off by the wind as it breaks into mist.
     vec3 p = position + aVel * age + vec3(0.0, -4.9, 0.0) * age * age + uWind * (0.32 * age * age);
     p.y = max(p.y, -0.1);
-    vec4 mv = viewMatrix * vec4(p, 1.0);
+    // Thrown in scene metres: the model-view matrix takes it about the scene's floating origin.
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
     gl_PointSize = min(96.0, aBorn.z * (1.0 + 2.6 * k) * uScale / max(-mv.z, 0.5));
     vAlpha = pow(1.0 - k, 1.4) * min(1.0, age * 14.0);

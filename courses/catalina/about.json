@@ -25,8 +25,8 @@
     "wind": "Recorded. NOAA HRRR 3 km analyses, one an hour, from 05:00 PDT on Saturday 19 July 2025 for 36 hours: a calm dawn, a light southerly morning, and a 10 to 13 knot westerly from mid afternoon. Baked on a 4 km grid.",
     "stream": "Recorded. NOAA's global tide model (STOFS-2D-Global) for the same hours, on a 1 km grid. The channel's stream is weak, a tenth of a knot or two, as it is in life.",
     "tide": "Recorded. The same model's water level at the node nearest the Los Angeles Outer Harbor tide station.",
-    "depth": "The tide model's depths where it has water. 200 m grid, with 50 m insets over Long Beach harbor, Avalon and Two Harbors. Water deeper than 127 m is charted as 127 m.",
-    "land": "Terrarium elevation tiles. 200 m grid, with finer insets over Long Beach harbor (80 m), Avalon and Two Harbors (40 m).",
+    "depth": "The tide model's depths where it has water, shoaling to a shoreline drawn from a Sentinel-2 satellite scene at 10 m. 200 m grid, with 50 m insets along the island and over Long Beach harbor, and 5 to 10 m ones over the piers at Avalon and Two Harbors. Water deeper than 127 m is charted as 127 m.",
+    "land": "Terrarium elevation tiles at zoom 13, the shoreline from Sentinel-2 at 10 m, and the colour of the ground from the same scene (22 August 2025, cloud filled in from 30 August). The island on 40 m insets, Palos Verdes and the Long Beach shore on 50 m, Avalon and Two Harbors on 10 m, 200 m elsewhere.",
     "swell": "A declaration, not a recording: a long, low south swell of 0.8 m at 12 s, usual for July. The breakwater does not yet lay the swell down inside the harbor.",
     "built": "Drawn from general knowledge and waiting to be checked against a chart: the federal breakwater with Angels Gate and Queens Gate, the four oil islands, the Beta field platforms and Edith, the traffic lanes, the lights, the kelp, Avalon and Two Harbors. See features.json and towns.json. The breakwater and the platforms are solid: scripts/stamp.ts wrote them into the depth."
   }

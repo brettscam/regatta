@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CourseData, GridSpec } from '@slack-tide/world';
 import { onCityNight } from './massing';
+import { DRY, SEABED, cellTriangles, cutTriangle, drawnHeightIn, shoreValue, type Corner, type DrawnGrid, type LandTest } from './landMesh';
 
 /** Repeatable noise in 0..1 from a grid position. */
 export function hash(i: number, j: number): number {
@@ -116,6 +117,13 @@ export interface LandPart {
   /** Boxes this part leaves undrawn because a finer inset draws them. */
   skip?: GridSpec[];
   name?: string;
+  /**
+   * Heights for the points on this part's edge from the land round it, so an inset meets the coarser grid it sits in
+   * without a crack. Undefined at a point: its own height.
+   */
+  edge?: (x: number, y: number) => number | undefined;
+  /** Land anywhere, from the finest grid there is: what a point near this part's edge sees beyond it when the shore is cut. */
+  land?: LandTest;
 }
 
 /**
@@ -142,8 +150,24 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const pos = new Float32Array(nx * ny * 3);
   const col = new Float32Array(nx * ny * 3);
   const h = new Float32Array(nx * ny);
+  const tint = new Float32Array(nx * ny);
   for (let k = 0; k < nx * ny; k++) h[k] = (heights[k] / 255) ** 2 * g.max;
-  const wet = (i: number, j: number) => h[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))] <= 0.4;
+  const wet = (i: number, j: number) => h[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))] <= DRY;
+  // The heights as drawn: water points on the sea bed, and an inset's edge at the height of the land round it.
+  const drawn: DrawnGrid = { x0: g.x0, y0: g.y0, dx, nx, ny, h: new Float32Array(nx * ny) };
+  for (let k = 0; k < nx * ny; k++) drawn.h[k] = h[k] > DRY ? h[k] : SEABED;
+  if (part?.edge) {
+    drawn.fixed = new Uint8Array(nx * ny);
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        if (i > 0 && j > 0 && i < nx - 1 && j < ny - 1) continue;
+        const z = part.edge(g.x0 + i * dx, g.y0 + j * dx);
+        if (z === undefined) continue;
+        drawn.h[j * nx + i] = z;
+        drawn.fixed[j * nx + i] = 1;
+      }
+    }
+  }
 
   const gold = new THREE.Color(0.55, 0.47, 0.27);
   const straw = new THREE.Color(0.63, 0.56, 0.36);
@@ -166,10 +190,10 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       const y = g.y0 + j * dx;
       const z = h[k];
       pos[k * 3] = x;
-      // Water cells sit well under the sea so the shoreline is cut by the water itself.
-      pos[k * 3 + 1] = z > 0.4 ? z : -6;
+      // Water points sit well under the sea; where a triangle has both, it is cut at the shore (see `landMesh.ts`).
+      pos[k * 3 + 1] = drawn.h[k];
       pos[k * 3 + 2] = -y;
-      if (z <= 0.4) {
+      if (z <= DRY) {
         // Seabed colour only shows where a triangle crosses the waterline.
         const bed = tropic ? coral : sand;
         col[k * 3] = bed.r * (tropic ? 1 : 0.8);
@@ -249,36 +273,173 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       // Faces turned away from the afternoon sun, to the north and east, read a touch darker.
       const away = THREE.MathUtils.clamp((-e - n) * 1.6, -0.5, 1);
       const grain = (0.93 + 0.14 * hash(i, j)) * (1 - 0.16 * Math.max(0, away)) * (1 + 0.05 * Math.max(0, -away));
+      tint[k] = grain;
       col[k * 3] = c.r * grain;
       col[k * 3 + 1] = c.g * grain;
       col[k * 3 + 2] = c.b * grain;
     }
   }
-  const idx = new Uint32Array((nx - 1) * (ny - 1) * 6);
-  let p = 0;
-  for (let j = 0; j < ny - 1; j++) {
-    for (let i = 0; i < nx - 1; i++) {
-      const a = j * nx + i;
-      const b = a + 1;
-      const d = a + nx;
-      const e = d + 1;
-      // Skip quads that are all water.
-      if (h[a] <= 0.4 && h[b] <= 0.4 && h[d] <= 0.4 && h[e] <= 0.4) continue;
-      // And the ones a finer inset draws.
-      if (part?.skip?.some((s) => g.x0 + i * dx >= s.x0 - 1 && g.x0 + (i + 1) * dx <= s.x0 + (s.nx - 1) * s.dx + 1 && g.y0 + j * dx >= s.y0 - 1 && g.y0 + (j + 1) * dx <= s.y0 + (s.ny - 1) * s.dx + 1)) continue;
-      idx[p++] = a; idx[p++] = b; idx[p++] = d;
-      idx[p++] = b; idx[p++] = e; idx[p++] = d;
+  // Where the water has a picture of its land from above (`course.terrain.image`), each point inside it knows its place
+  // in the picture (uv), how much of the picture to show (pic: all of it inside, fading out over the last few hundred
+  // metres to its edge, none beyond) and its grain and shading (to multiply the picture by). See `drapeLand`.
+  const im = course.terrain.image;
+  const uv = im ? new Float32Array(nx * ny * 2) : undefined;
+  const pic = im ? new Float32Array(nx * ny) : undefined;
+  if (im && uv && pic) {
+    for (let k = 0; k < nx * ny; k++) {
+      const x = pos[k * 3];
+      const y = -pos[k * 3 + 2];
+      const box = im.boxes.find((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+      if (!box) continue;
+      uv[k * 2] = box.u0 + ((x - box.x0) / (box.x1 - box.x0)) * (box.u1 - box.u0);
+      uv[k * 2 + 1] = box.v0 + ((y - box.y0) / (box.y1 - box.y0)) * (box.v1 - box.v0);
+      const inside = Math.min(x - box.x0, box.x1 - x, y - box.y0, box.y1 - y);
+      pic[k] = THREE.MathUtils.smoothstep(inside, 0, 600);
     }
   }
+
+  // The triangles. A cell all water is left out. A triangle with land and water both is cut at the shore, and the
+  // points made on its edges are shared by the triangles either side: one set for the land, one for the skirt below
+  // it, so the land's light at the waterline is not bent by the skirt's steep face.
+  const index: number[] = [];
+  const more = { pos: [] as number[], col: [] as number[], uv: [] as number[], pic: [] as number[], tint: [] as number[] };
+  const made = new Map<string, number>();
+  const value = new Float32Array(nx * ny).fill(NaN);
+  const landTest: LandTest = part?.land ?? ((x, y) => {
+    const i = Math.round((x - g.x0) / dx);
+    const j = Math.round((y - g.y0) / dx);
+    return h[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))] > DRY;
+  });
+  const shore = (k: number): number => {
+    if (Number.isNaN(value[k])) value[k] = shoreValue(drawn, k % nx, Math.floor(k / nx), landTest);
+    return value[k];
+  };
+  const vertex = (c: Corner, land: boolean): number => {
+    if ('k' in c) return c.k;
+    const lo = Math.min(c.a, c.b);
+    const key = `${lo}:${Math.max(c.a, c.b)}:${land ? 1 : 0}`;
+    const had = made.get(key);
+    if (had !== undefined) return had;
+    // The same point whichever way round the edge was met.
+    const [a, b, t] = c.a === lo ? [c.a, c.b, c.t] : [c.b, c.a, 1 - c.t];
+    const n = nx * ny + more.pos.length / 3;
+    more.pos.push(pos[a * 3] + (pos[b * 3] - pos[a * 3]) * t, 0, pos[a * 3 + 2] + (pos[b * 3 + 2] - pos[a * 3 + 2]) * t);
+    // The shore's colour is the land's, from whichever end is land.
+    const from = drawn.h[a] > DRY ? a : b;
+    more.col.push(col[from * 3], col[from * 3 + 1], col[from * 3 + 2]);
+    more.tint.push(tint[from]);
+    if (uv && pic) {
+      more.uv.push(uv[a * 2] + (uv[b * 2] - uv[a * 2]) * t, uv[a * 2 + 1] + (uv[b * 2 + 1] - uv[a * 2 + 1]) * t);
+      more.pic.push(pic[a] + (pic[b] - pic[a]) * t);
+    }
+    made.set(key, n);
+    return n;
+  };
+  for (let j = 0; j < ny - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const tris = cellTriangles(drawn, i, j);
+      const [[a, b, d], [, e]] = tris;
+      if (drawn.h[a] <= DRY && drawn.h[b] <= DRY && drawn.h[d] <= DRY && drawn.h[e] <= DRY) continue;
+      // And the ones a finer inset draws.
+      if (part?.skip?.some((s) => g.x0 + i * dx >= s.x0 - 1 && g.x0 + (i + 1) * dx <= s.x0 + (s.nx - 1) * s.dx + 1 && g.y0 + j * dx >= s.y0 - 1 && g.y0 + (j + 1) * dx <= s.y0 + (s.ny - 1) * s.dx + 1)) continue;
+      for (const tri of tris) {
+        const up = tri.map((k) => drawn.h[k] > DRY);
+        if (up[0] === up[1] && up[1] === up[2]) {
+          index.push(tri[0], tri[1], tri[2]);
+          continue;
+        }
+        for (const piece of cutTriangle(tri, [shore(tri[0]), shore(tri[1]), shore(tri[2])])) {
+          index.push(vertex(piece.c[0], piece.land), vertex(piece.c[1], piece.land), vertex(piece.c[2], piece.land));
+        }
+      }
+    }
+  }
+  const all = (grid: Float32Array, extra: number[]): Float32Array => {
+    const out = new Float32Array(grid.length + extra.length);
+    out.set(grid);
+    out.set(extra, grid.length);
+    return out;
+  };
   const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  geom.setIndex(new THREE.BufferAttribute(idx.subarray(0, p), 1));
+  geom.setAttribute('position', new THREE.BufferAttribute(all(pos, more.pos), 3));
+  geom.setAttribute('color', new THREE.BufferAttribute(all(col, more.col), 3));
+  if (uv && pic) {
+    geom.setAttribute('uv', new THREE.BufferAttribute(all(uv, more.uv), 2));
+    geom.setAttribute('pic', new THREE.BufferAttribute(all(pic, more.pic), 1));
+    geom.setAttribute('grain', new THREE.BufferAttribute(all(tint, more.tint), 1));
+  }
+  geom.setIndex(index);
   geom.computeVertexNormals();
   const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ vertexColors: true }));
   mesh.name = part?.name ?? 'terrain';
   mesh.frustumCulled = false;
+  mesh.userData.drawn = drawn;
   return mesh;
+}
+
+/** What `drapeLand` puts into the land's shader: the picture where it has one, a fine grain close to, the rule elsewhere. */
+const DRAPE = {
+  vertexHead: 'attribute float pic;\nattribute float grain;\nvarying float vPic;\nvarying float vGrain;\nvarying vec3 vLandAt;\n',
+  vertexBody: 'vPic = pic;\nvGrain = grain;\nvLandAt = (modelMatrix * vec4(transformed, 1.0)).xyz;\n',
+  fragmentHead: `varying float vPic;
+varying float vGrain;
+varying vec3 vLandAt;
+uniform float landDetail;
+float landHash(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+float landNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(landHash(i), landHash(i + vec2(1.0, 0.0)), f.x), mix(landHash(i + vec2(0.0, 1.0)), landHash(i + 1.0), f.x), f.y);
+}
+`,
+  // The picture is 15 to 20 m a pixel: from a boat close in, a blur. A grain of two sizes, fading in within a mile,
+  // breaks it into ground: bush and rock, sun and shade. The rule's colours fill in where the picture does not reach.
+  fragmentBody: `#ifdef USE_MAP
+  vec3 photo = texture2D(map, vMapUv).rgb;
+  float near = landDetail * (1.0 - smoothstep(250.0, 1800.0, distance(cameraPosition, vLandAt)));
+  float grit = landNoise(vLandAt.xz / 3.1) * 0.55 + landNoise(vLandAt.xz / 11.0) * 0.45;
+  photo *= vGrain * mix(1.0, 0.78 + 0.44 * grit, near);
+  diffuseColor.rgb *= mix(vColor, photo, vPic);
+#else
+  diffuseColor.rgb *= vColor;
+#endif
+`,
+};
+
+/**
+ * Drape a picture of the land from above over every part of it the picture covers (`course.terrain.image`; see
+ * `buildTerrain`), or take it off again with null. `detail` turns the fine grain close to on or off (off on low graphics).
+ */
+export function drapeLand(land: THREE.Object3D, picture: THREE.Texture | null, detail = true): number {
+  let n = 0;
+  land.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const geom = mesh.geometry as THREE.BufferGeometry | undefined;
+    if (!geom?.getAttribute('pic')) return;
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    const uniforms = (mat.userData.drape ??= { landDetail: { value: 1 } }) as { landDetail: { value: number } };
+    uniforms.landDetail.value = detail ? 1 : 0;
+    if (!mat.userData.draped) {
+      mat.userData.draped = true;
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.landDetail = uniforms.landDetail;
+        shader.vertexShader = DRAPE.vertexHead + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n${DRAPE.vertexBody}`);
+        shader.fragmentShader = DRAPE.fragmentHead + shader.fragmentShader
+          .replace('#include <map_fragment>', DRAPE.fragmentBody)
+          .replace('#include <color_fragment>', '');
+      };
+      mat.customProgramCacheKey = () => 'draped-land';
+    }
+    mat.map = picture;
+    mat.needsUpdate = true;
+    n++;
+  });
+  return n;
 }
 
 /** Where each grid of a course's land begins in its height data: the main grid, then its insets in order. */
@@ -292,17 +453,20 @@ export function landParts(course: CourseData): Array<{ grid: GridSpec; start: nu
   return out;
 }
 
+const within = (g: GridSpec, x: number, y: number): boolean => x >= g.x0 && y >= g.y0 && x <= g.x0 + (g.nx - 1) * g.dx && y <= g.y0 + (g.ny - 1) * g.dx;
+
+/** Which part of a course's land is read at a place: the last inset that covers it, or the main grid. */
+function partAt(parts: Array<{ grid: GridSpec }>, x: number, y: number): number {
+  for (let n = parts.length - 1; n > 0; n--) if (within(parts[n].grid, x, y)) return n;
+  return 0;
+}
+
 /** Height of the land at a course position, metres, read from the finest grid that covers it. 0 over water. */
 export function landHeight(course: CourseData, heights: Uint8Array): (x: number, y: number) => number {
   const parts = landParts(course);
   const max = course.terrain.max;
   return (x, y) => {
-    let k = 0;
-    for (let n = parts.length - 1; n > 0; n--) {
-      const g = parts[n].grid;
-      if (x >= g.x0 && y >= g.y0 && x <= g.x0 + (g.nx - 1) * g.dx && y <= g.y0 + (g.ny - 1) * g.dx) { k = n; break; }
-    }
-    const { grid: g, start } = parts[k];
+    const { grid: g, start } = parts[partAt(parts, x, y)];
     const fx = Math.min(g.nx - 1.001, Math.max(0, (x - g.x0) / g.dx));
     const fy = Math.min(g.ny - 1.001, Math.max(0, (y - g.y0) / g.dx));
     const i = Math.floor(fx);
@@ -314,92 +478,102 @@ export function landHeight(course: CourseData, heights: Uint8Array): (x: number,
   };
 }
 
-/**
- * Height of the land as it is drawn, read from the finest grid that covers a place: the same as `landHeight` on dry
- * ground, but water cells sit 6 m under the sea, as `buildTerrain` draws them, so the shoreline falls where the drawn
- * one does and the sea reads as below zero. This is what anything that builds on the shore of a water with insets
- * needs (`scene/venue.ts` looks for water as ground below zero). Added for Long Beach to Catalina.
- */
-export function drawnLandHeight(course: CourseData, heights: Uint8Array): (x: number, y: number) => number {
+/** Whether a grid point of a course's land is land, read from the finest grid there: what the shore's cut looks at. */
+function landTest(course: CourseData, heights: Uint8Array): LandTest {
   const parts = landParts(course);
   const max = course.terrain.max;
   return (x, y) => {
-    let k = 0;
-    for (let n = parts.length - 1; n > 0; n--) {
-      const g = parts[n].grid;
-      if (x >= g.x0 && y >= g.y0 && x <= g.x0 + (g.nx - 1) * g.dx && y <= g.y0 + (g.ny - 1) * g.dx) { k = n; break; }
-    }
-    const { grid: g, start } = parts[k];
-    const fx = Math.min(g.nx - 1.001, Math.max(0, (x - g.x0) / g.dx));
-    const fy = Math.min(g.ny - 1.001, Math.max(0, (y - g.y0) / g.dx));
-    const i = Math.floor(fx);
-    const j = Math.floor(fy);
-    const u = fx - i;
-    const v = fy - j;
-    const at = (ii: number, jj: number) => { const z = (heights[start + jj * g.nx + ii] / 255) ** 2 * max; return z > 0.4 ? z : -6; };
-    // The two triangles of the cell, as the mesh splits it (see the index order in `buildTerrain`).
-    const a = at(i, j);
-    const b = at(i + 1, j);
-    const d = at(i, j + 1);
-    const e = at(i + 1, j + 1);
-    return u + v <= 1 ? a + (b - a) * u + (d - a) * v : e + (d - e) * (1 - u) + (b - e) * (1 - v);
+    const { grid: g, start } = parts[partAt(parts, x, y)];
+    const i = Math.min(g.nx - 1, Math.max(0, Math.round((x - g.x0) / g.dx)));
+    const j = Math.min(g.ny - 1, Math.max(0, Math.round((y - g.y0) / g.dx)));
+    return (heights[start + j * g.nx + i] / 255) ** 2 * max > DRY;
   };
 }
 
 /**
+ * Every grid of a course's land as it is drawn (`DrawnGrid`): the main grid, then each inset with its edge raised or
+ * lowered to the main grid's surface where no other inset lies beside it. `buildLand` draws these; `drawnLandHeight` reads them.
+ */
+export function drawnGrids(course: CourseData, heights: Uint8Array): { grids: DrawnGrid[]; land: LandTest } {
+  const parts = landParts(course);
+  const max = course.terrain.max;
+  const land = landTest(course, heights);
+  const grids: DrawnGrid[] = [];
+  parts.forEach(({ grid: g, start }, n) => {
+    const d: DrawnGrid = { x0: g.x0, y0: g.y0, dx: g.dx, nx: g.nx, ny: g.ny, h: new Float32Array(g.nx * g.ny) };
+    for (let k = 0; k < g.nx * g.ny; k++) {
+      const z = (heights[start + k] / 255) ** 2 * max;
+      d.h[k] = z > DRY ? z : SEABED;
+    }
+    if (n > 0) {
+      const edge = insetEdge(parts, n, grids, land);
+      d.fixed = new Uint8Array(g.nx * g.ny);
+      for (let j = 0; j < g.ny; j++) {
+        for (let i = 0; i < g.nx; i++) {
+          if (i > 0 && j > 0 && i < g.nx - 1 && j < g.ny - 1) continue;
+          const z = edge(g.x0 + i * g.dx, g.y0 + j * g.dx);
+          if (z === undefined) continue;
+          d.h[j * g.nx + i] = z;
+          d.fixed[j * g.nx + i] = 1;
+        }
+      }
+    }
+    grids.push(d);
+  });
+  return { grids, land };
+}
+
+/**
+ * The height an inset's edge takes at a point: the surface of the grid it sits in there (the last other part that
+ * covers the point, the main grid at least), so the two meet without a crack. Beside an inset of the same spacing (the
+ * island's strips side by side) it keeps its own: the two have the same points there, and cut the shore the same way.
+ */
+function insetEdge(parts: Array<{ grid: GridSpec }>, n: number, grids: DrawnGrid[], land: LandTest): (x: number, y: number) => number | undefined {
+  const own = parts[n].grid;
+  return (x, y) => {
+    let m = 0;
+    for (let k = parts.length - 1; k > 0; k--) if (k !== n && within(parts[k].grid, x, y)) { m = k; break; }
+    const g = parts[m].grid;
+    if (m > 0 && g.dx === own.dx && Math.abs(((x - g.x0) / g.dx) - Math.round((x - g.x0) / g.dx)) < 1e-6) return undefined;
+    return grids[m] ? drawnHeightIn(grids[m], x, y, land) : undefined;
+  };
+}
+
+/**
+ * Height of the land as it is drawn, read from the finest grid that covers a place: the same as `landHeight` on dry
+ * ground, but the sea reads as below zero (down to the sea bed the water points are drawn at), and the shoreline falls
+ * where the drawn one does, cut smoothly through the cells (see `landMesh.ts`). Anything that builds on the shore
+ * needs this (`scene/venue.ts` looks for water as ground below zero).
+ */
+export function drawnLandHeight(course: CourseData, heights: Uint8Array): (x: number, y: number) => number {
+  const { grids, land } = drawnGrids(course, heights);
+  const parts = landParts(course);
+  return (x, y) => drawnHeightIn(grids[partAt(parts, x, y)], x, y, land);
+}
+
+/**
  * All of a course's land. A plain course is one mesh, as `buildTerrain` makes it. A course with insets is the main grid
- * with holes where the insets go, and a finer mesh in each hole. The main mesh keeps the name `terrain` and all its
- * points, so anything that reads the land back off it (the kayak's shoreline) still can.
+ * with holes where the insets go, and a finer mesh in each hole whose edge meets the main mesh (or the next inset)
+ * exactly. The main mesh keeps the name `terrain` and its grid's points first, so anything that reads the land back
+ * off it (the kayak's shoreline) still can.
  */
 export function buildLand(course: CourseData, heights: Uint8Array, cover = 'sf-bay'): THREE.Object3D {
   const insets = course.terrain.insets ?? [];
-  if (!insets.length) return buildTerrain(course, heights, cover);
+  const land = landTest(course, heights);
+  if (!insets.length) return buildTerrain(course, heights, cover, { grid: course.terrain, land });
   const parts = landParts(course);
   const main = course.terrain;
   const group = new THREE.Group();
   group.name = 'land';
-  const base = buildTerrain(course, heights.subarray(0, main.nx * main.ny), cover, { grid: main, skip: insets });
+  const base = buildTerrain(course, heights.subarray(0, main.nx * main.ny), cover, { grid: main, skip: insets, land, name: 'terrain' });
   group.add(base);
-  const basePos = base.geometry.getAttribute('position');
-  /** Height of the main mesh as drawn, at a place on one of its grid lines. */
-  const drawn = (x: number, y: number): number => {
-    const fx = Math.min(main.nx - 1.001, Math.max(0, (x - main.x0) / main.dx));
-    const fy = Math.min(main.ny - 1.001, Math.max(0, (y - main.y0) / main.dx));
-    const i = Math.floor(fx);
-    const j = Math.floor(fy);
-    const u = fx - i;
-    const v = fy - j;
-    const at = (ii: number, jj: number) => basePos.getY(jj * main.nx + ii);
-    return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
-  };
+  const grids: DrawnGrid[] = [base.userData.drawn as DrawnGrid];
   parts.slice(1).forEach(({ grid: g, start }, n) => {
-    const mesh = buildTerrain(course, heights.subarray(start, start + g.nx * g.ny), cover, { grid: g, name: `terrain-inset-${n}` });
-    // Along its edge an inset takes the height the main mesh is drawn at, so the two meet without a crack.
-    const pos = mesh.geometry.getAttribute('position');
-    for (let j = 0; j < g.ny; j++) {
-      for (let i = 0; i < g.nx; i++) {
-        if (i > 0 && j > 0 && i < g.nx - 1 && j < g.ny - 1) continue;
-        pos.setY(j * g.nx + i, drawn(g.x0 + i * g.dx, g.y0 + j * g.dx));
-      }
-    }
-    // A quad left out as all water may now have a raised edge. Close the gap by drawing the whole of the outer ring.
-    const idx: number[] = Array.from(mesh.geometry.getIndex()!.array);
-    const have = new Set<number>();
-    for (let k = 0; k < idx.length; k += 6) have.add(idx[k]);
-    for (let j = 0; j < g.ny - 1; j++) {
-      for (let i = 0; i < g.nx - 1; i++) {
-        if (i > 0 && j > 0 && i < g.nx - 2 && j < g.ny - 2) continue;
-        const a = j * g.nx + i;
-        if (have.has(a)) continue;
-        const b = a + 1;
-        const d = a + g.nx;
-        const e = d + 1;
-        if (pos.getY(a) < 0 && pos.getY(b) < 0 && pos.getY(d) < 0 && pos.getY(e) < 0) continue;
-        idx.push(a, b, d, b, e, d);
-      }
-    }
-    mesh.geometry.setIndex(idx);
-    mesh.geometry.computeVertexNormals();
+    const edge = insetEdge(parts, n + 1, grids, land);
+    // An inset leaves out what a later, finer one draws (a harbor's own land inside the island's strip).
+    const skip = parts.slice(n + 2).map((p) => p.grid).filter((f) => f.dx < g.dx);
+    const mesh = buildTerrain(course, heights.subarray(start, start + g.nx * g.ny), cover, { grid: g, name: `terrain-inset-${n}`, edge, land, skip });
+    grids.push(mesh.userData.drawn as DrawnGrid);
     group.add(mesh);
   });
   return group;

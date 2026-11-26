@@ -48,8 +48,8 @@
   {
     "id": "avalon-fuel",
     "name": "Avalon fuel dock",
-    "x": -2411,
-    "y": -22466,
+    "x": -2478,
+    "y": -22520,
     "kind": "dock",
     "stop": "marina",
     "say": "The fuel float under the bluff on the Casino side of the bay, with the harbor patrol alongside. Fuel, water and ice.",
@@ -143,8 +143,8 @@
   {
     "id": "emerald",
     "name": "Emerald Bay",
-    "x": -20800,
-    "y": -9200,
+    "x": -20900,
+    "y": -9250,
     "kind": "mooring",
     "stop": "snorkel",
     "say": "A shallow green bay toward the West End, behind Indian Rock, with moorings over sand and the clearest water on the island.",
