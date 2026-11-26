@@ -1,7 +1,7 @@
 import { isSoundState, type SimState } from '@slack-tide/sim';
 import { ReplayWorld } from '@slack-tide/world';
 import { eventWater, gunTime, nextEvent, setEventWater } from './race/events';
-import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES } from './boat/yard';
+import { BOATS, DEFAULT_BOAT, LINEUP, TOPSIDES, afloat } from './boat/yard';
 import { Lobby } from './lobby';
 import { Session } from './session';
 import { Stage } from './stage';
@@ -60,7 +60,9 @@ setEventWater(data.about.id);
 
 /** A complete, valid choice for the water showing, from whatever was asked for or remembered. */
 function settle(c: Partial<Choice>): Choice {
-  const boat = c.boat && BOATS[c.boat] && LINEUP.some((e) => e.id === c.boat && e.status === 'ready') ? c.boat : DEFAULT_BOAT;
+  const offered = (id: string | undefined): id is string => !!id && !!BOATS[id] && LINEUP.some((e) => e.id === id && afloat(e));
+  // Her own choice, else the boat this water suggests (`about.json` `boat`), else the 38.
+  const boat = offered(c.boat) ? c.boat : offered(data.about.boat) ? data.about.boat : DEFAULT_BOAT;
   const { starts: spots, times } = data;
   return {
     water: data.about.id,
@@ -149,7 +151,8 @@ function castOff(choice: Choice, resume?: SimState, clock?: number): void {
     y: num('y', spot.y),
     headingDeg: params.has('hdg') ? num('hdg', 0) : undefined,
     route: spot.route,
-    tutorial: choice.tutorial && !resume,
+    // The lesson is a sailing lesson: there is none for a boat with no sails.
+    tutorial: choice.tutorial && !resume && !BOATS[choice.boat].power,
     skipper: choice.skipper,
     logbook,
     places: data.places,

@@ -498,8 +498,13 @@ export class Angling implements Feature {
     boatView.root.updateWorldMatrix(true, true);
     // In the boat's own rod holders where her model has them, else in holders on the stern rail.
     const holder = (name: string, side: number): THREE.Vector3 => {
-      const node = boatView.root.getObjectByName(name);
-      if (node) return boatView.root.worldToLocal(node.getWorldPosition(new THREE.Vector3()));
+      // The builders name the parts of a boat (`model.nodes`); a model from anywhere else may only carry the name.
+      const node = (boatView.model.nodes as Record<string, THREE.Object3D | undefined>)[name] ?? boatView.root.getObjectByName(name);
+      if (node) {
+        const at = boatView.root.worldToLocal(node.getWorldPosition(new THREE.Vector3()));
+        at.y += 0.1;
+        return at;
+      }
       return new THREE.Vector3(side * d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
     };
     const sides = this.tackle.rods > 1 ? [1, -1] : [1];

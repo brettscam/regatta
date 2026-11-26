@@ -4,6 +4,7 @@
   "where": "The San Pedro Channel, Southern California",
   "say": "Out through Queens Gate at first light, 22 miles of open channel, and Avalon or the Isthmus on the far side. Glassy mornings, a westerly every afternoon, and fish on the way",
   "order": 5,
+  "boat": "console22",
   "sea": { "openFetchKm": 250, "swell": { "height": 0.8, "period": 12, "fromDeg": 200 } },
   "scenery": { "landCover": "gulf", "pieces": [] },
   "layers": {

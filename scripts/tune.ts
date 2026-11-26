@@ -1,12 +1,18 @@
 // Prints steady-state numbers for tuning the boat against the PRD targets.
 // Run with: npx vite-node scripts/tune.ts [boat id]
-import { Sim, KT, D2R, R2D, bestVmgAngle, polarSpeed, type BoatSpec } from '../packages/sim/src';
+import { Sim, KT, D2R, R2D, bestVmgAngle, fitOut, polarSpeed, type BoatSpec } from '../packages/sim/src';
+import { tunePower } from './tunePower';
 import { steadyWorld } from '../packages/world/src';
 import { readFileSync } from 'node:fs';
 
 // Usage: npx vite-node scripts/tune.ts [boat id]. The 38 when none is given.
 const boatJson = JSON.parse(readFileSync(new URL(`../boats/${process.argv[2] ?? 'sloop38'}.json`, import.meta.url), 'utf8'));
 
+// A powerboat has no polar to tune against: she gets a table of her own.
+if (boatJson.power) {
+  tunePower(fitOut(boatJson));
+  process.exit(0);
+}
 const boat = boatJson as unknown as BoatSpec;
 
 export function settle(twsKt: number, twaDeg: number, reef = 0, furl = 1, seconds = 240) {

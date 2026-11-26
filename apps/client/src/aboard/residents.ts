@@ -410,7 +410,8 @@ export class Residents implements Feature {
     }
     if (beside !== this.together.index) this.together = { index: beside, seconds: 0 };
     else if (beside >= 0) this.together.seconds += 0.25;
-    if (beside < 0 || this.together.seconds < DUEL.after || t - this.duelRest < 600 || ctx.race?.call) return;
+    // Nobody offers a powerboat a race: it would be no race at all.
+    if (beside < 0 || this.together.seconds < DUEL.after || t - this.duelRest < 600 || ctx.race?.call || ctx.sim.boat.power) return;
     const ahead = this.roster.ahead(beside, season - this.lag[beside]);
     this.together.seconds = 0;
     if (!ahead) return;

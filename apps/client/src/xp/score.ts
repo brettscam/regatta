@@ -11,7 +11,7 @@ const KT = 0.514444;
 
 export type AwardKind =
   | 'tack' | 'gybe' | 'groove' | 'hand' | 'gust' | 'mark' | 'finish' | 'place'
-  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'met' | 'dive' | 'lost';
+  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'met' | 'dive' | 'passage' | 'lost';
 
 export interface Award {
   kind: AwardKind;
@@ -41,6 +41,7 @@ export const KIND_NAMES: Record<AwardKind, string> = {
   seen: 'First sightings',
   met: 'Boats met',
   dive: 'Spearfishing and lobster',
+  passage: 'Passages under power',
   lost: 'Lost to knockdowns, crash gybes, groundings and collisions',
 };
 const KINDS = Object.keys(KIND_NAMES) as AwardKind[];
@@ -79,6 +80,109 @@ export const AGROUND_COOLDOWN = 120;
 export const COLLISION = { cooldown: 60, least: 1 } as const;
 
 const NONE: Award[] = [];
+
+/**
+ * A powerboat's points. There is no trim to reward, so they are few and small: a passage made without hurting her, a
+ * little more for making it at a speed that did not waste the tank, and the same eight for bringing her up as anyone gets.
+ */
+export const POWER = {
+  /** A passage counts from this many miles, earns a point a mile, and no more than `most`. */
+  leastNm: 3,
+  most: 30,
+  /** Slams a mile, on average, above which the passage was not a clean one. */
+  slamsPerNm: 2,
+  /** Extra for a passage made at this share, or better, of the miles a litre gives her at cruise. */
+  thrifty: 5,
+  thriftyShare: 0.92,
+  /** Taken for a landing that damaged her, no more often than every `poundedEvery` seconds, and for running the tank dry. */
+  pounded: -5,
+  poundedEvery: 300,
+  dry: -10,
+} as const;
+
+/**
+ * Watches a powerboat and awards her points. Call `step` once for every fixed sim step, as for `Seamanship`.
+ * A passage runs from when she is let go (or the sail starts) to when she is next brought up.
+ * @param cruiseNmPerLitre what a litre gives her at her cruising speed in flat water: the yardstick for thrift
+ */
+export class PowerSeamanship {
+  private t = 0;
+  private started = false;
+  private aground = false;
+  private lastAground = -1e9;
+  private hold: SimState['hold'] = 'none';
+  private lastBerth = -1e9;
+  private metres = 0;
+  private fuel0 = 0;
+  private slams0 = 0;
+  private damage0 = 0;
+  private slams = 0;
+  private damage = 0;
+  private stops = 0;
+  private lastPounded = -1e9;
+
+  constructor(private readonly cruiseNmPerLitre: number) {}
+
+  private begin(s: SimState): void {
+    this.metres = 0;
+    this.fuel0 = s.fuelUsed;
+    this.slams0 = s.slams;
+    this.damage0 = s.damage;
+  }
+
+  step(s: SimState, o: SimOutputs): Award[] {
+    if (!this.started) {
+      this.started = true;
+      this.aground = o.aground;
+      this.hold = s.hold;
+      this.slams = s.slams;
+      this.damage = s.damage;
+      this.stops = s.engineStops;
+      this.begin(s);
+    }
+    this.t += DT;
+    const t = this.t;
+    let out = NONE;
+    const give = (kind: AwardKind, points: number, label: string): void => {
+      if (out === NONE) out = [];
+      out.push({ kind, points, label });
+    };
+
+    if (o.aground && !this.aground && t - this.lastAground >= AGROUND_COOLDOWN) {
+      this.lastAground = t;
+      give('lost', POINTS.aground, 'Aground');
+    }
+    this.aground = o.aground;
+    // A landing off a wave that broke something. Collisions are scored where they are judged (`aboard/contact.ts`).
+    if (s.slams > this.slams && s.damage > this.damage && t - this.lastPounded >= POWER.poundedEvery) {
+      this.lastPounded = t;
+      give('lost', POWER.pounded, 'Pounded her hull');
+    }
+    this.slams = s.slams;
+    this.damage = s.damage;
+    if (s.engineStops > this.stops) give('lost', POWER.dry, 'Ran the tank dry');
+    this.stops = s.engineStops;
+
+    if (s.hold === 'none') this.metres += o.sog * DT;
+    if (s.hold !== this.hold) {
+      if (this.hold === 'none') {
+        if (t - this.lastBerth >= BERTH_COOLDOWN) {
+          this.lastBerth = t;
+          give('berth', POINTS.berth, s.hold === 'anchor' ? 'Anchored' : 'Made fast');
+        }
+        const nm = this.metres / 1852;
+        const clean = s.damage - this.damage0 < 0.005 && (s.slams - this.slams0) / Math.max(nm, 1) <= POWER.slamsPerNm;
+        if (nm >= POWER.leastNm && clean) {
+          give('passage', Math.min(POWER.most, Math.round(nm)), 'Clean passage');
+          const litres = s.fuelUsed - this.fuel0;
+          if (litres > 0 && nm / litres >= POWER.thriftyShare * this.cruiseNmPerLitre) give('passage', POWER.thrifty, 'Easy on the fuel');
+        }
+      } else this.begin(s);
+      this.hold = s.hold;
+    }
+    return out;
+  }
+}
 
 type Sails = Pick<SimOutputs, 'main' | 'jib'>;
 

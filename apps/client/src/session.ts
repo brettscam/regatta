@@ -19,6 +19,8 @@ import { Sound } from './audio/sound';
 import { createFeatures } from './aboard/index';
 import type { AboardContext, Feature } from './aboard/feature';
 import type { Residents } from './aboard/residents';
+import type { Powerboat } from './aboard/powerboat';
+import { ROD_HOLDERS } from './boat/buildConsole';
 import { Fleet, type Identity } from './net/fleet';
 import { alone } from './net/platform';
 import { myAvatar } from './boat/avatar';
@@ -30,6 +32,9 @@ import { capsizeAlarm } from './aboard/pressedRules';
 import { FleetPanel } from './ui/fleetpanel';
 import type { Stage } from './stage';
 import type { CourseFeatures } from './world/features';
+
+/** How the chart plans a passage under power: at the speed quoted, with nothing knocked off for a crew or for running without a spinnaker. */
+const POWER_PLAN = { efficiency: 1, noSpinnaker: 1 };
 
 /** Somewhere worth sailing to. */
 export interface Place {
@@ -124,8 +129,16 @@ export class Session {
   private aboard!: AboardContext;
   /** The boats that live on this water, as other vessels. See `aboard/residents.ts`. */
   private residents: Residents | null = null;
+  private powerboat: Powerboat | null = null;
   private readonly elsewhere: TrafficVessel[] = [];
-  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0, capsizes: 0 };
+  private readonly watch = { shallow: false, aground: false, marksReached: 0, warned: new Map<string, number>(), crashGybes: 0, knockdowns: 0, broaches: 0, wraps: 0, capsizes: 0, damage: 0 };
+
+  /** The way she points at the start: off the wind on a reach, or, with no sails, at the first mark of her route. */
+  private firstHeading(windDir: number): number {
+    const first = this.opts.route[0];
+    if (this.opts.spec.power && first) return Math.atan2(first.x - this.opts.x, first.y - this.opts.y) * R2D;
+    return windDir * R2D + 50;
+  }
 
   /** New sails from the Profile tab: hoisted now, and kept in the livery so a class race's boat flies them too. */
   setSailStyle(style: SailStyle): void {
@@ -139,10 +152,15 @@ export class Session {
     const wind = world.wind(opts.x, opts.y, 0);
     // The sim is not handed the world itself but the world as she feels it, so a wind shadow is just a lighter wind to it.
     this.air = new ShadedWind(world);
-    this.sim = new Sim(opts.spec, this.air, { x: opts.x, y: opts.y, headingDeg: opts.headingDeg ?? wind.dir * R2D + 50, speedKt: 5 });
+    this.sim = new Sim(opts.spec, this.air, { x: opts.x, y: opts.y, headingDeg: opts.headingDeg ?? this.firstHeading(wind.dir), speedKt: opts.spec.power ? 0 : 5 });
     this.sim.trimForWind();
     // Until the player takes the wheel, the boat holds her angle to the wind.
     this.sim.setHelm('wind');
+    // A powerboat starts lying stopped with her engine idling out of gear and the wheel in hand.
+    if (opts.spec.power) {
+      this.sim.setHelm('hand', 0);
+      this.sim.underWay(0);
+    }
     if (opts.resume) this.sim.restore(opts.resume);
     this.before = grab(this.sim.state);
     this.after = this.before;
@@ -164,7 +182,10 @@ export class Session {
       wind: (x, y, t) => world.wind(x, y, t, 'forecast'),
       current: (x, y, t) => world.current(x, y, t),
     });
+    // Under power she is planned at her cruising speed whatever the wind, with nothing taken off for a crew's sailing.
+    this.passage.planOptions = opts.spec.power ? POWER_PLAN : undefined;
     this.passage.setRoute(opts.route, this.sim.state, this.sim.state.t);
+    this.hud.setPower(!!opts.spec.power);
     this.chart = new Chart({
       world,
       passage: this.passage,
@@ -174,6 +195,7 @@ export class Session {
       traffic: () => this.everyoneElse(),
       places: opts.places,
       features: opts.features,
+      underPower: () => !!this.spec.power,
     });
 
     this.pilot = new Pilot(this.sim, this.passage, {
@@ -294,9 +316,17 @@ export class Session {
       sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
       view: () => ({ camera: this.drone.camera, width: window.innerWidth, height: window.innerHeight }), // ashore
+      underWay: () => {
+        const nodes = this.boatView.model.nodes;
+        return {
+          stwKt: this.sim.state.speed / KT, sogKt: this.sim.out.sog / KT, underPower: this.sim.underPower, power: !!this.sim.boat.power, planing: this.sim.out.plane,
+          rodHolders: ROD_HOLDERS.filter((name) => nodes[name]).map((name) => ({ name, node: nodes[name] })),
+        };
+      },
     };
     this.features = createFeatures(this.aboard);
     this.residents = this.features.find((f): f is Residents => f.id === 'residents') ?? null;
+    this.powerboat = this.features.find((f): f is Powerboat => f.id === 'powerboat') ?? null;
   }
 
   /**
@@ -320,7 +350,9 @@ export class Session {
     this.aboard.spec = spec;
     for (const f of this.features) f.reboat?.();
     this.identity.boat = spec.id;
+    this.passage.planOptions = spec.power ? POWER_PLAN : undefined;
     this.passage.setPolar(spec.polar, sim.state, sim.state.t);
+    this.hud.setPower(!!spec.power);
     // The old model goes, with everything made for it.
     stage.scene.remove(old.root);
     old.root.traverse((o) => {
@@ -434,8 +466,12 @@ export class Session {
   private checkAlarms(): void {
     const { sim, passage, watch } = this;
     const o = sim.out;
-    if (o.aground && !watch.aground) this.alarm('Aground. Get her head round to deeper water, or press U for a tow');
-    else if (!o.aground && o.underKeel !== null && o.underKeel < 2.5 && !watch.shallow) this.alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under the keel`);
+    // A boat drawing less than half a metre goes where a keelboat cannot, so she is warned much later.
+    const power = !!this.spec.power;
+    const thin = power ? 0.7 : 2.5;
+    if (o.aground && !watch.aground) this.alarm(power ? `Aground${sim.state.damage > watch.damage + 0.01 ? `, and hard: ${damageNote(Math.round(sim.state.damage * 100))}` : ''}. Back her off the way she came with comma, or press U for a tow` : 'Aground. Get her head round to deeper water, or press U for a tow');
+    else if (!o.aground && o.underKeel !== null && o.underKeel < thin && !watch.shallow) this.alarm(`Shallow water: ${o.underKeel.toFixed(1)} m under ${power ? 'her' : 'the keel'}`);
+    watch.damage = sim.state.damage;
     // The boom came across on its own.
     const windKt = Math.round(o.tws / KT);
     if (sim.state.capsizes > watch.capsizes) this.alarm(capsizeAlarm(this.spec, sim.state, o));
@@ -451,7 +487,7 @@ export class Session {
     watch.crashGybes = sim.state.crashGybes;
     watch.knockdowns = sim.state.knockdowns;
     watch.aground = o.aground;
-    watch.shallow = o.underKeel !== null && o.underKeel < (watch.shallow ? 4 : 2.5);
+    watch.shallow = o.underKeel !== null && o.underKeel < (watch.shallow ? thin * 1.6 : thin);
     const reached = passage.nextIndex;
     if (reached > watch.marksReached) {
       this.opts.logbook.count('marks', reached - watch.marksReached);
@@ -480,7 +516,8 @@ export class Session {
     }
     // A tack or a gybe for the logbook: the wind has changed sides.
     const side = o.twa >= 0 ? 1 : -1;
-    if (this.windSide !== 0 && side !== this.windSide && Math.abs(o.twa) > 0.35 && Math.abs(o.twa) < 2.8) {
+    if (power) this.windSide = side;
+    else if (this.windSide !== 0 && side !== this.windSide && Math.abs(o.twa) > 0.35 && Math.abs(o.twa) < 2.8) {
       this.opts.logbook.count('tacks');
       this.windSide = side;
     } else if (this.windSide === 0) this.windSide = side;
@@ -535,7 +572,7 @@ export class Session {
     // A last line of defence: if the boat's numbers ever go bad, put her back where she started rather than lose her.
     if (!Number.isFinite(sim.state.x + sim.state.y + sim.state.heading + sim.state.heel + sim.state.speed)) {
       const t = sim.state.t;
-      sim.restore({ ...initialState({ x: this.opts.x, y: this.opts.y, headingDeg: this.opts.headingDeg ?? world.wind(this.opts.x, this.opts.y, 0).dir * R2D + 50, speedKt: 4 }), t: Number.isFinite(t) ? t : 0, tick: Number.isFinite(t) ? Math.round(t / SIM_DT) : 0 });
+      sim.restore({ ...initialState({ x: this.opts.x, y: this.opts.y, headingDeg: this.opts.headingDeg ?? world.wind(this.opts.x, this.opts.y, 0).dir * R2D + 50, speedKt: this.spec.power ? 0 : 4 }), t: Number.isFinite(t) ? t : 0, tick: Number.isFinite(t) ? Math.round(t / SIM_DT) : 0 });
       sim.trimForWind();
       sim.setHelm('wind');
       this.before = this.after = grab(sim.state);
@@ -644,14 +681,19 @@ export class Session {
       depth: sim.out.underKeel === null ? null : sim.out.underKeel + this.spec.dimensions.draft,
     }, world.dateAt(sim.state.t), stage.course.timeZone, paused, rate, dtReal, fleet.boats.length);
     const gust = this.gusts.update(paused ? 0 : dtReal);
-    if (gust.alert) this.alarm(gust.alert);
+    // Gusts are a sailing boat's business: a powerboat is not warned of them, and they are left off her readout.
+    if (this.spec.power) gust.line = '';
+    else if (gust.alert) this.alarm(gust.alert);
     const doing = this.status();
     // In bad air the line says so for as long as it lasts, beside any gust on the way.
     const lostKt = Math.round((sim.out.tws / this.air.factor - sim.out.tws) / KT);
     // The sea in words goes with the wind's: what the water is doing, then what the air is.
-    const wakeLine = seaway.wake.height > 0.15 && !away ? (seaway.slatting ? 'sails slatting in a wake' : "ship's wake") : '';
-    const airLine = [seaway.words, wakeLine, this.air.factor < 0.93 && lostKt >= 1 ? `bad air, ${lostKt} kt down` : '', gust.line].filter(Boolean).join(' · ');
+    const wakeLine = seaway.wake.height > 0.15 && !away ? (seaway.slatting && !this.spec.power ? 'sails slatting in a wake' : "ship's wake") : '';
+    // A powerboat is told what speed the sea is good for on this heading: it is the number she is driven by.
+    const airLine = [seaway.words, this.powerboat?.seaNote() ?? '', wakeLine, this.air.factor < 0.93 && lostKt >= 1 ? `bad air, ${lostKt} kt down` : '', gust.line].filter(Boolean).join(' · ');
     if (doing) hud.setSail(doing, '', airLine);
+    // A boat with no sails has no point of sail. Her own feature says what she is doing; this is only for the moment before it does.
+    else if (this.spec.power) hud.setSail('Lying stopped', '', airLine);
     else hud.setSail(pointOfSail(sim.out.twa, sim.out.inIrons), sim.out.inIrons ? '' : ` · ${sim.out.twa >= 0 ? 'starboard' : 'port'} tack`, airLine);
     hud.setPilot(pilot.line());
     this.race.note = pilot.raceNote();
@@ -664,7 +706,7 @@ export class Session {
     const loose = Math.max(o.main.luff * 0.7 + (o.main.flogging ? 0.3 : 0), sim.state.spin ? (o.spin.flogging ? 1 : o.spin.luff * 0.6) : sim.state.furl > 0.03 ? o.jib.luff * 0.7 + (o.jib.flogging ? 0.3 : 0) : 0);
     this.sound.update(o.aws / KT, sim.state.speed / KT + motion.surf * 3, loose, paused);
 
-    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower, held: sim.state.hold !== 'none' }, this.everyoneElse(), o.tws / KT, chart.isOpen);
+    stage.frame(dtReal, rate, sim.state.t, seaTime, drone.camera, { x, z, heading, speed: sim.state.speed, heel: pose.heel, hulls: boatView.rig.hullOffset, length: this.spec.dimensions.loa, beam: this.spec.dimensions.beam, power: sim.underPower || !!this.spec.power, held: sim.state.hold !== 'none', launch: this.spec.lights, plane: sim.out.plane }, this.everyoneElse(), o.tws / KT, chart.isOpen);
   }
 
   /** A short account of the boat and the conditions, for attaching to feedback. */

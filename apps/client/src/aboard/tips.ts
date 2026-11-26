@@ -383,7 +383,7 @@ export class Tips implements Feature {
       lesson: this.lessonSeen, news: this.news,
       company: boats.length, nearBoat, boatName, trafficCalls: this.trafficCalls,
       racing, raceOffered: !!race && race.call === null && race.offers.size > 0, countdown: racing ? race.countdown : null, raceDone: this.raceDone,
-      windKt, twaDeg: twa, heelDeg: Math.abs(s.heel) * R2D, speedKt,
+      power: !!sim.boat.power, windKt, twaDeg: twa, heelDeg: Math.abs(s.heel) * R2D, speedKt,
       reef: s.reef, reefs: Math.max(0, ctx.spec.sails.main.reefs.length - 1), hasSpin: !!ctx.spec.sails.spinnaker, spin: s.spin,
       hasEngine: !!sim.boat.engine, engine: s.engineOn,
       hand: s.helmMode === 'hand', mistrim, aground: o.aground, stuck: this.stuck, knockdowns: s.knockdowns - this.knockAtStart,
