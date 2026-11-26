@@ -1900,6 +1900,24 @@ export class DiveScene {
     });
   }
 
+  /** One fish into the mesh for its body. */
+  private readonly tints = new Map<string, THREE.Color>();
+  private readonly putFish = (f: Fish, x: number, y: number, z: number, heading: number, pitch: number, roll: number, beat: number, amp: number): void => {
+    const s = this.shoals[f.species.shape] ?? this.shoals.bass;
+    if (s.n >= s.most) return;
+    const len = (f.cm / 100) * (f.species.shape === 'big' ? 1.25 : 1);
+    this.e.set(pitch, Math.PI - heading, roll);
+    this.m.compose(this.v.set(x, y, z), this.q.setFromEuler(this.e), this.s.setScalar(len));
+    s.mesh.setMatrixAt(s.n, this.m);
+    // Colours are read from their hex once, and kept.
+    const hex = colourOf(f);
+    let c = this.tints.get(hex);
+    if (!c) this.tints.set(hex, (c = new THREE.Color(hex)));
+    s.tint.setXYZ(s.n, c.r, c.g, c.b);
+    s.mark.setXYZ(s.n, patternOf(f), beat, amp);
+    s.n++;
+  };
+
   /**
    * Put every fish where it is, swimming: its body wave as quick and wide as it is going, banked into its turns,
    * a seal rolled over in its corkscrew. A school is one draw: only its leader is written here, and every fish in it
@@ -1907,20 +1925,9 @@ export class DiveScene {
    * a hole round her when she swims into it. Fish on her stringer hang under the float.
    * @param eye where she is, scene coordinates
    */
-  drawFish(fish: Fish[], t: number, dt: number, held: Fish | null, heldAt: THREE.Vector3 | null, eye: THREE.Vector3, strung: { at: THREE.Vector3; list: ReadonlyArray<{ fish: Fish }> } | null): void {
+  drawFish(fish: Fish[], t: number, dt: number, held: Fish | null, heldAt: THREE.Vector3 | null, eye: THREE.Vector3, strung: { at: THREE.Vector3; list: ReadonlyArray<{ fish?: Fish; onFloat: boolean }> } | null): void {
     for (const shape in this.shoals) this.shoals[shape as FishShape].n = 0;
-    const put = (f: Fish, x: number, y: number, z: number, heading: number, pitch: number, roll: number, beat: number, amp: number): void => {
-      const s = this.shoals[f.species.shape] ?? this.shoals.bass;
-      if (s.n >= s.most) return;
-      const len = (f.cm / 100) * (f.species.shape === 'big' ? 1.25 : 1);
-      this.e.set(pitch, Math.PI - heading, roll);
-      this.m.compose(this.v.set(x, y, z), this.q.setFromEuler(this.e), this.s.setScalar(len));
-      s.mesh.setMatrixAt(s.n, this.m);
-      this.colour.set(colourOf(f));
-      s.tint.setXYZ(s.n, this.colour.r, this.colour.g, this.colour.b);
-      s.mark.setXYZ(s.n, patternOf(f), beat, amp);
-      s.n++;
-    };
+    const put = this.putFish;
     for (const f of fish) {
       if (f.mode === 'gone' || f.count > 1) continue;
       const len = Math.max(0.08, f.cm / 100);
@@ -1952,6 +1959,7 @@ export class DiveScene {
     if (strung) {
       let k = 0;
       for (const c of strung.list) {
+        if (!c.onFloat || !c.fish) continue;
         put(c.fish, strung.at.x + 0.12 * Math.sin(k * 2.1 + t * 0.5), strung.at.y - 0.45 - k * 0.32, strung.at.z + 0.12 * Math.cos(k * 1.7), c.fish.heading + k, -1.45, 0.1 * Math.sin(t + k), t * 2 + k, 0.2);
         if (++k >= MAX_STRUNG) break;
       }

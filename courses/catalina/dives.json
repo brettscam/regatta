@@ -1,5 +1,5 @@
 {
-  "about": "Dive sites, fish and rules for Santa Catalina Island. Positions (checked for depth against the water's own chart with scripts/divesites.ts, not against a real chart), depths, sizes, limits and reserve boundaries are written from memory and need checking against a chart and the current California regulations before anyone leans on them. The reserves are drawn as circles, which the real ones are not.",
+  "about": "Dive sites, fish and rules for Santa Catalina Island. Positions (checked for depth against the water's own chart with scripts/divesites.ts, not against a real chart), depths, sizes, limits and reserve boundaries are written from memory and need checking against a chart and the current California regulations before anyone leans on them. The reserves are drawn as circles, which the real ones are not. The species added in the third dive pass (sand bass, whitefish, bonito, barracuda, halfmoon, rock wrasse, sea lion, blue shark, mola) and the hand rules (rock scallop ten a day, red urchin 35, abalone closed) are from general knowledge, as are each fish's wariness, speed, way of fleeing and where it runs when speared.",
   "water": {
     "visibility": [12, 25],
     "tempC": 19,

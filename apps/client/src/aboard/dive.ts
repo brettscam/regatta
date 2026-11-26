@@ -182,6 +182,16 @@ export class Dive implements Feature {
   private readonly sky = new THREE.Color();
   private readonly pose: DiverPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, lookX: 0, lookY: 0, lookZ: -1, kick: 0, kickAmp: 0, arm: 'glide', armK: 0, firstPerson: true, loaded: true, bead: 0 };
   private readonly unwatch: () => void;
+  // Held between frames so that a frame makes nothing new.
+  private readonly atTop = { x: 0, y: 0, d: 0, vx: 0, vy: 0, vd: 0, yaw: 0, pitch: 0 };
+  private readonly eyeSim = { x: 0, y: 0, d: 0 };
+  private readonly backDir = { x: 0, y: 0, d: -1 };
+  private readonly tryDir = { x: 0, y: 0, d: -1 };
+  private under = false;
+  private readonly solid = (x: number, y: number, dd: number): boolean => (dd > this.scene.floorAt(x, y) - 0.2) || (this.under && dd > 0.6 && this.scene.kelpNear(x, y, 0.15));
+  private readonly hulls: Array<{ x: number; z: number; heading: number; length: number; beam: number }> = [{ x: 0, z: 0, heading: 0, length: 0, beam: 0 }];
+  private readonly tenderHull = { x: 0, z: 0, heading: 0, length: 0, beam: 0 };
+  private readonly strung = { at: this.floatAt, list: this.stringer };
 
   constructor(private readonly ctx: AboardContext) {
     const course = ctx.stage.course.id;
@@ -547,10 +557,35 @@ export class Dive implements Feature {
     return out;
   }
 
+  /** What the view is locked on to, now: found by its key without building the whole list, once a frame or more. */
   private locked(): Mark | null {
-    if (!this.lockKey) return null;
-    return this.marks().find((m) => m.key === this.lockKey) ?? null;
+    const key = this.lockKey;
+    if (!key) return null;
+    const m = this.lockMark;
+    const index = Number(key.slice(1));
+    m.key = key;
+    m.fish = undefined; m.lobster = undefined; m.thing = undefined;
+    if (key[0] === 'f') {
+      const f = this.fish.find((q) => q.index === index);
+      if (!f) return null;
+      const sp = f.species;
+      m.x = f.x; m.y = f.y; m.d = f.d; m.fish = f;
+      m.live = f.mode === 'cruise' || f.mode === 'bolt';
+      m.legal = !sp.protected && !sp.spare && (sp.minCm === undefined || f.cm >= sp.minCm);
+    } else if (key[0] === 'l') {
+      const l = this.lobsters.find((q) => q.index === index);
+      if (!l) return null;
+      m.x = l.x; m.y = l.y; m.d = l.d; m.lobster = l; m.live = l.mode === 'there';
+      m.legal = l.mm >= (this.file.lobster?.minMm ?? 0);
+    } else {
+      const t = this.hand.find((q) => q.index === index);
+      if (!t) return null;
+      m.x = t.x; m.y = t.y; m.d = t.d; m.thing = t; m.live = t.mode === 'there'; m.legal = !t.spec.protected;
+    }
+    return m;
   }
+
+  private readonly lockMark: Mark = { key: '', x: 0, y: 0, d: 0, legal: false, live: false };
 
   /** Q: lock on to what she is looking at, or move on to the next; Shift+Q lets go. The lock only does the looking. */
   private lockOn(release: boolean): void {
@@ -1019,7 +1054,8 @@ export class Dive implements Feature {
   private life(dt: number): void {
     const d = this.diver;
     const g = this.ground!;
-    const diver = this.mode === 'under' ? d : { ...d, d: 0.2 };
+    // At the top she is seen as just under it.
+    const diver = this.mode === 'under' ? d : Object.assign(this.atTop, d, { d: 0.2 });
     for (const f of this.fish) {
       if (f === this.shot?.hit) continue;
       stepFish(f, diver, dt, this.clock, this.scene.floorAt, g.cover === 'kelp' && g.grows((f.x + d.x) / 2, (f.y + d.y) / 2));
@@ -1116,7 +1152,8 @@ export class Dive implements Feature {
     const { ctx } = this;
     const d = this.diver;
     const home = this.home();
-    const onFloat = this.stringer.filter((k) => k.onFloat && k.fish).length;
+    let onFloat = 0;
+    for (const k of this.stringer) if (k.onFloat && k.fish) onFloat++;
     const r = thiefStep(this.thief, {
       onFloat, fromBoat: Math.hypot(home.x - d.x, home.y - d.y), guarding: this.mode === 'surface' && Math.hypot(this.floatAt.x - d.x, -this.floatAt.z - d.y) < 3,
       thief: true, key: nameKey(this.site.id) + this.shift, t: this.clock, dt,
@@ -1172,11 +1209,13 @@ export class Dive implements Feature {
       const want = chaseLength(speed) + (this.mode === 'surface' ? 0.4 : 0);
       const upBy = this.mode === 'surface' ? 1.1 : CHASE.up;
       const half = this.camPitch * 0.3;
-      const eyeSim = { x: d.x, y: d.y, d: -headY };
+      const eyeSim = this.eyeSim;
+      eyeSim.x = d.x; eyeSim.y = d.y; eyeSim.d = -headY;
+      this.under = this.mode === 'under';
       const under = this.mode === 'under';
-      const solid = (x: number, y: number, dd: number) => (dd > this.scene.floorAt(x, y) - 0.2) || (under && dd > 0.6 && this.scene.kelpNear(x, y, 0.15));
+      const solid = this.solid;
       // If the line back is blocked close in, the camera climbs over her rather than come down into her fins.
-      let back = { x: 0, y: 0, d: -1 };
+      const back = this.backDir;
       let blen = want;
       let reach = 0;
       for (const climb of [0, 0.5, 1]) {
@@ -1184,9 +1223,10 @@ export class Dive implements Feature {
         const by = -Math.sin(half) * want + upBy + climb * want * 0.8;
         const bz = Math.cos(this.camYaw) * Math.cos(half) * want * (1 - climb * 0.6);
         const len = Math.hypot(bx, by, bz);
-        const dirB = { x: bx / len, y: -bz / len, d: -by / len };
+        const dirB = this.tryDir;
+        dirB.x = bx / len; dirB.y = -bz / len; dirB.d = -by / len;
         const r = chaseReach(eyeSim, dirB, len, solid);
-        if (r > reach) { reach = r; back = dirB; blen = len; }
+        if (r > reach) { reach = r; back.x = dirB.x; back.y = dirB.y; back.d = dirB.d; blen = len; }
         if (r >= Math.min(len, 1.9)) break;
       }
       this.a.set(d.x + back.x * reach, headY - back.d * reach, -d.y - back.y * reach);
@@ -1235,8 +1275,10 @@ export class Dive implements Feature {
 
     const tender = this.tender();
     const s = ctx.sim.state;
-    const hulls = [{ x: s.x, z: -s.y, heading: s.heading, length: ctx.spec.dimensions.loa, beam: ctx.spec.dimensions.beam }];
-    if (tender) hulls.push({ x: tender.kayak.x, z: -tender.kayak.y, heading: tender.kayak.heading, length: tender.spec.length ?? 3.4, beam: tender.spec.beam ?? 0.9 });
+    const hulls = this.hulls;
+    Object.assign(hulls[0], { x: s.x, z: -s.y, heading: s.heading, length: ctx.spec.dimensions.loa, beam: ctx.spec.dimensions.beam });
+    hulls.length = 1;
+    if (tender) { hulls.push(this.tenderHull); Object.assign(this.tenderHull, { x: tender.kayak.x, z: -tender.kayak.y, heading: tender.kayak.heading, length: tender.spec.length ?? 3.4, beam: tender.spec.beam ?? 0.9 }); }
     const strength = Math.min(2.2, 0.35 + sea.height * 1.4);
     const swellTo = (sea.swellHeight > 0.05 ? sea.swellDir : sea.dir) + Math.PI;
     // The muzzle bead: honest about range, and about whether the lead is right.
@@ -1305,8 +1347,7 @@ export class Dive implements Feature {
     this.float.position.set(d.x + 0.9 * Math.sin(d.yaw + 2.5), fy, -d.y + 0.9 * -Math.cos(d.yaw + 2.5));
     this.float.rotation.set(0.12 * Math.sin(this.clock * 1.1), d.yaw * 0.2 + 0.3 * Math.sin(this.clock * 0.3), 0.1 * Math.sin(this.clock * 1.4));
     this.floatAt.copy(this.float.position);
-    const strung = this.stringer.filter((k) => k.onFloat && k.fish) as Array<Kept & { fish: Fish }>;
-    this.scene.drawFish(this.fish, this.clock, dt, shot?.landed ? shot.hit : null, shot?.landed && shot.hit ? this.heldAt : null, cam.position, strung.length ? { at: this.floatAt, list: strung } : null);
+    this.scene.drawFish(this.fish, this.clock, dt, shot?.landed ? shot.hit : null, shot?.landed && shot.hit ? this.heldAt : null, cam.position, this.stringer.length ? this.strung : null);
     // Her breath going up: a burst as she turns for the top, a trickle on the way, and a little with each contraction.
     if (this.mode === 'under' && (this.puff -= dt) <= 0) {
       this.puff = this.ascending || d.vd < -0.35 ? 0.35 : 2.5 + 3 * hash01(Math.floor(this.clock), 79);
