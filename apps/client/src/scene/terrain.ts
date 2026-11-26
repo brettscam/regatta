@@ -232,7 +232,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
         }
       }
       // A dry island at midsummer is dark against the sea and the sky: white walls stand out on it from miles off.
-      if (socal && use !== 'city') c.multiplyScalar(0.78);
+      if (socal && use !== 'city') c.setRGB(c.r * 0.9, c.g * 0.74, c.b * 0.6);
       // Steep ground shows rock.
       c.lerp(slope > 0.8 ? cliff : rock, THREE.MathUtils.smoothstep(slope, 0.42, 0.95));
 
