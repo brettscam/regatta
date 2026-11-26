@@ -234,7 +234,7 @@ export function whySlow(table: FishTable, spot: Spot, tackle: Tackle, fresh = 1)
   const moving = prospects(table, { ...spot, tideRate: 0.2 }, tackle, way);
   if (Math.abs(spot.tideRate) < 0.03 && total(moving) > total(prospects(table, spot, tackle, way)) * 1.3) return 'Slack tide. The bass and the halibut feed better once the water starts to move';
   if (spot.casting) return 'Within a cast of the fish. Stay off them: a boat driven through the middle puts them down';
-  if ((spot.hab.channel ?? 0) > 0.5 && !spot.platform && !spot.hab.point) return 'Deep, open water under her, and nothing to hold fish. Find a platform, a paddy or the birds, or tow a lure';
+  if ((spot.hab.channel ?? 0) > 0.5 && !Object.entries(spot.hab).some(([k, v]) => k !== 'channel' && k !== 'offshore' && (v ?? 0) > 0)) return 'Deep, open water under her, and nothing to hold fish. Find a platform, a paddy or the birds, or tow a lure';
   if (lowLight(spot.hour) < 0.3 && spot.hab.kelp) return 'The kelp fishes best at first light and again in the evening';
   return '';
 }

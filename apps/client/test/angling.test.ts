@@ -209,6 +209,8 @@ describe('what bites where and when', () => {
     // Open water with nothing in it holds nothing for a bait.
     expect(typicalWait(table, spot({ ...CHANNEL, hours: 3 }), tackle({ rig: 'squid' }))).toBe(Infinity);
     expect(whySlow(table, spot({ ...CHANNEL, hours: 3 }), tackle({ rig: 'squid' }))).toMatch(/nothing to hold fish/);
+    // A reef in deep water is not nowhere.
+    expect(whySlow(table, spot({ x: HORSESHOE.x, y: HORSESHOE.y - 1300, hours: 3 }), tackle({ rig: 'iron' }))).not.toMatch(/nothing to hold fish/);
   });
 
   it('follows the light: white seabass at dawn, the surface fish by day, the bottom after dark', () => {
