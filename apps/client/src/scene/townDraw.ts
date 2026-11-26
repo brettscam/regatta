@@ -39,7 +39,7 @@ export function drawTown(m: Massing, plan: TownPlan, ground: (x: number, y: numb
   /** True if a point is on some other piece of ground at about this height: no rail or wall is wanted there. */
   const joined = (self: TownRing, x: number, y: number): boolean => rings.some((r) => r !== self && Math.abs(r.z - self.z) < 0.6 && inRing(r.ring, x, y));
 
-  rings.forEach((r, n) => {
+  rings.forEach((r) => {
     m.next();
     const ring = r.ring;
     const cx = ring.reduce((s, p) => s + p[0], 0) / ring.length;
@@ -47,7 +47,7 @@ export function drawTown(m: Massing, plan: TownPlan, ground: (x: number, y: numb
     const top = SURFACE[r.kind];
     const inside: P3 = [cx, cy, r.z - 2];
     const at = (k: number, z: number): P3 => [ring[k % ring.length][0], ring[k % ring.length][1], z];
-    m.quad(at(0, r.z), at(1, r.z), at(2, r.z), at(3, r.z), top.clone().multiplyScalar(0.94 + ((n * 37) % 10) * 0.012), inside);
+    m.quad(at(0, r.z), at(1, r.z), at(2, r.z), at(3, r.z), top, inside);
     // What holds it up: a wall to the sea bed for the front and the mole, the thickness of its planks for a pier or a float.
     const thin = r.kind === 'pier' ? 0.45 : r.kind === 'float' ? 0.75 : 0;
     for (let k = 0; k < ring.length; k++) {

@@ -134,7 +134,9 @@ function resortIsland(m: Massing, s: Structure, lights: Light[], seed: number): 
   const r = s.r ?? 120;
   const top = 3.4;
   m.lathe(x, y, -4, [[r + 14, 0], [r + 5, 4.2], [r, 4 + top], [r - 3, 4 + top + 0.3]], 28, ROCK, WIN.none, 0.9, seed);
-  m.lathe(x, y, top, [[r - 3, 0.3], [0.1, 0.5]], 28, SAND, WIN.none, 0.9, seed);
+  m.lathe(x, y, top, [[r - 3, 0.3], [r - 14, 0.4]], 28, SAND, WIN.none, 0.9, seed);
+  // Lawns inside the ring of sand: these islands are gardened.
+  m.lathe(x, y, top, [[r - 14, 0.4], [0.1, 0.9]], 28, C(0.3, 0.44, 0.2), WIN.none, 0.9, seed);
   const turn = hash(seed, 11) * 3;
   const at = (u: number, v: number): [number, number] => [x + Math.cos(turn) * u - Math.sin(turn) * v, y + Math.sin(turn) * u + Math.cos(turn) * v];
   // Palms round the rim, a little unevenly.

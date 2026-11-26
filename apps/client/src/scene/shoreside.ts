@@ -12,7 +12,11 @@ export interface ShoreSpot {
   x: number;
   y: number;
   top: number;
-  /** The deck, the dock and the named spots on them, in course metres. See `scene/venue.ts`. */
+  /**
+   * The deck, the dock and the named spots on them, in course metres. See `scene/venue.ts`.
+   * For a place in a town (a water's `towns.json`) this is the whole town, a `TownLayout` (`scene/town.ts`): the same
+   * fields, with `town: true`, a height for each ring of `walk` in `heights`, and the named paths in `paths`.
+   */
   layout: VenueLayout;
 }
 

@@ -148,6 +148,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const gold = new THREE.Color(0.55, 0.47, 0.27);
   const straw = new THREE.Color(0.63, 0.56, 0.36);
   const scrub = new THREE.Color(0.24, 0.29, 0.17);
+  const chaparral = new THREE.Color(0.31, 0.28, 0.16);
   const coastal = new THREE.Color(0.33, 0.37, 0.25);
   const forest = new THREE.Color(0.11, 0.18, 0.11);
   const rock = new THREE.Color(0.4, 0.36, 0.31);
@@ -211,7 +212,9 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       } else {
         c.copy(gold).lerp(straw, broad);
         c.lerp(coastal, oceanward * 0.7);
-        c.lerp(scrub, THREE.MathUtils.clamp(patch * 0.85 + sheltered * 0.6 - 0.45, 0, 1));
+        // Chaparral is brown where the Bay's scrub is green, and there is less of it on a dry island.
+        if (socal) c.lerp(chaparral, THREE.MathUtils.clamp(patch * 0.8 + sheltered * 0.5 - 0.5, 0, 0.8));
+        else c.lerp(scrub, THREE.MathUtils.clamp(patch * 0.85 + sheltered * 0.6 - 0.45, 0, 1));
         if (use === 'city') {
           // City blocks: pale roofs broken by darker streets and the odd green square.
           const bi = Math.floor(x / 160);

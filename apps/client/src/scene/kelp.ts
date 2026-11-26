@@ -18,7 +18,7 @@ export interface KelpPatch {
 
 /** The depths kelp reaches the surface from, metres on the chart, where a bed does not give its own. */
 export const KELP_DEPTH: [number, number] = [3.5, 24];
-const STEP = 46;
+const STEP = 42;
 
 function toLine(line: ReadonlyArray<readonly [number, number]>, x: number, y: number): number {
   let best = 1e9;
@@ -53,11 +53,12 @@ export function kelpCanopy(beds: readonly KelpBed[] | undefined, depthAt: (x: nu
         const x = Math.round((i + hash(i, j) * 0.8) * STEP);
         const y = Math.round((j + hash(j + 91, i - 17) * 0.8) * STEP);
         if (toLine(bed.line, x, y) > bed.reach) continue;
+        if (bed.clear?.some(([cx, cy, cr]) => Math.hypot(x - cx, y - cy) < cr)) continue;
         const d = depthAt(x, y);
         if (d < lo || d > hi) continue;
         // Beds are patchy: thick for a few hundred metres, then a gap of sand.
         if (smoothNoise(x / 170 + 5, y / 170 - 3) * 0.7 + hash(i * 3 + 1, j * 7 - 2) * 0.3 < 0.44) continue;
-        out.push({ x, y, r: Math.round(9 + hash(i - 5, j + 11) * 13), bed: bed.id });
+        out.push({ x, y, r: Math.round(7 + hash(i - 5, j + 11) * 9), bed: bed.id });
       }
     }
   }
@@ -78,10 +79,11 @@ export function buildKelp(patches: readonly KelpPatch[]): THREE.InstancedMesh {
   const sides = 8;
   const pos: number[] = [];
   const idx: number[] = [];
-  pos.push(0, 0.16, 0);
+  pos.push(0, 0.1, 0);
   for (let k = 0; k < sides; k++) {
     const a = (k / sides) * Math.PI * 2;
-    const r = 0.72 + 0.28 * hash(k, 77);
+    // Ragged: fronds lie out in tongues, not in a disc.
+    const r = k % 2 ? 0.45 + 0.2 * hash(k, 77) : 0.8 + 0.2 * hash(k, 79);
     pos.push(Math.cos(a) * r, 0, Math.sin(a) * r);
     idx.push(0, 1 + ((k + 1) % sides), 1 + k);
   }
@@ -89,7 +91,7 @@ export function buildKelp(patches: readonly KelpPatch[]): THREE.InstancedMesh {
   geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geom.setIndex(idx);
   geom.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, transparent: true, opacity: 0.86, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, transparent: true, opacity: 0.7, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
   const mesh = new THREE.InstancedMesh(geom, mat, patches.length);
   const mtx = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -98,10 +100,10 @@ export function buildKelp(patches: readonly KelpPatch[]): THREE.InstancedMesh {
   patches.forEach((p, i) => {
     q.setFromAxisAngle(up, hash(p.x, p.y) * 6.28);
     // Mats lie longer one way than the other, as the swell combs them.
-    mtx.compose(new THREE.Vector3(p.x, 0.1, -p.y), q, new THREE.Vector3(p.r * (1 + hash(p.y, p.x) * 0.5), 1, p.r * 0.8));
+    mtx.compose(new THREE.Vector3(p.x, 0.06, -p.y), q, new THREE.Vector3(p.r * (1 + hash(p.y, p.x) * 0.7), 1, p.r * 0.7));
     mesh.setMatrixAt(i, mtx);
     const t = hash(p.x + 3, p.y - 9);
-    mesh.setColorAt(i, c.setRGB(0.3 + t * 0.14, 0.24 + t * 0.1, 0.07 + t * 0.03));
+    mesh.setColorAt(i, c.setRGB(0.17 + t * 0.1, 0.12 + t * 0.07, 0.03 + t * 0.02));
   });
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;

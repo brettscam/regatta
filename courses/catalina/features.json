@@ -600,6 +600,18 @@
    "id": "avalon",
    "name": "Lover's Cove and Casino Point",
    "reach": 260,
+   "clear": [
+    [
+     -2270,
+     -22700,
+     340
+    ],
+    [
+     -2420,
+     -22180,
+     110
+    ]
+   ],
    "line": [
     [-1540, -23046],
     [-1700, -23086],
@@ -633,6 +645,13 @@
    "id": "whites",
    "name": "Long Point to White's Landing and Empire Landing",
    "reach": 300,
+   "clear": [
+    [
+     -6350,
+     -17450,
+     230
+    ]
+   ],
    "line": [
     [-6326, -17900],
     [-6486, -17620],
@@ -667,6 +686,13 @@
    "id": "blue-cavern",
    "name": "Blue Cavern to the Isthmus",
    "reach": 300,
+   "clear": [
+    [
+     -18150,
+     -11800,
+     470
+    ]
+   ],
    "line": [
     [-14620, -12646],
     [-15100, -12206],
@@ -692,6 +718,13 @@
    "id": "emerald",
    "name": "Emerald Bay to Arrow Point",
    "reach": 300,
+   "clear": [
+    [
+     -20800,
+     -9200,
+     230
+    ]
+   ],
    "line": [
     [-19020, -10766],
     [-19660, -10486],
@@ -738,7 +771,7 @@
   {
    "id": "horseshoe",
    "name": "Horseshoe Kelp",
-   "reach": 700,
+   "reach": 380,
    "depth": [14, 32],
    "line": [
     [6300, 13100],

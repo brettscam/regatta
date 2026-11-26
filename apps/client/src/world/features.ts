@@ -74,6 +74,8 @@ export interface KelpBed {
   reach: number;
   /** The charted depths it grows in here, metres, where they are not the usual 3.5 to 24. */
   depth?: [number, number];
+  /** Water inside the bed's reach that has none, as [x, y, radius]: a harbor's moorings, an anchorage's sand. */
+  clear?: Array<[number, number, number]>;
 }
 
 /** A lighthouse or lit mark: drawn on the land, labelled on the chart, and lit after dark with its own rhythm. */
