@@ -153,7 +153,8 @@ export class Tips implements Feature {
     const step = Math.min(this.acc, 2);
     this.acc = 0;
     const s = this.snap = this.look(step);
-    const due = this.picker.next(s, step, this.showing !== null);
+    // In the water with a mask on she has her own panel, and no hand free for a card about the boat.
+    const due = this.ctx.feature('dive')?.focus?.() ? null : this.picker.next(s, step, this.showing !== null);
     const now = this.showing;
     if (now) {
       // Done, timed out, or something more pressing is going on.

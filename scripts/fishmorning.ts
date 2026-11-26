@@ -132,12 +132,12 @@ function fish(style: Style, startHours: number, minutes: number): Result {
 
 const styles = (): Style[] => [
   troller('Troll, feathers, sail', 'A sailing boat reaching along the breakwater and out past Horseshoe Kelp at 6 kt with feathers on one rod', 'feather', 1, 6, [10500, 18300], [7400, 13300]),
-  troller('Troll, plugs, power', 'A powerboat with two rods towing plugs at 7.5 kt from Queens Gate across the channel towards Long Point', 'plug', 2, 7.5, [10500, 17500], [-5000, -14500]),
+  troller('Troll, plugs, power', 'A powerboat with two rods towing plugs at 7.5 kt from Queens Gate across the channel towards Hen Rock', 'plug', 2, 7.5, [10500, 17500], [-5000, -16000]),
   troller('Troll, marlin lure', 'A powerboat dragging the big lure at 8 kt along the far side, off the East End', 'marlin', 2, 8, [3000, -24000], [-9000, -11000]),
   sitter('Bait, Platform Edith', 'Drifting live bait 170 m off Platform Edith, started on the up-current side', 'bait', 12, [14770 - 120, 5080 + 120], false, 0.25, 330),
   sitter('Squid, Platform Edith', 'The same drift with squid on the bottom', 'squid', 0, [14770 - 120, 5080 + 120], false, 0.25, 330),
-  sitter('Bait, kelp, Long Point', 'Anchored on the kelp line inside Long Point with live bait', 'bait', 12, [-6200, -16150], true),
-  sitter('Iron, kelp, Long Point', 'The same spot with the iron and no bait', 'iron', 0, [-6200, -16150], true),
+  sitter('Bait, kelp, Hen Rock', 'Anchored on the kelp at Hen Rock, just outside the Long Point reserve, with live bait', 'bait', 12, [-6116, -16707], true),
+  sitter('Iron, kelp, Hen Rock', 'The same spot with the iron and no bait', 'iron', 0, [-6116, -16707], true),
   sitter('Bait, harbor flats', 'Drifting a live bait over the sand inside the breakwater', 'bait', 12, [14000, 21000], false, 0.5, 500),
   sitter('Squid, Horseshoe Kelp', 'Anchored on Horseshoe Kelp with squid', 'squid', 0, [7400, 13300], true),
   runAndGun('Run and gun, iron', 'A powerboat running to the birds and the paddies in the channel and casting the iron', 'iron', 0, [6000, 6000]),
@@ -176,7 +176,7 @@ if (args[0] === 'day') {
   for (const fmt of FORMATS) {
     const call = makeDerby(WATER, 'Script', fmt.id, len, Math.round(startHours * 3600), 5, 'calico');
     const rows: DerbyRow[] = [
-      ...results.filter(({ s }) => /kelp, Long|plugs|Edith|Run and gun, bait/.test(s.name) && !/Iron|Squid/.test(s.name)).map(({ s, r }) => ({ name: `You (${s.name})`, boat: '', me: true, rival: false, fish: r.fish.filter((f) => f.m < len) })),
+      ...results.filter(({ s }) => /kelp, Hen|plugs|Edith|Run and gun, bait/.test(s.name) && !/Iron|Squid/.test(s.name)).map(({ s, r }) => ({ name: `You (${s.name})`, boat: '', me: true, rival: false, fish: r.fish.filter((f) => f.m < len) })),
       ...derbyRivals(call).map((e) => ({ name: `${e.who.skipper} (${e.level.id}, rod ${rodSkill(e).toFixed(2)})`, boat: e.who.boat, me: false, rival: true, fish: rivalFish(call, table, e, len * 60) })),
     ];
     console.log(`\nTournament: ${formatWords(call, table)}`);

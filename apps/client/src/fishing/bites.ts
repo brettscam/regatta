@@ -211,7 +211,7 @@ function better(table: FishTable, spot: Spot, tackle: Tackle, way: Way): string 
  */
 export function whySlow(table: FishTable, spot: Spot, tackle: Tackle, fresh = 1): string {
   const way = wayOf(spot, tackle);
-  if (spot.reserve) return spot.reserve.say;
+  if (spot.reserve) return spot.reserve.say.replace(/\.$/, '');
   if (spot.platform?.inside) return `Inside the ${spot.platform.p.keepOff} m ring round ${spot.platform.p.name}: nobody fishes or anchors here. Stand off and fish the up-current side`;
   if (way === 'skip') return `At ${kt(spot.speedKt)} kt the lures are skipping on top. Slow to under ${SKIP_KT} kt`;
   if (way === 'troll') {

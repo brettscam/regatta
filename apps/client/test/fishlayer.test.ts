@@ -42,7 +42,7 @@ describe('the fishing layer of the chart', () => {
     const layer = fishingLayer(table, reserves, { depth: (x, y) => world.chartDepth(x, y) }, () => []);
     const c = fakeCanvas();
     layer.draw(c.ctx, whole);
-    for (const name of ['Horseshoe Kelp', 'Long Point', 'East End', 'Platform Eureka', 'Platform Edith', 'Island Grissom', 'Bait barge']) expect(c.words, name).toContain(name);
+    for (const name of ['Horseshoe Kelp', 'Hen Rock', 'East End', 'Platform Eureka', 'Platform Edith', 'Island Grissom', 'Bait barge']) expect(c.words, name).toContain(name);
     // Kelp: hundreds of dots along the island, none of them a label.
     expect(c.calls.arc).toBeGreaterThan(300);
     expect(c.calls.setLineDash).toBeGreaterThan(10);
@@ -50,7 +50,7 @@ describe('the fishing layer of the chart', () => {
     expect(c.words.join('|')).not.toMatch(/no take/);
     const near = fakeCanvas();
     layer.draw(near.ctx, close(-2000, -22600, 0.2));
-    expect(near.words).toContain('Casino Point: no take');
+    expect(near.words).toContain('Casino Point Dive Park: no take');
     expect(near.words).toContain("Lover's Cove: no take");
     expect(near.calls.clip).toBe(2);
   });

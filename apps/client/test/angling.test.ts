@@ -33,7 +33,8 @@ const tackle = (over: Partial<Tackle> = {}): Tackle => ({ lure: 'feather', rig: 
 const names = (list: Array<{ species: FishSpecies }>) => list.map((p) => p.species.id);
 
 const EDITH = table.platforms.find((p) => p.id === 'edith')!;
-const LONG_POINT_KELP = { x: -6200, y: -16150 };
+/** On the kelp at Hen Rock, just outside the Long Point reserve. */
+const LONG_POINT_KELP = { x: -6116, y: -16707 };
 const FLATS = { x: 14000, y: 21000 };
 const CHANNEL = { x: 6000, y: 3000 };
 const HORSESHOE = { x: 7400, y: 13300 };
@@ -91,10 +92,17 @@ describe('the fishing table of a water', () => {
       expect(wet, g.name).toBeGreaterThan(5);
     }
     for (const r of reserves) expect(w.chartDepth(r.x, r.y) > 0 || w.chartDepth(r.x + r.r * 0.7, r.y + r.r * 0.7) > 0, r.name).toBe(true);
-    expect(reserves.map((r) => r.id)).toEqual(['casino-point', 'lovers-cove']);
-    // The reserves do not swallow the moorings at Avalon.
+    // One list with diving: the zones of the water's dives.json.
+    expect(reserves.map((r) => r.id)).toEqual(['casino-point', 'lovers-cove', 'long-point', 'blue-cavern']);
+    expect(reserves[2].say).toBe('Long Point is a no-take reserve: nothing may be taken here.');
+    // The reserves do not swallow the moorings at Avalon or at the Isthmus.
     expect(reserveAt(reserves, -2250, -22700)).toBeNull();
+    expect(reserveAt(reserves, -18250, -11750)).toBeNull();
     expect(reserveAt(reserves, reserves[0].x + 50, reserves[0].y)?.id).toBe('casino-point');
+    // Long Point itself is inside its reserve, so the ground to fish there is Hen Rock, outside it.
+    expect(reserveAt(reserves, -6050, -15850)?.id).toBe('long-point');
+    expect(reserveAt(reserves, LONG_POINT_KELP.x, LONG_POINT_KELP.y)).toBeNull();
+    expect(reservesOf('sf-bay')).toEqual([]);
   });
 
   it('reads the hour and the month from the water\'s own clock', () => {
@@ -106,7 +114,7 @@ describe('the fishing table of a water', () => {
 
 describe('what kind of water she is in', () => {
   it('knows the grounds by name', () => {
-    expect(spot(LONG_POINT_KELP).ground?.id).toBe('long-point');
+    expect(spot(LONG_POINT_KELP).ground?.id).toBe('hen-rock');
     expect(spot(LONG_POINT_KELP).hab.kelp).toBe(1);
     expect(spot(HORSESHOE).hab.reef).toBe(1);
     expect(spot(FLATS).hab.flats).toBe(1);
@@ -261,7 +269,7 @@ describe('what bites where and when', () => {
 
   it('says true things about where she is', () => {
     const s = spot({ ...LONG_POINT_KELP, held: true, hours: 1 });
-    expect(advice(table, s, tackle())).toMatch(/^Fishing a live bait on Long Point for /);
+    expect(advice(table, s, tackle())).toMatch(/^Fishing a live bait on Hen Rock for /);
     expect(sounderLine(table, s, tackle())).toMatch(/rock and kelp · (good|thick) marks/);
     expect(sounderLine(table, spot(CHANNEL), tackle())).toMatch(/no bottom · nothing showing/);
     // Squid in the kelp at dawn when bait would do far better, or the other way about on a reef: the crew say so.

@@ -1,5 +1,5 @@
 {
-  "note": "Fishing on the San Pedro Channel: what lives where, what it takes, how big it runs and what may be kept. All of it is from general knowledge of Southern California sport fishing, not from a survey or the current regulations booklet: sizes, limits and positions are approximate. Read by apps/client/src/fishing/table.ts; the rules that use it are in fishing/grounds.ts and fishing/bites.ts. Lengths in centimetres, positions in flat metres east and north of the course origin.",
+  "note": "Fishing on the San Pedro Channel: what lives where, what it takes, how big it runs and what may be kept. All of it is from general knowledge of Southern California sport fishing, not from a survey or the current regulations booklet: sizes, limits and positions are approximate. No-take reserves are not listed here: they are the `zones` of this water's dives.json, read through fishing/zones.ts, so fishing and diving obey one list. Read by apps/client/src/fishing/table.ts; the rules that use it are in fishing/grounds.ts and fishing/bites.ts. Lengths in centimetres, positions in flat metres east and north of the course origin.",
   "name": "Southern California",
   "jackpot": "yellowtail",
   "bait": { "name": "live sardines", "scoop": 12, "most": 24 },
@@ -12,7 +12,7 @@
     { "id": "lb-breakwater", "name": "the Long Beach breakwater", "kind": "rocks", "line": [[10900, 19100], [15100, 19200]], "width": 280, "say": "Calico and sand bass tight to the rocks, bonito off the ends." },
     { "id": "horseshoe", "name": "Horseshoe Kelp", "kind": "reef", "circle": [7400, 13300, 1700], "say": "A low reef three miles out: sand bass, calico, sculpin, and barracuda over the top of it." },
     { "id": "kelp-line", "name": "the island kelp line", "kind": "kelp", "box": [-24500, -30500, 4500, -7500], "depth": [4, 30], "say": "The kelp along the island's front side: calico, sheephead, whitefish, and white seabass at first light." },
-    { "id": "long-point", "name": "Long Point", "kind": "point", "circle": [-6050, -15850, 950], "say": "Current round the point brings yellowtail past the kelp." },
+    { "id": "hen-rock", "name": "Hen Rock", "kind": "point", "circle": [-6150, -16750, 550], "say": "The reef just outside the Long Point reserve: yellowtail come round the corner along the kelp." },
     { "id": "east-end", "name": "the East End", "kind": "point", "circle": [-460, -27070, 1300], "say": "Yellowtail off the corner of the island, and the first place a marlin is seen." },
     { "id": "bird-rock", "name": "Bird Rock", "kind": "point", "circle": [-17350, -10980, 650], "say": "A white rock off the Isthmus with yellowtail and calico round it." },
     { "id": "ship-rock", "name": "Ship Rock", "kind": "point", "circle": [-17810, -9650, 650], "say": "A pinnacle in deep water: yellowtail and bonito on top, whitefish down the sides." },
