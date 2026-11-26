@@ -51,6 +51,10 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['Shift', '+', 'O'], name: 'Change tender', what: 'Aboard, with the tender stowed: the next one your boat carries. Every boat has the kayak; 30 ft and up the dinghy, an outboard skiff; 42 ft and up (the catamaran, the 45 and the 50) a wave runner as well. Also chosen on the way in, beside the boat\'s name.' },
     { keys: ['K'], name: 'Crab pot', since: 'v9', what: 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.' },
     { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it.' },
+    { keys: ['5'], name: 'Go diving', what: 'Anchored or on a mooring, or stopped in the tender: over the side with mask, fins, a speargun and a float with a dive flag. You swim on your fins with the arrow keys: each press of the up arrow is a kick, and you glide between kicks; left and right turn you; down puts your head down for a duck dive; E turns it up again; drag to look about. W A S D work the same. Kicking hard burns breath: kick, glide, and come up with air in hand. Rest on the float between dives, and wait for "breathed up" before the next. 5 under water heads for the surface, and 5 beside the boat climbs out. Clean dives grow your lungs: the logbook keeps your freediving level.' },
+    { keys: ['F'], name: 'Speargun', what: 'Under water: fires the shaft where you are looking. It is good for three or four metres, so stalk close and slowly. The panel names the fish you are looking at and its rule: a protected fish, a short one or one over the limit costs a citation, and the gun stays on safe in a reserve.' },
+    { keys: ['G'], name: 'Grab a lobster', what: 'Under water, within arm\'s reach of a lobster: takes it by hand, which is the only way allowed. Come at it from the front and slowly or it shoots off backwards. Each one is measured: short ones go back, and so do all of them out of season.' },
+    { keys: ['6'], name: 'Lobster season practice', what: 'Where the water\'s own day is outside the lobster season: treats the season as open on your dives, and the water below as night, when lobster walk the reef. Only for you: nobody else\'s day changes. Press again to turn it off.' },
   ] },
   { id: 'views', title: 'Views', rows: [
     { keys: ['1', '2', '3', '4'], name: 'Camera', what: 'Jump to a view: the wheel, the mast, the bow, or above the boat.' },
@@ -91,7 +95,7 @@ export function isNewSince(since: string | undefined, seen: string, ids: readonl
 }
 
 /** What the player is doing, as far as the strip of main keys is concerned. */
-export type StripContext = 'sailing' | 'racing' | 'held' | 'tender';
+export type StripContext = 'sailing' | 'racing' | 'held' | 'tender' | 'diving';
 
 /** The handful of keys that matter most in each situation: the caps, then a word or two. */
 export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
@@ -116,8 +120,8 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
   held: [
     [['X'], 'set off'],
     [['O'], 'go ashore'],
-    [['L'], 'fishing line'],
-    [['K'], 'crab pot'],
+    [['5'], 'dive'],
+    [['L', 'K'], 'fishing line, crab pot'],
     [['Z'], 'sleep till morning'],
     [['I'], 'engine'],
     [['B'], 'all keys'],
@@ -129,9 +133,17 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['O'], 'land, or climb back aboard'],
     [['B'], 'all keys'],
   ],
+  diving: [
+    [['↑'], 'kick, then glide'],
+    [['←', '→'], 'turn'],
+    [['↓', 'E'], 'head down, up'],
+    [['F'], 'fire'],
+    [['G'], 'grab a lobster'],
+    [['5'], 'surface; climb out'],
+  ],
 };
 
 /** Which strip to show. The kayak comes first: while she is out, the yacht's keys are not hers. */
-export function stripContext(c: { away: boolean; racing: boolean; held: boolean }): StripContext {
-  return c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : 'sailing';
+export function stripContext(c: { away: boolean; racing: boolean; held: boolean; diving?: boolean }): StripContext {
+  return c.diving ? 'diving' : c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : 'sailing';
 }

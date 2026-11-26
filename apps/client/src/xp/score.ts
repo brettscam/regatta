@@ -11,7 +11,7 @@ const KT = 0.514444;
 
 export type AwardKind =
   | 'tack' | 'gybe' | 'groove' | 'hand' | 'gust' | 'mark' | 'finish' | 'place'
-  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'met' | 'lost';
+  | 'berth' | 'night' | 'ashore' | 'fish' | 'crabs' | 'seen' | 'met' | 'dive' | 'lost';
 
 export interface Award {
   kind: AwardKind;
@@ -40,6 +40,7 @@ export const KIND_NAMES: Record<AwardKind, string> = {
   crabs: 'Crab landed',
   seen: 'First sightings',
   met: 'Boats met',
+  dive: 'Spearfishing and lobster',
   lost: 'Lost to knockdowns, crash gybes, groundings and collisions',
 };
 const KINDS = Object.keys(KIND_NAMES) as AwardKind[];

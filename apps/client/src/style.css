@@ -761,3 +761,23 @@ body:not(.lobby) .newsflash { bottom: calc(var(--edge-bottom) + 78px); }
 .join .when.tenders .chip { min-width: 0; padding: 5px 8px; }
 .join .when.tenders .chip b { font-size: 13px; }
 .join .chip:disabled { opacity: 0.42; cursor: default; }
+
+/* The dive panel (aboard/dive.ts): where she is, her breath, the gun, what she is looking at and the catch. */
+.dive[hidden] { display: none; }
+.dive { left: var(--edge-left, 16px); top: 240px; width: min(390px, calc(100% - 32px)); box-sizing: border-box; padding: 10px 14px; font-size: 13px; line-height: 1.45; color: rgba(238, 243, 244, 0.9); pointer-events: none; }
+.dive .where { font-weight: 600; letter-spacing: 0.02em; }
+.dive .breath { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.dive .breath span { flex: 0 0 150px; }
+.dive .breath i { flex: 1; height: 8px; border-radius: 4px; background: rgba(238, 243, 244, 0.16); overflow: hidden; }
+.dive .breath b { display: block; height: 100%; background: #6fd0c4; }
+.dive .breath[data-call="warn"] b { background: #e8b23c; }
+.dive .breath[data-call="danger"] b { background: #e2513f; }
+.dive .breath[data-call="danger"] span { color: #ff8a7a; font-weight: 600; }
+.dive .aim[data-rule="no"] { color: #ff9d7a; font-weight: 600; }
+.dive .aim:empty, .dive .brief:empty { display: none; }
+.dive .brief { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(238, 243, 244, 0.18); color: var(--dim); font-size: 12.5px; }
+body.lobby .dive { display: none; }
+.dive .breath[data-call="urge"] b { background: #b9cf6a; }
+/* The edge of the mask going dark: a contraction, or the breath running out. Nothing in it can be pressed. */
+.dive-veil { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 3; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0.92) 100%); }
+body.lobby .dive-veil { display: none; }

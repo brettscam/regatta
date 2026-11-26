@@ -8,6 +8,7 @@ import { myAvatarCode, readAvatar } from '../boat/avatar';
 import { mySailStyleCode, readSailStyle } from '../boat/sailStyle';
 import { readDamage } from '../aboard/contactRules';
 import { readTender, type TenderReport } from '../aboard/tenders'; // tender
+import { readDive } from '../aboard/diveRules'; // dive
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
@@ -91,6 +92,8 @@ export interface RemoteBoat {
   // `aboard/tenderFleet.ts` draws it in her colour with her skipper in it.
   tender: TenderReport | null;
   tenderAt: number;
+  // ---- dive: where her dive flag is while her skipper is in the water (`dv`, checked by `readDive`). `aboard/dive.ts` draws it.
+  diver: { x: number; y: number } | null;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -119,6 +122,7 @@ class Remote implements RemoteBoat {
   // ---- tender
   tender: TenderReport | null = null;
   tenderAt = 0;
+  diver: { x: number; y: number } | null = null; // dive
   /** Her sails as she sent them, a code to be read with `readSailStyle`. */
   private sl = '';
   readonly colour: string;
@@ -182,6 +186,7 @@ class Remote implements RemoteBoat {
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.damage = readDamage(v.dm);
     this.tender = readTender(v.oc); // tender
+    this.diver = readDive(v.dv); // dive
     this.tenderAt = now;
     this.raceCall = v.rc ?? null;
     this.raceEvent = v.ev ?? null;

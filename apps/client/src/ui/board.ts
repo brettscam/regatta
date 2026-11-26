@@ -3,6 +3,8 @@ import roadmapJson from '../data/roadmap.json';
 import { visited } from '../aboard/visited';
 import { FIELD_GUIDE, KINDS as ANIMALS } from '../aboard/fauna';
 import { sightings } from '../aboard/sightings';
+import { diveLog } from '../aboard/diveLog';
+import { lungsFor } from '../aboard/diveRules';
 import { met } from '../aboard/met';
 import { residentWaters } from '../aboard/residentData';
 import { COURSES } from '../world/loadCourse';
@@ -448,6 +450,17 @@ export class Board {
     return `<h3>Seen on the water · ${n} of ${ANIMALS.length}</h3><p class="lede">The crew call out each animal the first time it comes in sight on a sail. Porpoise like the tide at the Gate, seals the quiet anchorages, and a whale needs the flood and some luck.</p><ul class="barhop seen">${cards}</ul>`;
   }
 
+  /** The dive log: the best of each kind taken, the deepest dive and the longest breath. Nothing until she has been in. */
+  private diveCard(): string {
+    const log = diveLog();
+    if (!log.dives) return '';
+    const kinds = Object.values(log.species).sort((a, b) => b.n - a.n);
+    const lungs = lungsFor(this.logbook.totals.freedive);
+    const minutes = `${Math.floor(log.longest / 60)}:${String(Math.round(log.longest % 60)).padStart(2, '0')}`;
+    const cards = kinds.map((k) => `<li class="been"><b>${esc(k.name)}</b><span>${k.n} taken</span><i>best ${k.best} ${k.unit}</i></li>`).join('');
+    return `<h3>Dive log · ${log.dives} ${log.dives === 1 ? 'time' : 'times'} over the side</h3><p class="lede">Freediving level ${lungs.level} of 10, ${esc(lungs.name)}: about ${Math.round(lungs.hold)} s on one breath, comfortable to ${Math.round(lungs.easy)} m. Clean dives, up with air in hand, are what grow it. Your bests: deepest dive ${log.deepest.toFixed(1)} m, longest breath ${minutes}. ${kinds.length ? 'The best of each kind taken with the speargun, and lobster by hand (measured across the carapace).' : 'Nothing taken yet: stalk slowly, shoot inside four metres, and read the rule for each fish before you do.'}</p>${cards ? `<ul class="barhop seen">${cards}</ul>` : ''}`;
+  }
+
   /** The boats that live on each water, each marked once the player has met her. */
   private metCard(): string {
     const seen = met();
@@ -486,7 +499,7 @@ export class Board {
     const mine = `<div class="stats">
       ${stat('Miles sailed', t.miles.toFixed(1))}${stat('Hours under way', t.hours.toFixed(1))}${stat('Sails', String(t.sails))}
       ${stat('Marks rounded', String(t.marks))}${stat('Tacks and gybes', String(t.tacks))}${stat('Knockdowns', String(t.knockdowns))}${stat('Top speed', `${t.topKt.toFixed(1)} kt`)}
-      ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}
+      ${stat('Crab', String(t.crabs))}${stat('Fish', String(t.fish))}${t.lobsters ? stat('Lobster', String(t.lobsters)) : ''}
     </div>`;
     const fleet = this.logbook.fleet;
     const rows = fleet.map((p, i) => `<tr class="${p.me ? 'me' : ''}"><td>${i + 1}</td><td>${esc(p.skipper || 'A skipper')}${p.me ? ' (you)' : ''}</td><td>${esc(p.boatName)}</td><td>${p.log.xp.toLocaleString('en-GB')}</td><td>${p.log.miles.toFixed(1)}</td><td>${p.log.hours.toFixed(1)}</td><td>${p.log.marks}</td></tr>`).join('');
@@ -500,7 +513,7 @@ export class Board {
       : alone()
         ? 'In this copy of the game it is kept in this browser only.'
         : 'On the shared page it is also kept with your sign-in, so it follows you.';
-    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${this.metCard()}${table}`;
+    return `<p class="lede">Your logbook adds up every sail on this device. ${kept} Experience, ratings and prizes will be built on it.</p>${this.xpCard()}${mine}${this.barHop()}${this.seenCard()}${this.diveCard()}${this.metCard()}${table}`;
   }
 
   /** The website's sign-in: an email address, and a link sent to it. Nothing is drawn where the platform has none. */
