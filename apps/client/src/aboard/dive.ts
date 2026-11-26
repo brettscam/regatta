@@ -872,10 +872,17 @@ export class Dive implements Feature {
       d.yaw += turn * 1.5 * dt;
       d.pitch = THREE.MathUtils.clamp(d.pitch + nod * 1.1 * dt - this.drag.y * 0.004, -1.45, 1.45);
       // A drag turns her head, as far as over her shoulder; it comes back round to the front as she swims on.
-      this.headYaw = THREE.MathUtils.clamp(this.headYaw + this.drag.x * 0.004, -2.6, 2.6);
+      this.headYaw = THREE.MathUtils.clamp(this.headYaw + this.drag.x * 0.004, -2.9, 2.9);
       if (this.sinceKick < 1 && !this.dragging) this.headYaw *= 1 - Math.min(1, dt * 1.2);
     }
     if (this.lockKey && !lock) this.lockKey = null;
+    // With a fish on the line she turns to face it, so she can see it run and work it.
+    if (this.fight && this.shot?.hit && !locked) {
+      const want = lookToward(d, this.shot.hit);
+      d.yaw += wrap(want.yaw - d.yaw) * Math.min(1, dt * 2.5);
+      d.pitch += (THREE.MathUtils.clamp(want.pitch, -1.2, 1.2) - d.pitch) * Math.min(1, dt * 2.5);
+      this.headYaw *= 1 - Math.min(1, dt * 4);
+    }
     this.drag.x = this.drag.y = 0;
     // Turned for the surface: head up, and an easy kick all the way.
     if (this.ascending) d.pitch += (1.35 - d.pitch) * Math.min(1, dt * 3);
@@ -987,7 +994,7 @@ export class Dive implements Feature {
       } else this.handedTold = false;
     } else if (this.still <= 0) {
       d.d += d.vd * dt;
-      const deepest = Math.min(lungs.limit, Math.max(0.3, floor - 0.35));
+      const deepest = Math.min(lungs.limit, Math.max(0.3, floor - 0.5));
       if (d.d > deepest) {
         d.d = deepest;
         d.vd = Math.min(0, d.vd);

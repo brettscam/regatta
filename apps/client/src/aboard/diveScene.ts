@@ -643,8 +643,8 @@ const speckFragment = /* glsl */ `
       float a = smoothstep(0.5, 0.42, r) * (0.25 + 0.75 * smoothstep(0.25, 0.45, r)) * vFade;
       gl_FragColor = vec4(mix(uWater, vec3(0.92, 1.0, 1.0), 0.85) * (0.3 + 0.7 * uLight + 0.6 * uLamp), a);
     #elif defined(SILT)
-      float a = smoothstep(0.5, 0.0, r) * vFade * vLit * 0.32;
-      gl_FragColor = vec4(mix(uWater, vec3(0.62, 0.56, 0.42), 0.55) * (0.35 + 0.65 * uLight + 0.5 * uLamp), a);
+      float a = smoothstep(0.5, 0.05, r) * vFade * vLit * 0.6;
+      gl_FragColor = vec4(mix(uWater, vec3(0.74, 0.68, 0.52), 0.7) * (0.45 + 0.75 * uLight + 0.5 * uLamp), a);
     #else
       float a = smoothstep(0.5, mix(0.1, 0.45, vSoft), r) * vFade * mix(0.5, 0.22, vSoft);
       // In the dive light the plankton sparkles; at night it glows green where she stirs it.
@@ -1953,7 +1953,7 @@ export class DiveScene {
         // A moray is a head and a neck out of a hole, mouth working: the rest of it is back in the rock.
         const fx = Math.sin(f.heading);
         const fy = Math.cos(f.heading);
-        put(f, f.hx - fx * len * 0.32, -f.d + 0.16, -(f.hy - fy * len * 0.32), f.heading, 0.42 + 0.08 * Math.sin(t * 0.7 + f.phase), 0, ff.beat * 0.15, 0.3);
+        put(f, f.hx - fx * len * 0.42, -f.d + 0.05, -(f.hy - fy * len * 0.42), f.heading, 0.62 + 0.08 * Math.sin(t * 0.7 + f.phase), 0, ff.beat * 0.15, 0.3);
         continue;
       }
       const bank = Math.max(-0.6, Math.min(0.6, (f.turn ?? 0) * 0.35));

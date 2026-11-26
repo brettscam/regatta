@@ -31,14 +31,14 @@ export function handTargetsAt(file: DiveFile, ground: Ground, cx: number, cy: nu
       let x = cx;
       let y = cy;
       let ok = false;
-      for (let attempt = 0; attempt < 16 && !ok; attempt++) {
+      for (let attempt = 0; attempt < 28 && !ok; attempt++) {
         const a = hash01(key, shift, index, 610 + attempt) * Math.PI * 2;
         const far = 3 + (LIFE_RADIUS - 5) * Math.sqrt(hash01(key, shift, index, 630 + attempt));
         x = cx + Math.sin(a) * far;
         y = cy + Math.cos(a) * far;
         const rock = ground.rock(x, y);
         const d = ground.floor(x, y);
-        ok = d > 1.5 && (spec.on === 'rock' ? rock > 0.55 : rock < 0.25);
+        ok = d > 1.5 && (spec.on === 'rock' ? rock > 0.55 : rock < 0.35);
       }
       if (!ok) continue;
       const [lo, hi] = spec.size;
