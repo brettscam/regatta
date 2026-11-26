@@ -409,32 +409,32 @@
   {
    "id": "casino-point-light",
    "name": "Casino Point",
-   "x": -2215,
-   "y": -22330,
-   "focal": 9,
-   "tower": 6,
+   "x": -2302,
+   "y": -22375,
+   "focal": 9.5,
+   "tower": 3,
    "character": "Fl G 4s",
    "period": 4,
    "shows": 0.5,
    "range": 5,
    "colour": "#7dffa8",
-   "on": "land",
-   "say": "The end of the rock wall under the Casino. The north side of the way in to Avalon"
+   "on": "buoy",
+   "say": "On the sea wall under the Casino. The north side of the way in to Avalon"
   },
   {
    "id": "cabrillo-mole-light",
    "name": "Cabrillo Mole",
-   "x": -2020,
-   "y": -22840,
-   "focal": 9,
-   "tower": 6,
+   "x": -2056,
+   "y": -22764,
+   "focal": 8,
+   "tower": 3,
    "character": "Fl R 4s",
    "period": 4,
    "shows": 0.5,
    "range": 5,
    "colour": "#ff5a48",
-   "on": "land",
-   "say": "The ferry mole. The south side of the way in to Avalon"
+   "on": "buoy",
+   "say": "The end of the ferry mole. The south side of the way in to Avalon"
   }
  ],
  "structures": [

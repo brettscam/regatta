@@ -305,6 +305,10 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
       m.hall(wx, wy, footing(wx, wy, 12) - 0.5, 34, 15, 8 + wz - footing(wx, wy, 12), 3.4, 0.7, WHITE, C(0.42, 0.42, 0.44), WIN.homes);
       lights.push({ p: [wx, wy, wz + 6], a: WARM, b: WARM, shape: SHAPE.glow, size: 8, min: 3.6 });
     }
+    // The two harbor lights are lit by the seamarks (`features.json`): here are the posts they stand on, on the Casino's
+    // sea wall and at the end of the mole.
+    m.beam([-2302, -22375, terrace], [-2302, -22375, terrace + 3.5], 0.3, 0.3, C(0.2, 0.5, 0.3));
+    m.beam([-2056, -22764, floor], [-2056, -22764, floor + 5], 0.3, 0.3, C(0.7, 0.15, 0.12));
     // The dive park: a ring of white buoys with an orange band, on the water off the point.
     {
       let n = 0;

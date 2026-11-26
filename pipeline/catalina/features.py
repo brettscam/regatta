@@ -91,8 +91,8 @@ lights = [
   L(at(33.3020, -118.3170), id='east-end', name='Catalina East End', focal=65, tower=5, character='Fl W 10s', period=10, shows=0.8, range=14, on='land', say='Seal Rocks lie under it'),
   L(at(33.4790, -118.6040), id='west-end', name='Catalina West End', focal=23, tower=5, character='Fl W 10s', period=10, shows=0.8, range=12, on='land'),
   L(at(33.4633, -118.4917), id='ship-rock', name='Ship Rock', focal=23, tower=6, character='Fl W 4s', period=4, shows=0.5, range=6, on='rock', say='A rock like a ship under sail, a mile north of the Isthmus, white with birds. Foul ground reaches south of it'),
-  L([-2215, -22330], id='casino-point-light', name='Casino Point', focal=9, tower=6, character='Fl G 4s', period=4, shows=0.5, range=5, colour=G, on='land', say='The end of the rock wall under the Casino. The north side of the way in to Avalon'),
-  L([-2020, -22840], id='cabrillo-mole-light', name='Cabrillo Mole', focal=9, tower=6, character='Fl R 4s', period=4, shows=0.5, range=5, colour=R, on='land', say='The ferry mole. The south side of the way in to Avalon'),
+  L([-2302, -22375], id='casino-point-light', name='Casino Point', focal=9.5, tower=3, character='Fl G 4s', period=4, shows=0.5, range=5, colour=G, on='buoy', say='On the sea wall under the Casino. The north side of the way in to Avalon'),
+  L([-2056, -22764], id='cabrillo-mole-light', name='Cabrillo Mole', focal=8, tower=3, character='Fl R 4s', period=4, shows=0.5, range=5, colour=R, on='buoy', say='The end of the ferry mole. The south side of the way in to Avalon'),
 ]
 
 structures = [

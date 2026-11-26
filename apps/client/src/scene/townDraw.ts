@@ -10,15 +10,15 @@ import { inRing, type TownPlan, type TownRing } from './town';
 
 type P3 = [number, number, number];
 const C = (r: number, g: number, b: number) => new THREE.Color(r, g, b);
-const PAVING = C(0.78, 0.71, 0.6);
+const PAVING = C(0.68, 0.6, 0.48);
 const KERB = C(0.6, 0.57, 0.5);
 const WALL = C(0.55, 0.52, 0.47);
 const ASPHALT = C(0.45, 0.44, 0.43);
 const DIRT = C(0.64, 0.55, 0.4);
-const PLANK = C(0.5, 0.42, 0.31);
+const PLANK = C(0.36, 0.27, 0.18);
 const PILE = C(0.24, 0.21, 0.18);
 const FLOAT = C(0.62, 0.6, 0.55);
-const TILE = C(0.82, 0.76, 0.66);
+const TILE = C(0.72, 0.62, 0.5);
 const WHITE = C(0.93, 0.92, 0.88);
 const WARM = C(1, 0.76, 0.45);
 const WOOD = C(0.42, 0.31, 0.2);
