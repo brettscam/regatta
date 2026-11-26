@@ -4,7 +4,7 @@ import {
   GUN, SHY, alarm, castOf, grab, lobsterShies, makeGround, populate, spook, stepFish,
   type DiveFile, type DiveSpecies, type Diver, type Fish, type Lobster,
 } from '../src/aboard/diveRules';
-import { LINE, THIEF, aimAt, boltholeOf, holdOf, huntAwards, leadCue, newFight, newThief, stepFight, strikeOf, targetsOfDive, thiefStep, type Fight } from '../src/aboard/diveHunt';
+import { LINE, THIEF, aimAt, fightWord, boltholeOf, holdOf, huntAwards, leadCue, newFight, newThief, stepFight, strikeOf, targetsOfDive, thiefStep, type Fight } from '../src/aboard/diveHunt';
 import { BUOY, CHASE, buoyancy, chaseLength, chaseReach, lockBreaks, lockCandidates, lookToward, nextLock, suitFor, type Lockable } from '../src/aboard/diveBody';
 import { HAND, handTargetsAt, takeByHand, type HandThing } from '../src/aboard/diveHand';
 import { member, slotOf, type SchoolState } from '../src/aboard/diveFlock';
@@ -119,6 +119,10 @@ describe('the fight on the line', () => {
     expect(boltholeOf({ habitat: 'reef' })).toBe('hole');
     expect(boltholeOf({ habitat: 'open' })).toBe('run');
     expect(boltholeOf(species(catalina, 'calico'))).toBe('kelp');
+  });
+  it('doing what the panel says lands even a big fish held badly', () => {
+    const f = play((g) => fightWord(g).startsWith('easing') || fightWord(g).startsWith('spent') || fightWord(g).startsWith('in the'), 'run', 10, 0.45);
+    expect(f.end).toBe('landed');
   });
   it('the same fight goes the same way every time', () => {
     const a = play((g) => g.pull < g.strength * 0.6, 'kelp');

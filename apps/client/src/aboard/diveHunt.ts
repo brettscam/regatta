@@ -148,7 +148,9 @@ export function leadCue(from: Point, dir: Point, f: Moving): LeadCue {
   const ay = from.y + dir.y * along - f.y;
   const ad = from.d + dir.d * along - f.d;
   const ahead = across > 1e-4 ? (ax * cx + ay * cy + ad * cd) / across : 0;
-  const onTarget = !!aimAt(from, dir, [f]).hit && range <= GUN.effective;
+  // Green only for a shot that would go into the body or the head: a shot that would only find the tail is not one to take.
+  const would = aimAt(from, dir, [f]);
+  const onTarget = !!would.hit && would.spot >= 0.25 && range <= GUN.effective;
   return { range, inRange: range <= GUN.effective, onTarget, lead, ahead };
 }
 
@@ -250,7 +252,8 @@ export function stepFight(f: Fight, dt: number, hauling: boolean): FightEnd | nu
 export function fightWord(f: Fight): string {
   if (f.energy < 0.15) return 'spent: work it in';
   if (f.made >= f.cover) return f.toward === 'kelp' ? 'in the kelp: haul it out before the line wraps' : 'in the reef: haul it out of the hole';
-  if (f.pull > f.strength * 0.7) return 'surging: give it line';
+  // Honest about this shaft: hauling now would put more strain on it than it holds.
+  if (f.pull + 0.5 > 0.6 + 1.2 * f.hold) return 'surging: give it line';
   return 'easing: haul now';
 }
 

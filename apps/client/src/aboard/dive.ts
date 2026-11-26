@@ -1208,9 +1208,9 @@ export class Dive implements Feature {
     if (!chase) {
       // Looking round over her shoulder, her head turns on her neck: the eye goes out to that side and up a little,
       // so she sees down her own back to her legs and fins.
-      const over = Math.sin(this.headYaw);
+      const over = Math.sign(this.headYaw) * Math.min(1, Math.abs(this.headYaw) / 1.5);
       const round = Math.abs(Math.sin(this.headYaw / 2));
-      cam.position.set(d.x + Math.cos(d.yaw) * over * 0.2, headY + 0.14 * round, -d.y + Math.sin(d.yaw) * over * 0.2);
+      cam.position.set(d.x + Math.cos(d.yaw) * over * 0.34, headY + 0.24 * round, -d.y + Math.sin(d.yaw) * over * 0.34);
       cam.rotation.set(this.camPitch + (this.dazed > 0 ? 0.25 * Math.sin(this.clock * 1.3) : 0) - 0.02 * Math.sin(this.stroke * Math.PI) + tug * 0.03 * Math.sin(this.clock * 13), -this.camYaw, this.camRoll + (this.dazed > 0 ? 0.2 * Math.sin(this.clock * 0.9) : 0) + sway + tug * 0.03 * Math.sin(this.clock * 9));
       if (cam.fov !== 58) { cam.fov = 58; cam.updateProjectionMatrix(); }
     } else {
