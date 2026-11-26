@@ -208,6 +208,11 @@ export interface PowerSpec {
     /** Waves shorter than `spanFrom` waterline lengths she bridges; by `spanFull` she feels all of their height. */
     spanFrom: number;
     spanFull: number;
+    /**
+     * A real sea is short-crested: even beam on, a fast boat runs onto the shoulders of the waves. This is the share of
+     * her speed she is taken to meet a beam sea with. A head sea she meets with all of it; it fades out abaft the beam.
+     */
+    shortCrest: number;
     /** Each wave is this much of the significant height, lowest to highest, settled by the count of waves met. */
     waveLow: number;
     waveHigh: number;

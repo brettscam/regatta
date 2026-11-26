@@ -76,7 +76,7 @@ export class Mooring implements Feature {
       // The sim holds her by her middle, so allow half her length for the bow to lie a little off the buoy.
       sim.holdAt('mooring', place.x, place.y, spec.dimensions.loa / 2 + 3);
       this.berth = place;
-      this.ctx.say(`${berthStatus(place)}. Sails stowed. X ${place.kind === 'dock' ? 'casts off' : 'slips the mooring'}, Z turns in for the night`, 8);
+      this.ctx.say(`${berthStatus(place)}. ${sim.boat.power ? 'Out of gear' : 'Sails stowed'}. X ${place.kind === 'dock' ? 'casts off' : 'slips the mooring'}, Z turns in for the night`, 8);
       return;
     }
     // The anchor goes down from the bow.
@@ -87,7 +87,7 @@ export class Mooring implements Feature {
     if (!verdict.ok) return this.ctx.say(verdict.say, 8);
     sim.holdAt('anchor', bowX, bowY, verdict.scope);
     this.berth = null;
-    this.ctx.say(`Anchor down in ${depth.toFixed(1)} m, ${verdict.scope} m of cable out. Sails stowed. X weighs anchor, Z turns in for the night`, 8);
+    this.ctx.say(`Anchor down in ${depth.toFixed(1)} m, ${verdict.scope} m of cable out. ${sim.boat.power ? 'Out of gear' : 'Sails stowed'}. X weighs anchor, Z turns in for the night`, 8);
   }
 
   /** X while held: weigh or slip. The sim sets the sails and puts her on a close reach with the pilot holding it. */
@@ -103,6 +103,8 @@ export class Mooring implements Feature {
     const left = was === 'anchor' ? 'Anchor aweigh' : berth?.kind === 'dock' ? `Cast off from ${berth.name}` : `Mooring slipped${berth ? ` at ${berth.name}` : ''}`;
     // With the engine running she leaves under power, and the sim leaves the wheel and the sheets alone.
     if (s.engineOn) return this.ctx.say(`${left}. The engine is running, out of gear, and you have the wheel. Full stop puts her ahead, comma astern`, 8);
+    // No sails to set: with her engine stopped she is let go and lies there.
+    if (sim.boat.power) return this.ctx.say(`${left}. She is adrift with the engine off: I starts it, then the full stop key puts her ahead`, 8);
     // The sim bears away on whichever side the wind happens to be. Take the tack that leads to open water.
     const preferred = sim.out.twa >= 0 ? 1 : -1;
     const side = clearerTack((heading, metres) => world.depth(s.x + Math.sin(heading) * metres, s.y + Math.cos(heading) * metres, s.t), sim.out.twd, preferred);

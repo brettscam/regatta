@@ -133,6 +133,9 @@ export interface RaceContext {
   finished(): void;
 }
 
+/** What a powerboat's skipper is told on trying to race. */
+export const NO_POWER_RACING = 'The races here are sailed, and she has no sails. Come out in a sailing boat to race, or run alongside and watch';
+
 /**
  * Racing: call a race or join one somebody else has called, a countdown to the gun, the course on the chart,
  * and who is where. Other people's boats report their own progress. Pace boats are sailed here by the autopilot.
@@ -197,6 +200,7 @@ export class Race {
    * @param cls the class it is sailed in: a boat id. The caller's own boat unless given
    */
   callRace(course: { name: string; marks: RaceMark[] }, minutes: number, pace: number, cls: string = this.ctx.own.id, mix: Mix = 'mixed'): void {
+    if (this.barred()) return;
     const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e5).toString(36)}`;
     const call: RaceCall = {
       id, name: course.name.slice(0, 60), marks: course.marks.slice(0, 12).map((m) => ({ name: m.name.slice(0, 28), x: Math.round(m.x), y: Math.round(m.y) })),
@@ -207,7 +211,18 @@ export class Race {
     this.join(call, true);
   }
 
+  /**
+   * A powerboat does not race: the races here are sailed, and the pace boats and the class boats are sailing boats.
+   * Says so, and returns true, when the player's own boat is one.
+   */
+  barred(): boolean {
+    if (!this.ctx.own.power) return false;
+    this.ctx.say(NO_POWER_RACING, 8);
+    return true;
+  }
+
   join(call: RaceCall, mine = false): void {
+    if (this.barred()) return;
     this.leave(true, true);
     const { sim, passage, world, scene } = this.ctx;
     // One design: everyone sails the race's class, whatever she came in. Her own boat comes back when the race is left.

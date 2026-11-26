@@ -269,11 +269,15 @@ describe('the sea decides how fast she can go', () => {
     expect(head(chop(1, 20))).toBeLessThan(18);
   });
 
-  it('the same sea is easier on the bow than dead ahead, and no limit abeam or astern', () => {
+  it('the same sea is easier on the bow than dead ahead, easier again abeam, and no limit astern', () => {
     const sea = chop(1, 20);
     expect(comfortSpeed(boat, sea, 45 * D2R)).toBeGreaterThan(comfortSpeed(boat, sea, 0) * 1.25);
-    expect(comfortSpeed(boat, sea, 90 * D2R)).toBeCloseTo(topSpeed(p), 6);
+    // Abeam she still runs onto the shoulders of a steep sea: faster than into it, but not flat out.
+    expect(comfortSpeed(boat, sea, 90 * D2R)).toBeGreaterThan(comfortSpeed(boat, sea, 45 * D2R) * 1.2);
+    expect(comfortSpeed(boat, sea, 90 * D2R) / KT).toBeLessThan(34);
     expect(comfortSpeed(boat, sea, 180 * D2R) / KT).toBeGreaterThan(35);
+    // The easy afternoon sea of the channel leaves her free abeam.
+    expect(comfortSpeed(boat, chop(0.65, 23), 90 * D2R)).toBeCloseTo(topSpeed(p), 6);
   });
 
   it('a longer sea of the same height lets her go faster, and a steeper one slower', () => {

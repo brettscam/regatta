@@ -49,8 +49,14 @@ export class Lobby {
     sim.setCrewTrim(true);
     sim.trimForWind();
     sim.setHelm('wind', Number.isNaN(at.heading) ? undefined : sim.out.twa);
+    // A powerboat is shown running at her cruising speed in a wide circle, so she stays near her start.
+    if (spec.power) {
+      sim.underWay(spec.power.cruiseKt);
+      sim.setControl('rudder', 0.035);
+    }
     const view = new BoatView(spec, { topsides: choice.colour, name: choice.name, avatar: myAvatar() });
-    view.setPilot({ engaged: true, mode: 'wind', label: `${Math.round(Math.abs(sim.out.twa) * R2D)}° ${sim.out.twa >= 0 ? 'S' : 'P'}` });
+    if (spec.power) view.setPilot({ engaged: false, mode: 'heading', label: '' });
+    else view.setPilot({ engaged: true, mode: 'wind', label: `${Math.round(Math.abs(sim.out.twa) * R2D)}° ${sim.out.twa >= 0 ? 'S' : 'P'}` });
     this.stage.scene.add(view.root);
     this.boat = { view, sim, key };
   }
@@ -89,7 +95,8 @@ export class Lobby {
     view.update(pose, s, sim.out, seaTime, dt);
 
     // Wide and high to choose the water, closer for the lesson question, alongside to choose the boat.
-    const scale = sim.boat.dimensions.loa / 11.6;
+    // A small open boat is looked at from nearer the water, and not from so close that she fills the screen.
+    const scale = Math.max(sim.boat.dimensions.loa, sim.boat.power ? 9 : 0) / 11.6;
     // On the home screen (step -1) she is close enough to see who is at the wheel.
     const want = this.step < 0 ? { dist: 17 * scale, pitch: 0.2 } : this.step === 0 ? { dist: 330, pitch: 0.2 } : this.step === 1 ? { dist: 78 * scale, pitch: 0.26 } : { dist: 25 * scale, pitch: 0.17 };
     const ease = Math.min(1, dt * 1.6);
@@ -97,7 +104,7 @@ export class Lobby {
     this.pitch += (want.pitch - this.pitch) * ease;
     this.yaw += dt * (this.step === 0 ? 0.035 : this.step < 0 ? 0.05 : 0.07);
     const cp = Math.cos(this.pitch);
-    this.look.set(x, 3.5 * scale, z);
+    this.look.set(x, sim.boat.power ? 1.4 : 3.5 * scale, z);
     this.camera.position.set(x + Math.sin(this.yaw) * cp * this.dist, Math.max(2.5, 3.5 + Math.sin(this.pitch) * this.dist), z + Math.cos(this.yaw) * cp * this.dist);
     this.camera.lookAt(this.look);
 
@@ -107,6 +114,6 @@ export class Lobby {
     if (w > 760) this.camera.setViewOffset(w, h, -Math.min(230, w * 0.2), 0, w, h);
     else this.camera.setViewOffset(w, h, 0, h * 0.22, w, h);
 
-    this.stage.frame(dt, 1, this.elapsed, seaTime, this.camera, { x, z, heading: s.heading, speed: s.speed, heel: s.heel, hulls: view.rig.hullOffset }, this.stage.traffic.vessels, sim.out.tws / KT);
+    this.stage.frame(dt, 1, this.elapsed, seaTime, this.camera, { x, z, heading: s.heading, speed: s.speed, heel: s.heel, hulls: view.rig.hullOffset, length: sim.boat.dimensions.loa, beam: sim.boat.dimensions.beam, power: !!sim.boat.power }, this.stage.traffic.vessels, sim.out.tws / KT);
   }
 }

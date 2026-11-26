@@ -1,6 +1,6 @@
 import { D2R, R2D, KT, clamp, lerp, wrapPi, wrapTau, smoothstep, approach, interp1 } from './math';
 import { polarSpeed } from './polar';
-import { comfortSpeed, fitOut, leverBurn, leverRpm, leverSnap, leverSpeed, planing, topSpeed, waveG, waveSpan } from './power';
+import { comfortSpeed, fitOut, leverBurn, leverFor, leverRpm, leverSnap, leverSpeed, planing, topSpeed, waveG, waveSpan } from './power';
 import type { BoatFile, BoatSpec, ControlName, EngineSpec, Environment, HelmMode, PowerSpec, SailReport, SeaSample, SimOutputs, SimState } from './types';
 
 /** Fixed step. The sim never takes any other step size. */
@@ -378,6 +378,23 @@ export class Sim {
   provision(): void {
     this.state.fuelUsed = 0;
     this.state.batteryUsed = 0;
+    this.engineReadout();
+  }
+
+  /**
+   * Put a powerboat under way at once: engine running, the lever where it holds about this speed, and that speed on.
+   * For setting up a start, the boat behind the join screen, or a test. 0 leaves her stopped with the engine idling in
+   * neutral. Nothing happens to a boat with sails, or to one that is held.
+   * @param kt knots through the water
+   */
+  underWay(kt: number): void {
+    const p = this.boat.power;
+    const s = this.state;
+    if (!p || s.hold !== 'none' || this.fuel <= 0) return;
+    s.engineOn = true;
+    s.engineCrank = 0;
+    s.throttle = kt > 0 ? leverSnap(p, leverFor(p, kt)) : 0;
+    s.speed = kt > 0 ? leverSpeed(p, s.throttle) : 0;
     this.engineReadout();
   }
 

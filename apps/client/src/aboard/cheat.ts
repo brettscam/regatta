@@ -54,6 +54,7 @@ export class CheatStrip implements Feature {
       away: !!this.ctx.feature('kayak')?.focus?.(),
       racing: !!race && race.call !== null && race.finish === null,
       held: sim.state.hold !== 'none',
+      power: !!sim.boat.power,
     });
     if (context === this.context) return;
     this.context = context;

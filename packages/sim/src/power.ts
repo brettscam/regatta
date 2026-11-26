@@ -112,19 +112,28 @@ export function waveSpan(p: PowerSpec, lwl: number, length: number): number {
 }
 
 /**
+ * The share of her speed she meets the waves with, by where they come from off her bow: all of it into a head sea,
+ * `shortCrest` of it abeam (the crests are not long straight lines), and against her when she runs with them.
+ */
+export function meeting(p: PowerSpec, rel: number): number {
+  const a = Math.abs(wrapPi(rel));
+  return Math.max(Math.cos(a), p.sea.shortCrest * (1 - smoothstep((100 * Math.PI) / 180, (150 * Math.PI) / 180, a)));
+}
+
+/**
  * The g a significant wave top throws her up with at a speed, m/s: half the height she feels times the square of how
  * fast she meets the waves. `rel` is where the waves come from off her bow, radians: 0 a head sea, pi dead astern.
  */
 export function waveG(p: PowerSpec, lwl: number, sea: SeaSample, rel: number, speed: number): number {
   const k = (Math.PI * 2) / sea.length;
   const c = Math.sqrt(G / k);
-  const met = k * (c + speed * Math.cos(rel));
+  const met = k * (c + speed * meeting(p, rel));
   return (0.5 * sea.height * waveSpan(p, lwl, sea.length) * met * met) / G;
 }
 
 /**
  * The fastest she can go in a sea before a significant wave throws her clear of the water, m/s, and never more than
- * her top speed. Into it the waves come at her fast and the answer is low; across it or down it there is often no limit.
+ * her top speed. Into it the waves come at her fast and the answer is low; across it she can go faster, and down it there is often no limit.
  * @param heading compass radians
  */
 export function comfortSpeed(boat: BoatSpec, sea: SeaSample | null | undefined, heading: number): number {
@@ -138,9 +147,9 @@ export function comfortSpeed(boat: BoatSpec, sea: SeaSample | null | undefined, 
   const c = Math.sqrt(G / k);
   // The closing speed with the crests at which half the felt height, shaken at that rate, is `comfortG`.
   const closing = Math.sqrt((2 * G * p.sea.comfortG) / felt) / k;
-  const cos = Math.cos(wrapPi(sea.dir - heading));
-  if (cos > 0.05) return clamp((closing - c) / cos, 0, top);
+  const share = meeting(p, sea.dir - heading);
+  if (share > 0.05) return clamp((closing - c) / share, 0, top);
   // Running with it she has to overtake the waves that fast before they throw her.
-  if (cos < -0.05) return clamp((closing + c) / -cos, 0, top);
+  if (share < -0.05) return clamp((closing + c) / -share, 0, top);
   return top;
 }

@@ -62,6 +62,14 @@ export interface AboardContext {
   sound: Sound;
   /** Another feature, by id, for the few cases where one depends on another. */
   feature<T extends Feature>(id: string): T | undefined;
+  /**
+   * How she is moving, for anything that tows something through the water: trolling a lure, a dive float.
+   * `stwKt` is her speed through the water along her heading (negative astern), `sogKt` over the ground, `underPower`
+   * true while an engine is in gear, `power` true for a boat with no sails, `planing` 0 to 1 (always 0 for a sailing boat).
+   * `rodHolders` are the holders her model has, as named nodes (`rod_port`, `rod_stbd`, `rod_ttop_1` and so on: see
+   * `boat/buildConsole.ts`), each with its own +Y running up the rod: none on a boat that was not built with any.
+   */
+  underWay(): { stwKt: number; sogKt: number; underPower: boolean; power: boolean; planing: number; rodHolders: Array<{ name: string; node: import('three').Object3D }> };
 }
 
 /**

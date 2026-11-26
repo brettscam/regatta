@@ -1,4 +1,4 @@
-import type { BoatSpec } from '@slack-tide/sim';
+import { fitOut, type BoatFile, type BoatSpec } from '@slack-tide/sim';
 
 /** A boat file with the fields the boat picker shows. */
 export interface YardBoat extends BoatSpec {
@@ -7,7 +7,7 @@ export interface YardBoat extends BoatSpec {
   role?: string;
   /** How hard she is to sail well, in a few words, where it is worth saying. */
   difficulty?: string;
-  /** Which builder draws her: 'catamaran', or left out for a sloop. */
+  /** Which builder draws her: 'catamaran', 'console' (a centre console powerboat), or left out for a sloop. */
   model?: string;
   /** Working views of her own, by name (helm, mast, foredeck, drone), where a sloop's would look at the wrong place. */
   views?: Record<string, import('../camera/drone').ViewPreset>;
@@ -18,8 +18,12 @@ export interface YardBoat extends BoatSpec {
 
 export interface LineupEntry {
   id: string;
-  /** "ready" boats can be sailed. "yard" boats are planned and shown greyed out. */
-  status: 'ready' | 'yard';
+  /**
+   * "ready" boats can be sailed. "yard" boats are planned and shown greyed out. "power" is a powerboat ready to drive:
+   * offered in the picker like a ready boat, but left out of everything that is for sailing boats (the classes a race
+   * can be sailed in, the pace boats, the sailing lesson).
+   */
+  status: 'ready' | 'yard' | 'power';
   file?: string;
   name?: string;
   lengthFt?: number;
@@ -33,13 +37,17 @@ export const BOATS: Record<string, YardBoat> = {};
 let lineup: LineupEntry[] | null = null;
 for (const [path, value] of Object.entries(files)) {
   if (path.endsWith('lineup.json')) lineup = value as LineupEntry[];
-  else if ((value as Partial<BoatSpec>).polar) BOATS[(value as BoatSpec).id] = value as YardBoat;
+  // A boat file has a polar, or, with no rig at all, a power block. The second kind is completed with bare poles.
+  else if ((value as Partial<BoatSpec>).polar || (value as Partial<BoatSpec>).power) BOATS[(value as BoatFile).id] = fitOut(value as BoatFile) as YardBoat;
 }
 
 /** The picker's list, in order. A boat listed as ready whose file is missing is shown as still in the yard. */
 export const LINEUP: LineupEntry[] = (lineup ?? Object.keys(BOATS).map((id) => ({ id, status: 'ready' as const }))).map((e) =>
-  e.status === 'ready' && !BOATS[e.id] ? { ...e, status: 'yard' as const } : e,
+  e.status !== 'yard' && !BOATS[e.id] ? { ...e, status: 'yard' as const } : e,
 );
+
+/** True for a boat the player can take out: a sailing boat that is ready, or a powerboat. */
+export const afloat = (e: LineupEntry): boolean => e.status === 'ready' || e.status === 'power';
 
 export const DEFAULT_BOAT = BOATS.sloop38 ? 'sloop38' : Object.keys(BOATS)[0];
 

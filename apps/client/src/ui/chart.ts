@@ -47,7 +47,12 @@ export interface ChartHost {
   traffic?: () => TrafficVessel[];
   /** Hazards, traffic lanes, refuges and lights, on a water that has them. */
   features?: CourseFeatures;
+  /** True for a boat with no sails: her legs are told by where the wind is, not as a beat, a reach or a run. */
+  underPower?: () => boolean;
 }
+
+/** A leg's wind in a powerboat skipper's words. */
+const WIND_ON: Record<string, string> = { beat: 'ahead', reach: 'abeam', run: 'astern' };
 
 interface View {
   cx: number;
@@ -1130,7 +1135,7 @@ export class Chart {
       return `<tr class="${done ? 'done' : i === st.nextIndex ? 'next' : ''}">
         <td>${i + 1}</td><td class="name">${m.name}</td>
         <td>${leg ? `${pad3(leg.bearing)}°` : ''}</td><td>${leg ? metresToNm(leg.distance).toFixed(2) : ''}</td>
-        <td>${leg ? `${leg.twsKt.toFixed(0)} kt ${leg.sail}` : ''}</td><td>${stream}</td>
+        <td>${leg ? `${leg.twsKt.toFixed(0)} kt ${this.host.underPower?.() ? WIND_ON[leg.sail] ?? '' : leg.sail}` : ''}</td><td>${stream}</td>
         <td>${leg ? leg.sogKt.toFixed(1) : ''}</td><td>${m.plannedEta !== null ? this.clock(m.plannedEta) : ''}</td><td>${actual}</td></tr>`;
     }).join('');
 
@@ -1192,7 +1197,7 @@ export class Chart {
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
       ${traffic}
-      <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
+      <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. ${this.host.underPower?.() ? 'Plan times are at her cruising speed with the forecast tidal stream: the sea may not let her make it' : "Plan times use the boat's polar with the forecast wind and tidal stream"}.</p>
       <p class="source">Wind and gusts: ${windSource(this.course)}. Stream and tide: NOAA ${/NOAA ([\w-]+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }

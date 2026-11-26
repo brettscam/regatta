@@ -13,6 +13,8 @@ const SITE = 'bajaregatta.com';
 /** New to the game: the first couple of sails. */
 const novice = (s: Snap): boolean => s.sails <= 2 && s.hours < 1.5;
 const sailing = (s: Snap): boolean => s.hold === 'none' && !s.tender && !s.aground;
+/** Under way in a boat that has sails: the tips about sails, tacking and racing are for her only. */
+const underSail = (s: Snap): boolean => sailing(s) && !s.power;
 const other = (s: Snap): string => s.boatName || 'Another boat';
 /** The tender she carries, as the skipper would call it: the skiff is the dinghy. */
 const dinghy = (s: Snap): string => (s.tenderName === 'Skiff' ? 'dinghy' : s.tenderName.toLowerCase());
@@ -22,14 +24,20 @@ export const TIPS: Tip[] = [
   {
     id: 'welcome-steer', icon: 'helm', title: 'Welcome aboard', keys: ['A', 'D'], series: true, priority: 99, max: 1,
     text: 'The crew is steering for now. Press A or D and the wheel is yours: A turns her left, D turns her right.',
-    when: (s) => novice(s) && !s.lesson && s.t >= 6 && sailing(s),
+    when: (s) => novice(s) && !s.lesson && s.t >= 6 && underSail(s),
     done: ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'], doneWhen: (s) => s.hand,
   },
   {
     id: 'welcome-trim', icon: 'sail', title: 'Set the sails', keys: ['W', 'S', 'Q', 'E'], series: true, priority: 98, max: 1,
     text: 'W pulls the mainsail in and S lets it out. Q and E do the same for the jib, the front sail. If a sail flutters, pull it in until it just stops.',
-    when: (s) => novice(s) && !s.lesson && s.t >= 45 && sailing(s),
+    when: (s) => novice(s) && !s.lesson && s.t >= 45 && underSail(s),
     done: ['KeyW', 'KeyS', 'KeyQ', 'KeyE'],
+  },
+  {
+    id: 'welcome-power', icon: 'engine', title: 'Welcome aboard', keys: ['.', ',', 'A', 'D'], series: true, priority: 99, max: 2,
+    text: 'No sails on this one. The full stop key opens the throttle a step and the comma key closes it: hold either. A and D turn the wheel. In a sea, the comma key is the one that looks after her.',
+    when: (s) => s.power && s.sails <= 3 && s.t >= 14 && sailing(s),
+    done: ['Period'],
   },
   {
     id: 'welcome-keys', icon: 'keys', title: 'Every key, when you want it', keys: ['/', 'B'], series: true, priority: 97, max: 1,
@@ -74,13 +82,13 @@ export const TIPS: Tip[] = [
   {
     id: 'race-offer', icon: 'flag', title: 'A race has been called', keys: ['R'], priority: 80, cooldown: 600, max: 3,
     text: 'Press R to see it and join. If you are far away, joining tows you to the start.',
-    when: (s) => s.raceOffered && !s.racing && sailing(s),
+    when: (s) => s.raceOffered && !s.racing && underSail(s),
     done: ['KeyR'],
   },
   {
     id: 'race-call', icon: 'flag', title: 'Race them', keys: ['R'], priority: 55, hold: 90,
     text: 'Press R to call a race now, or fix one for later and send your friends the link.',
-    when: (s) => s.company > 0 && !s.racing && !s.raceOffered && sailing(s),
+    when: (s) => s.company > 0 && !s.racing && !s.raceOffered && underSail(s),
     done: ['KeyR'],
   },
   {
@@ -111,7 +119,7 @@ export const TIPS: Tip[] = [
   {
     id: 'engine', icon: 'engine', title: 'Going nowhere', keys: ['I', '.', ','], priority: 75, cooldown: 1800,
     text: 'Press I to start the engine, then the full stop key to put her ahead. The comma key throttles back. It is not allowed in a race.',
-    when: (s) => s.hasEngine && !s.engine && !s.racing && sailing(s) && s.stuck > 50,
+    when: (s) => s.hasEngine && !s.engine && !s.racing && underSail(s) && s.stuck > 50,
     done: ['KeyI'], doneWhen: (s) => s.engine,
   },
   {
@@ -129,14 +137,16 @@ export const TIPS: Tip[] = [
   },
   {
     id: 'pilot', icon: 'helm', title: 'A long way to go', keys: ['P'], priority: 30, hold: 30,
-    text: 'P switches the autopilot on: she steers herself and the crew trims the sails. Shift and P chooses what it follows: a heading, the wind, or your route.',
+    text: (s) => (s.power
+      ? 'P switches the autopilot on: it steers for your next mark and the throttle stays yours. Shift and P has it hold a heading instead.'
+      : 'P switches the autopilot on: she steers herself and the crew trims the sails. Shift and P chooses what it follows: a heading, the wind, or your route.'),
     when: (s) => s.hand && !s.racing && sailing(s) && s.t > 420 && s.mark !== null && s.mark.d > 2500,
     done: ['KeyP'],
   },
   {
     id: 'chart', icon: 'chart', title: 'The mark is upwind', keys: ['M'], priority: 40, hold: 20,
     text: 'She cannot sail straight at it, so it will take some tacks. Press M for the chart: your route, the tide and the forecast are all there.',
-    when: (s) => sailing(s) && s.t > 120 && s.mark !== null && s.mark.upwind && s.mark.d > 1500,
+    when: (s) => underSail(s) && s.t > 120 && s.mark !== null && s.mark.upwind && s.mark.d > 1500,
     done: ['KeyM'],
   },
   {
@@ -148,7 +158,7 @@ export const TIPS: Tip[] = [
   {
     id: 'flow', icon: 'wind', title: 'See the wind', keys: ['F'], priority: 35, hold: 20,
     text: 'Press F for the wind tunnel view: lines of smoke show the air over your sails, and whether they are set right.',
-    when: (s) => sailing(s) && !s.engine && ((s.mistrim && s.t > 60) || (novice(s) && s.t > 300)),
+    when: (s) => underSail(s) && !s.engine && ((s.mistrim && s.t > 60) || (novice(s) && s.t > 300)),
     done: ['KeyF'],
   },
 

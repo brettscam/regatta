@@ -5,6 +5,8 @@ export type PilotMode = 'heading' | 'wind' | 'route';
 
 const MODE_NAME: Record<PilotMode, string> = { heading: 'heading', wind: 'wind angle', route: 'route' };
 const ORDER: PilotMode[] = ['heading', 'wind', 'route'];
+/** The same for a boat with no sails. */
+const POWER_ORDER: PilotMode[] = ['heading', 'route'];
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const deg3 = (rad: number) => String(Math.round(((rad * R2D) % 360 + 360) % 360) % 360).padStart(3, '0');
 
@@ -42,6 +44,8 @@ export class Pilot {
   private lastT = 0;
 
   constructor(private readonly sim: Sim, private readonly passage: Passage, private readonly hooks: PilotHooks) {
+    // With no sails there is no wind angle to hold. She is steered for her next mark, or on a heading when she has none.
+    if (sim.boat.power) this.mode = 'route';
     this.turns = sim.state.routeTurns;
     this.trips = sim.state.pilotTrips;
     this.wasEngaged = this.engaged;
@@ -77,6 +81,19 @@ export class Pilot {
     return this.sim.state.helmMode !== 'hand';
   }
 
+  /**
+   * True aboard a boat with no sails (`boat.power`). Her pilot has one level, because there is nothing for a crew to
+   * trim, and two things it can hold, a heading or a route: a wind angle means nothing to her.
+   */
+  private get sailless(): boolean {
+    return !!this.sim.boat.power;
+  }
+
+  /** What the pilot can hold in this boat, in the order Shift+P steps through them. */
+  private get order(): PilotMode[] {
+    return this.sailless ? POWER_ORDER : ORDER;
+  }
+
   private nextMark() {
     return this.passage.marks[this.passage.nextIndex] ?? null;
   }
@@ -96,7 +113,7 @@ export class Pilot {
     if (this.heldFast()) return;
     if (!this.engaged) {
       this.engage(this.mode, true, 'partial');
-    } else if (this.level === 'partial' && this.fullAllowed(true)) {
+    } else if (!this.sailless && this.level === 'partial' && this.fullAllowed(true)) {
       this.sim.setCrewTrim(true);
       const left = this.fullLeft();
       this.hooks.say(`Full pilot: ${this.describe()}, and the crew has the sheets${left !== null ? `. ${clock(left)} of full pilot left this race` : ''}`);
@@ -105,20 +122,22 @@ export class Pilot {
       this.sim.setControl('rudder', this.sim.state.rudder);
       this.sim.setCrewTrim(false);
       this.wasEngaged = false;
-      this.hooks.say('Pilot off. You have the helm and the sheets');
+      this.hooks.say(this.sailless ? 'Pilot off. You have the helm' : 'Pilot off. You have the helm and the sheets');
     }
   }
 
   /** Step to the next thing the pilot can hold. If it is steering, it changes over at once. */
   cycle(): void {
     if (this.heldFast()) return;
-    this.mode = ORDER[(ORDER.indexOf(this.mode) + 1) % ORDER.length];
+    const order = this.order;
+    this.mode = order[(order.indexOf(this.mode) + 1) % order.length];
     if (this.engaged) this.engage(this.mode, true);
     else this.hooks.say(`Pilot set to hold ${MODE_NAME[this.mode]}. P engages it`);
   }
 
   private engage(mode: PilotMode, speak: boolean, level: PilotLevel = this.level ?? 'partial'): void {
     const sim = this.sim;
+    if (this.sailless && mode === 'wind') mode = 'heading';
     const full = level === 'full' && this.fullAllowed(false);
     if (mode === 'route') {
       const next = this.nextMark();
@@ -137,7 +156,7 @@ export class Pilot {
     this.mode = mode;
     sim.setCrewTrim(full);
     this.wasEngaged = true;
-    if (speak) this.hooks.say(full ? `Full pilot: ${this.describe()}, and the crew has the sheets` : `Pilot steering: ${this.describe()}. The sheets are yours; P again and the crew trims too`);
+    if (speak) this.hooks.say(this.sailless ? `Pilot steering: ${this.describe()}. The throttle is yours` : full ? `Full pilot: ${this.describe()}, and the crew has the sheets` : `Pilot steering: ${this.describe()}. The sheets are yours; P again and the crew trims too`);
   }
 
   /** The player has picked up a sheet, so the crew leaves the trimming alone. */
@@ -191,7 +210,8 @@ export class Pilot {
   /** The big figure on the pilot's screen. */
   label(): string {
     const s = this.sim.state;
-    const mode = this.engaged && !s.maneuver ? (s.helmMode as PilotMode) : this.mode;
+    let mode = this.engaged && !s.maneuver ? (s.helmMode as PilotMode) : this.mode;
+    if (this.sailless && mode === 'wind') mode = 'heading';
     if (mode === 'heading') return `${deg3(this.engaged ? s.helmTarget : s.heading)}°`;
     if (mode === 'wind') {
       const a = this.engaged && s.helmMode === 'wind' ? s.helmTarget : this.sim.out.twa;
@@ -208,11 +228,15 @@ export class Pilot {
 
   /** For the tag at the pointer. */
   tag(): string {
-    return this.engaged ? this.describe() : `standby, set to ${MODE_NAME[this.mode]}`;
+    return this.engaged ? this.describe() : `standby, set to ${MODE_NAME[this.sailless && this.mode === 'wind' ? 'heading' : this.mode]}`;
   }
 
   /** One line for the instrument readout. */
   line(): string {
+    if (this.sailless) {
+      const set = this.mode === 'wind' ? 'heading' : this.mode;
+      return this.engaged ? `Pilot steering <b class="on">${this.describe()}</b> · the throttle is yours` : `Helm <b>in hand</b> · pilot set to ${MODE_NAME[set]}`;
+    }
     const crew = this.sim.state.crewTrim ? 'crew trimming' : 'you trim';
     if (!this.engaged) return `Helm <b>in hand</b> · ${crew} · pilot set to ${MODE_NAME[this.mode]}`;
     const left = this.fullLeft();

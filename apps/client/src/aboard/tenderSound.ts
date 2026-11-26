@@ -31,8 +31,9 @@ export class TenderSound {
    * @param revs 0 idling to 1 flat out. Below 0 the engine is stopped
    * @param load 0 out of gear or in the air, 1 pushing hard
    * @param near 1 aboard her, falling to 0 out of earshot
+   * @param big true for a big outboard on a boat of her own, not a tender's: the same engine note, lower and fuller
    */
-  update(kind: Kind, revs: number, load: number, near = 1): void {
+  update(kind: Kind, revs: number, load: number, near = 1, big = false): void {
     const out = this.sound.output();
     if (!out) return;
     const running = kind !== 'none' && revs >= 0 && near > 0.01;
@@ -63,7 +64,7 @@ export class TenderSound {
       v.gain.gain.setTargetAtTime(running ? near * (0.022 + 0.17 * r * r + 0.05 * l) : 0, now, running ? 0.1 : 0.3);
     } else {
       // A small two-stroke: a buzz at the firing rate that burbles at idle and smooths out as it revs.
-      const f = 27 + 165 * r;
+      const f = (27 + 165 * r) * (big ? 0.7 : 1);
       v.low.frequency.setTargetAtTime(f, now, 0.1);
       v.high.frequency.setTargetAtTime(f * 2.01, now, 0.1);
       v.highGain.gain.setTargetAtTime(0.4, now, 0.1);
@@ -72,7 +73,7 @@ export class TenderSound {
       v.beatDepth.gain.setTargetAtTime(Math.max(0.08, 0.5 - 0.5 * r), now, 0.2);
       v.hissTone.frequency.setTargetAtTime(500 + 900 * r, now, 0.15);
       v.hiss.gain.setTargetAtTime(running ? 0.2 + 0.5 * l : 0, now, 0.15);
-      v.gain.gain.setTargetAtTime(running ? near * (0.03 + 0.15 * r * r + 0.04 * l) : 0, now, running ? 0.12 : 0.3);
+      v.gain.gain.setTargetAtTime(running ? near * (big ? 1.5 : 1) * (0.03 + 0.15 * r * r + 0.04 * l) : 0, now, running ? 0.12 : 0.3);
     }
   }
 

@@ -65,6 +65,7 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['I'], name: 'Engine', since: 'v21', what: 'Start it or stop it. It takes a second or two to fire, and starts out of gear.' },
     { keys: ['.'], name: 'Throttle up', since: 'v21', what: 'One step at a time: ahead slow, half, cruise, full. From astern it comes back through neutral.' },
     { keys: [','], name: 'Throttle down', since: 'v21', what: 'One step back: down to neutral, then astern slow and astern full. Astern is weak, and she steers badly backwards.' },
+    { keys: ['.', ','], name: 'A powerboat\'s throttle', what: 'The centre console has no sails: the same two keys work a lever with sixteen positions ahead, from idling in gear to wide open, and hold to run it up or down. It stops in neutral on the way through. A and D turn the wheel, and with it the outboard: out of gear she hardly steers. In a sea the comma key is the one that looks after her.' },
   ] },
   { id: 'help', title: 'Time, and getting unstuck', rows: [
     { keys: ['U'], name: 'Tow', since: 'v10', what: 'Run aground? This tows you back to deep water.' },
@@ -91,7 +92,7 @@ export function isNewSince(since: string | undefined, seen: string, ids: readonl
 }
 
 /** What the player is doing, as far as the strip of main keys is concerned. */
-export type StripContext = 'sailing' | 'racing' | 'held' | 'tender';
+export type StripContext = 'sailing' | 'racing' | 'held' | 'tender' | 'driving';
 
 /** The handful of keys that matter most in each situation: the caps, then a word or two. */
 export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
@@ -122,6 +123,15 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['I'], 'engine'],
     [['B'], 'all keys'],
   ],
+  driving: [
+    [['.', ','], 'throttle up, down'],
+    [['A', 'D'], 'steer'],
+    [['I'], 'engine'],
+    [['P'], 'autopilot'],
+    [['M'], 'chart'],
+    [['X'], 'stop here'],
+    [['B'], 'all keys'],
+  ],
   tender: [
     [['W', 'S'], 'ahead, back'],
     [['Shift'], 'flat out'],
@@ -132,6 +142,6 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
 };
 
 /** Which strip to show. The kayak comes first: while she is out, the yacht's keys are not hers. */
-export function stripContext(c: { away: boolean; racing: boolean; held: boolean }): StripContext {
-  return c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : 'sailing';
+export function stripContext(c: { away: boolean; racing: boolean; held: boolean; power?: boolean }): StripContext {
+  return c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : c.power ? 'driving' : 'sailing';
 }

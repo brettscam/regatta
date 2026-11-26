@@ -1,4 +1,4 @@
-import type { SimOutputs, SimState } from '@slack-tide/sim';
+import { rangeNm, type SimOutputs, type SimState } from '@slack-tide/sim';
 
 const R2D = 180 / Math.PI;
 const KT = 0.514444;
@@ -42,6 +42,9 @@ export class Hud {
   private readonly tag = document.getElementById('tag')!;
   private readonly fps = document.getElementById('fps')!;
   private readonly cells = new Map<string, HTMLElement>();
+  /** Each cell's caption and unit, so the three wind cells can become a powerboat's: revs, fuel and range. */
+  private readonly captions = new Map<string, { k: HTMLElement; unit: HTMLElement; label: string; unitText: string }>();
+  private power = false;
   private readonly needles: Record<string, SVGGElement> = {};
   private readonly tideLine: HTMLElement;
   private readonly pilotLine: HTMLElement;
@@ -86,6 +89,7 @@ export class Hud {
       cell.innerHTML = `<span class="k">${label}</span><span class="v"><span></span><small>${unit}</small></span>`;
       cells.appendChild(cell);
       this.cells.set(key, cell.querySelector('.v > span') as HTMLElement);
+      this.captions.set(key, { k: cell.querySelector('.k') as HTMLElement, unit: cell.querySelector('small') as HTMLElement, label, unitText: unit });
     }
     this.readout.addEventListener('click', () => this.toggleReadout());
 
@@ -93,6 +97,21 @@ export class Hud {
     this.clockTime = this.clock.querySelector('.time') as HTMLElement;
     this.clockSub = this.clock.querySelector('.sub') as HTMLElement;
     this.bindClock();
+  }
+
+  /**
+   * Fit the readout to the boat. A powerboat (anything given here) reads revs, fuel and the range that fuel gives at
+   * this moment's speed and burn, where a sailing boat reads the apparent and true wind. The wind is still on the dial
+   * and in the line under it. Null puts the sailing cells back.
+   */
+  setPower(info: { tankL: number; topRpm: number } | null): void {
+    this.power = info !== null;
+    const swap: Record<string, [string, string]> = { awa: ['Revs', 'rpm'], aws: ['Fuel', 'L'], tws: ['Range', 'nm'] };
+    for (const [key, c] of this.captions) {
+      const to = this.power && swap[key] ? swap[key] : [c.label, c.unitText];
+      c.k.textContent = to[0];
+      c.unit.textContent = to[1];
+    }
   }
 
   toggleReadout(): void {
@@ -183,10 +202,17 @@ export class Hud {
       this.tideLine.innerHTML = line;
       this.tideLine.dataset.html = line;
     }
-    const awa = Math.round(Math.abs(out.awa) * R2D);
-    this.set('awa', `${awa}° ${out.awa >= 0 ? 'S' : 'P'}`);
-    this.set('aws', (out.aws / KT).toFixed(0));
-    this.set('tws', (out.tws / KT).toFixed(0));
+    if (this.power) {
+      const range = rangeNm(out.fuel, out.sog / KT, out.burnLph);
+      this.set('awa', String(Math.round(out.engineRpm / 50) * 50));
+      this.set('aws', out.fuel.toFixed(0));
+      this.set('tws', range > 0 ? String(Math.min(999, Math.round(range))) : '—');
+    } else {
+      const awa = Math.round(Math.abs(out.awa) * R2D);
+      this.set('awa', `${awa}° ${out.awa >= 0 ? 'S' : 'P'}`);
+      this.set('aws', (out.aws / KT).toFixed(0));
+      this.set('tws', (out.tws / KT).toFixed(0));
+    }
 
     const time = shipTime.toLocaleTimeString('en-GB', { timeZone, hour12: false });
     if (this.clockTime.textContent !== time) this.clockTime.textContent = time;

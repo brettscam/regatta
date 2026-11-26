@@ -58,6 +58,7 @@
     "sea": {
       "spanFrom": 0.8,
       "spanFull": 3.2,
+      "shortCrest": 0.55,
       "waveLow": 0.65,
       "waveHigh": 1.25,
       "comfortG": 1.0,
