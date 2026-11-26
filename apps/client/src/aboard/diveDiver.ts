@@ -64,7 +64,7 @@ export class DiverModel {
     const mat = (colour: number, roughness = 0.6, extra: THREE.MeshStandardMaterialParameters = {}) => { const m = new THREE.MeshStandardMaterial({ color: colour, roughness, ...extra }); this.mats.push(m); return m; };
 
     // Long freediving fins: a foot pocket and a blade three times its length, a bright tip.
-    const finMat = mat(0x1c2a3a, 0.5, { side: THREE.DoubleSide });
+    const finMat = mat(0x2b4256, 0.45, { side: THREE.DoubleSide });
     const tipMat = mat(0x2a9fd6, 0.5, { side: THREE.DoubleSide });
     for (let i = 0; i < 2; i++) {
       const root = new THREE.Group();
@@ -72,12 +72,26 @@ export class DiverModel {
       const pocket = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.16, 3, 8), finMat);
       pocket.rotation.x = Math.PI / 2;
       pocket.position.z = 0.04;
-      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.62, 1, 4), finMat);
-      sheet.rotation.x = -Math.PI / 2;
-      sheet.position.z = 0.42;
-      const tip = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.1), tipMat);
-      tip.rotation.x = -Math.PI / 2;
-      tip.position.z = 0.78;
+      // The blade: narrow at the foot, widening, with a rounded, bright tip, and ribs along its edges.
+      const outline = new THREE.Shape();
+      outline.moveTo(-0.05, 0.1);
+      outline.lineTo(-0.095, 0.5);
+      outline.quadraticCurveTo(-0.1, 0.76, 0, 0.8);
+      outline.quadraticCurveTo(0.1, 0.76, 0.095, 0.5);
+      outline.lineTo(0.05, 0.1);
+      outline.lineTo(-0.05, 0.1);
+      const bladeGeo = new THREE.ShapeGeometry(outline, 6);
+      bladeGeo.rotateX(Math.PI / 2);
+      const sheet = new THREE.Mesh(bladeGeo, finMat);
+      const tipShape = new THREE.Shape();
+      tipShape.moveTo(-0.098, 0.66);
+      tipShape.quadraticCurveTo(-0.1, 0.76, 0, 0.8);
+      tipShape.quadraticCurveTo(0.1, 0.76, 0.098, 0.66);
+      tipShape.lineTo(-0.098, 0.66);
+      const tipGeo = new THREE.ShapeGeometry(tipShape, 6);
+      tipGeo.rotateX(Math.PI / 2);
+      tipGeo.translate(0, 0.003, 0);
+      const tip = new THREE.Mesh(tipGeo, tipMat);
       blade.add(sheet, tip);
       root.add(pocket, blade);
       this.fins.push({ root, blade });

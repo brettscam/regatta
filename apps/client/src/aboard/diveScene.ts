@@ -22,7 +22,7 @@ export const RADIUS = 46;
 const PATTERNS: Record<string, number> = {
   plain: 0, sheephead: 1, yellowtail: 2, mottled: 3, stripes: 4, spotted: 5, sand: 6, parrot: 7, 'sheephead-f': 8, 'garibaldi-young': 9, bonito: 10, barred: 11,
   whitefish: 12, halfmoon: 13, wrasse: 14, hogfish: 15, mutton: 16, tarpon: 17, mola: 18, senorita: 19, opaleye: 20, seabass: 21, leopard: 22, blueshark: 23,
-  sealion: 24, barjack: 25, barracuda: 26,
+  sealion: 24, barjack: 25, barracuda: 26, silver: 27,
 };
 /** The pattern a fish wears: its species', or a young one's or a big male's own. */
 export function patternOf(f: Pick<Fish, 'species' | 'young' | 'male'>): number {
@@ -202,7 +202,7 @@ const LIGHTING = /* glsl */ `
     float a = sin(q.x * 2.1 + t) * sin(q.y * 2.3 - t * 1.2);
     q = p * 1.7 + vec2(cos(p.y * 0.9 - t * 0.5), sin(p.x * 1.2 + t * 0.7));
     a += sin(q.x * 1.9 - t * 1.1) * sin(q.y * 2.2 + t * 0.9);
-    return pow(clamp(1.0 - abs(a) * 0.9, 0.0, 1.0), 6.0);
+    return pow(clamp(1.0 - abs(a) * 0.9, 0.0, 1.0), 8.0);
   }
   // What grows on rock: pink and purple coralline crust, patches of orange and strawberry anemone, a green turf in
   // the shallows. Over coral: yellow and lavender sponge and a brown turf.
@@ -240,7 +240,7 @@ const LIGHTING = /* glsl */ `
     float nl = 0.5 + 0.5 * max(dot(n, uSun), 0.0);
     // The dancing light of the surface reaches the shallows and is gone by about ten metres.
     float ca = caustic(world.xz, uTime) * (1.0 - smoothstep(1.0, 11.0, depth)) * uCaustic * max(n.y, 0.0);
-    vec3 lit = albedo * sun * (nl + ca * 1.6 + glow);
+    vec3 lit = albedo * sun * (nl + ca * 0.7 + glow);
     // The dive light is white and close: it gives the colours back, for a few metres.
     vec3 ray = normalize(world - cameraPosition);
     float cone = smoothstep(0.8, 0.96, dot(ray, uLook));
@@ -405,6 +405,10 @@ const fragment = /* glsl */ `
         // Great barracuda: dark bars along the back, scattered black blotches low on the side.
         if (y > 0.0) c *= 0.55 + 0.45 * smoothstep(-0.3, 0.3, sin(z * 22.0));
         if (y < -0.1 && hash3(floor(vec3(z * 14.0, y * 8.0, 0.0))) > 0.8) c = vec3(0.06);
+      } else if (mark == 27) {
+        // Bait: a dark blue-green back, and flanks of bright silver that flash as the school turns.
+        c = mix(vec3(0.86, 0.9, 0.93), c * 0.7, smoothstep(-0.02, 0.12, y));
+        glow += 0.6 * smoothstep(0.1, -0.1, y);
       }
       // An eye, which is most of what makes a fish a fish.
       float eye = length(vec2(z - uForm.y, vBody.y - uForm.z));
