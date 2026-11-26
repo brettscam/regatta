@@ -162,7 +162,8 @@ function resortIsland(m: Massing, s: Structure, lights: Light[], seed: number): 
     }
     m.solid({ x: tx, y: ty, base: top, w: w * 0.5, h: tall + 3, turn, color: WHITE, win: WIN.floodlit, sides: 8 });
     const g = glow[(seed + k) % glow.length];
-    lights.push({ p: [tx, ty, top + tall * 0.45], a: g, b: g, shape: SHAPE.glow, size: w * 2.6, min: 6 });
+    // Coloured floodlights up its height: each tower its own colour after dark.
+    for (const f of [0.15, 0.4, 0.65, 0.88]) lights.push({ p: [tx, ty, top + tall * f], a: g, b: g, shape: SHAPE.glow, size: w * 2.2, min: 5 });
     lights.push({ p: [tx, ty, top + tall + 4], a: RED, b: RED, shape: SHAPE.glow, size: 2, min: 3 });
   }
   // The waterfall: a stepped concrete face with white water down it, on the side toward the city.
@@ -241,13 +242,17 @@ function platform(m: Massing, s: Structure, lights: Light[], seed: number, all: 
   // Decks. Each is a slab with a darker edge and a rail of lamps.
   for (const [z, grow] of [[cellar, 0.98], [deck, 1.06]] as const) {
     box(0, 0, z - 1.2, w * grow, d * grow, 1.2, GREY.clone().multiplyScalar(0.7));
-    for (const sgn of [-1, 1]) {
-      const n = 5;
-      for (let k = 0; k <= n; k++) {
-        const u = (-0.5 + k / n) * w * grow;
-        const q = P(u, sgn * d * grow * 0.5, z + 1.6);
-        m.solid({ x: q[0], y: q[1], base: z + 1.4, w: 0.6, h: 0.5, color: z === deck ? COOL : WARM, win: WIN.lamp });
-        lights.push({ p: q, a: z === deck ? COOL : WARM, b: WARM, shape: SHAPE.glow, size: 2.2, min: 2.4 });
+    // Work lights all round both decks: a platform is lit like a small town, all night.
+    const n = 7;
+    for (let k = 0; k <= n; k++) {
+      for (const sgn of [-1, 1]) {
+        const q = P((-0.5 + k / n) * w * grow, sgn * d * grow * 0.5, z + 1.6);
+        m.solid({ x: q[0], y: q[1], base: z + 1.4, w: 0.9, h: 0.7, color: z === deck ? COOL : WARM, win: WIN.lamp });
+        lights.push({ p: q, a: z === deck ? COOL : WARM, b: WARM, shape: SHAPE.glow, size: 4.5, min: 3.6 });
+      }
+      if (k > 0 && k < n && k % 2 === 0) for (const sgn of [-1, 1]) {
+        const q = P(sgn * w * grow * 0.5, (-0.5 + k / n) * d * grow, z + 1.6);
+        lights.push({ p: q, a: WARM, b: WARM, shape: SHAPE.glow, size: 4.5, min: 3.6 });
       }
     }
   }
@@ -260,6 +265,7 @@ function platform(m: Massing, s: Structure, lights: Light[], seed: number, all: 
   // On the main deck: quarters at one end with the helideck over them, modules along the middle.
   const q0 = -w * 0.34;
   box(q0, 0, deck, w * 0.26, d * 0.72, 11, WHITE, WIN.grid);
+  for (const dv of [-0.3, 0, 0.3]) lights.push({ p: P(q0 - w * 0.14, d * dv, deck + 6), a: WARM, b: WARM, shape: SHAPE.glow, size: 7, min: 3.4 });
   box(q0, 0, deck + 11, w * 0.2, d * 0.5, 3, WHITE, WIN.ribbon);
   {
     // The helideck: an eight-sided pad out over the corner, green with a pale ring.
@@ -303,7 +309,9 @@ function platform(m: Massing, s: Structure, lights: Light[], seed: number, all: 
     box(du, dv, base + tall, 3.4, 3.4, 2.4, RED.clone().multiplyScalar(0.7));
     top = base + tall + 3;
     lights.push({ p: P(du, dv, top), a: RED, b: RED, shape: SHAPE.glow, size: 3, min: 4.5 });
-    for (const f of [0.3, 0.62]) lights.push({ p: P(du, dv, base + tall * f), a: COOL, b: COOL, shape: SHAPE.glow, size: 5, min: 3 });
+    // Lamps up all four legs of the derrick: the tallest lit thing for miles.
+    for (const f of [0.12, 0.3, 0.48, 0.66, 0.84]) for (let k = 0; k < 4; k += 2) lights.push({ p: corner(k, base + tall * f), a: COOL, b: COOL, shape: SHAPE.glow, size: 3.6, min: 3.2 });
+    lights.push({ p: P(du, dv, deck + 4), a: WARM, b: WARM, shape: SHAPE.glow, size: 16, min: 5 });
   } else {
     // A processing platform: tall vessels and a vent stack where the derrick would be.
     for (let k = 0; k < 3; k++) {
@@ -334,8 +342,8 @@ function platform(m: Massing, s: Structure, lights: Light[], seed: number, all: 
     m.beam(P(w * 0.5, -d * 0.1, deck + 9), tip, 0.4, 0.4, GREY);
     m.beam(P(w * 0.5, -d * 0.1, deck), P(w * 0.5, -d * 0.1, deck + 9), 0.8, 0.8, GREY);
     const flame = C(1, 0.55, 0.12);
-    m.solid({ x: tip[0], y: tip[1], base: tip[2], w: 2.4, h: 5, sides: 6, top: 0.1, color: flame, win: WIN.lamp });
-    lights.push({ p: [tip[0], tip[1], tip[2] + 2.5], a: flame, b: flame, shape: SHAPE.glow, size: 14, min: 7 });
+    m.solid({ x: tip[0], y: tip[1], base: tip[2], w: 3, h: 7, sides: 6, top: 0.1, color: flame, win: WIN.lamp });
+    lights.push({ p: [tip[0], tip[1], tip[2] + 3.5], a: flame, b: flame, shape: SHAPE.glow, size: 26, min: 10 });
   }
   // The boat landing: a grating at the waterline on the lee side, fendered, and the sea lions that have taken it over.
   {
@@ -355,7 +363,9 @@ function platform(m: Massing, s: Structure, lights: Light[], seed: number, all: 
     lights.push({ p: P(0, d * 0.5 + 4, 3.4), a: WARM, b: WARM, shape: SHAPE.glow, size: 1.6, min: 2.4 });
   }
   // The whole of her, seen from miles off: one loom of light.
-  lights.push({ p: P(0, 0, deck + 8), a: WARM, b: WARM, shape: SHAPE.glow, size: 46, min: 9 });
+  lights.push({ p: P(0, 0, deck + 8), a: WARM, b: WARM, shape: SHAPE.glow, size: 70, min: 12 });
+  // The sea under her is lit too: lamps under the cellar deck, shining down through the jacket.
+  for (const c of [cols[0], cols[3]]) for (const r of rows) lights.push({ p: leg(c, r, cellar - 2), a: WARM, b: WARM, shape: SHAPE.glow, size: 6, min: 3.4 });
 
   // A footbridge to her neighbour.
   const other = all.find((o) => o.id === s.bridgeTo);

@@ -41,6 +41,9 @@ function casino(m: Massing, lights: Light[], terrace: number): void {
   m.lathe(x, y, terrace + 21.3, [[r - 0.4, 0], [r - 0.4, 6.4]], 32, C(0.8, 0.76, 0.68), WIN.fins);
   m.lathe(x, y, terrace + 27.7, [[r + 2.2, 0], [r + 1.2, 1.1], [r * 0.46, 8.2], [5, 10.2], [3.2, 12.6], [0.3, 14.6]], 32, TILE_RED);
   m.beam([x, y, terrace + 42], [x, y, terrace + 49], 0.3, 0.3, WHITE);
+  // The flag on its staff, which like a club's burgee never draws smaller than a few pixels: with the white drum under
+  // it, that is what picks the Casino out from two miles off.
+  lights.push({ p: [x, y, terrace + 47.5], a: C(0.95, 0.95, 0.92), b: C(0.8, 0.16, 0.12), shape: SHAPE.flag, size: 5, min: 11 });
   lights.push({ p: [x, y, terrace + 16], a: C(1, 0.95, 0.85), b: WARM, shape: SHAPE.glow, size: 70, min: 10 });
   for (let k = 0; k < 12; k++) {
     const a = (k / 12) * Math.PI * 2;
@@ -328,9 +331,6 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
     counts.avalonTriangles = m.triangles;
     group.add(mesh);
     detail.push({ object: mesh, x: -2300, y: -22800, far: 16000 });
-    const lamps = beacons(lights, 1.6, 'avalon_lights');
-    group.add(lamps);
-    detail.push({ object: lamps, x: -2300, y: -22800, far: 26000 });
 
     // The houses stacked up the canyon and both hillsides: one instanced mesh of walls and one of roofs.
     {
@@ -373,11 +373,18 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
       }
       walls.name = 'avalon_houses';
       tops.name = 'avalon_roofs';
-      // Lamps in the windows after dark.
-      onCityNight((n) => wallMat.emissive.setRGB(0.42 * n, 0.3 * n, 0.14 * n));
+      // After dark the walls keep a faint warmth, and one house in three shows a lit window across the water.
+      onCityNight((n) => wallMat.emissive.setRGB(0.11 * n, 0.08 * n, 0.04 * n));
+      spots.forEach((b, i) => {
+        if (i % 3 === 0) lights.push({ p: [b.x, b.y, b.z + b.h * 0.7], a: WARM, b: WARM, shape: SHAPE.glow, size: 1.5, min: 2 });
+      });
       counts.avalonHouses = spots.length;
       triangles += spots.length * 24;
     }
+    // Every lamp in the town, the Casino's and the houses' among them: one set of points.
+    const lamps = beacons(lights, 1.6, 'avalon_lights');
+    group.add(lamps);
+    detail.push({ object: lamps, x: -2300, y: -22800, far: 26000 });
 
     // The mooring field: rows across the whole bay, bows to the north-east, with a fairway left down the middle to the pier.
     {

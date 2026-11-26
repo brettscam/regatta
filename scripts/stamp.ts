@@ -214,11 +214,16 @@ for (const { g, start } of parts(course.terrain).slice(1)) {
   for (let j = 4; j < g.ny - 4; j++) for (let i = 4; i < g.nx - 4; i++) {
     const z = h(i, j);
     if (z < 30) continue;
-    let top = 0;
+    // The ground a few cells off, all round. One or two other spikes may stand in that ring: they are not counted.
     let sum = 0;
     let n = 0;
-    for (let d = -4; d <= 4; d++) for (const [ii, jj] of [[i + d, j - 4], [i + d, j + 4], [i - 4, j + d], [i + 4, j + d]]) { const r = h(ii, jj); top = Math.max(top, r); sum += r; n++; }
-    if (top < 15 && top < z * 0.25) fixes.push([j * g.nx + i, Math.round(Math.sqrt(sum / n / course.terrain.max) * 255)]);
+    let high = 0;
+    for (let d = -4; d <= 4; d++) for (const [ii, jj] of [[i + d, j - 4], [i + d, j + 4], [i - 4, j + d], [i + 4, j + d]]) {
+      const r = h(ii, jj);
+      if (r > z * 0.3) high++;
+      else { sum += r; n++; }
+    }
+    if (high <= 3 && n > 0 && sum / n < 25) fixes.push([j * g.nx + i, Math.round(Math.sqrt(sum / n / course.terrain.max) * 255)]);
   }
   for (const [k, v] of fixes) { terrain[start + k] = v; spikes++; }
 }

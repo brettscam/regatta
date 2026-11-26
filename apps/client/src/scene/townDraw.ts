@@ -10,7 +10,7 @@ import { inRing, type TownPlan, type TownRing } from './town';
 
 type P3 = [number, number, number];
 const C = (r: number, g: number, b: number) => new THREE.Color(r, g, b);
-const PAVING = C(0.68, 0.6, 0.48);
+const PAVING = C(0.6, 0.52, 0.41);
 const KERB = C(0.6, 0.57, 0.5);
 const WALL = C(0.55, 0.52, 0.47);
 const ASPHALT = C(0.45, 0.44, 0.43);
