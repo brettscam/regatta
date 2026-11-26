@@ -91,6 +91,12 @@ export interface RemoteBoat {
   // `aboard/tenderFleet.ts` draws it in her colour with her skipper in it.
   tender: TenderReport | null;
   tenderAt: number;
+  // ---- ashore: what she says of herself on foot (`as`), exactly as she sent it, to be read with `readAshore`
+  // (`ashore/wire.ts`), and when it was heard (ms). Her last hail and when that was heard, for the bubble over her head.
+  ashore: unknown;
+  ashoreAt: number;
+  hail: string;
+  hailAt: number;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -119,6 +125,11 @@ class Remote implements RemoteBoat {
   // ---- tender
   tender: TenderReport | null = null;
   tenderAt = 0;
+  // ---- ashore
+  ashore: unknown = null;
+  ashoreAt = 0;
+  hail = '';
+  hailAt = 0;
   /** Her sails as she sent them, a code to be read with `readSailStyle`. */
   private sl = '';
   readonly colour: string;
@@ -183,6 +194,8 @@ class Remote implements RemoteBoat {
     this.damage = readDamage(v.dm);
     this.tender = readTender(v.oc); // tender
     this.tenderAt = now;
+    this.ashore = v.as ?? null; // ashore
+    this.ashoreAt = now;
     this.raceCall = v.rc ?? null;
     this.raceEvent = v.ev ?? null;
     this.windBoost = Math.min(2, Math.max(1, num(v.wb, 1)));
@@ -195,7 +208,12 @@ class Remote implements RemoteBoat {
     if (mt !== this.hailStamp) {
       const first = this.hailStamp === -1;
       this.hailStamp = mt;
-      if (!first && mt && typeof v.msg === 'string' && v.msg.trim()) this.onHail(v.msg.slice(0, 160));
+      if (!first && mt && typeof v.msg === 'string' && v.msg.trim()) {
+        this.onHail(v.msg.slice(0, 160));
+        // ashore
+        this.hail = v.msg.slice(0, 160);
+        this.hailAt = now;
+      }
     }
   }
 

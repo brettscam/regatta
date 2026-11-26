@@ -19,6 +19,7 @@ import { Residents } from './residents';
 import { Tips } from './tips';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
+import { Ashore } from '../ashore/walk'; // ashore
 
 /**
  * Every feature in the game, in the order their hooks run. Add a line here for a new one.
@@ -31,6 +32,8 @@ export function createFeatures(ctx: AboardContext): Feature[] {
   return [
     // Local knowledge comes first only so that it can keep the kayak aboard inside a wildlife refuge. It takes O nowhere else and gives no status.
     new Pilotage(ctx),
+    // ashore: on foot at a place. Before the dock and the tender: while she is walking, the keys, the status and the camera are hers.
+    new Ashore(ctx),
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),

@@ -276,6 +276,7 @@ export class Session {
       openHail: () => this.openHail(),
       toggleFleet: () => this.fleetPanel.toggle(),
       featureKey: (code, shift) => this.features.some((f) => f.key?.(code, shift) ?? false),
+      firstKey: (code, shift) => this.features.some((f) => f.firstKey?.(code, shift) ?? false), // ashore
     });
 
     this.aboard = {
@@ -292,6 +293,7 @@ export class Session {
       held: (code) => this.controls.isHeld(code),
       sound: this.sound,
       feature: <T extends Feature>(id: string) => this.features.find((f) => f.id === id) as T | undefined,
+      view: () => ({ camera: this.drone.camera, width: window.innerWidth, height: window.innerHeight }), // ashore
     };
     this.features = createFeatures(this.aboard);
     this.residents = this.features.find((f): f is Residents => f.id === 'residents') ?? null;
@@ -344,7 +346,7 @@ export class Session {
   }
 
   /** Where the player is when not at the helm, in the kayak for instance. */
-  private focus(): { x: number; y: number; heading: number; height: number } | null {
+  private focus(): { x: number; y: number; heading: number; height: number; real?: boolean } | null {
     for (const f of this.features) {
       const p = f.focus?.();
       if (p) return p;
@@ -503,6 +505,8 @@ export class Session {
 
     const away = this.focus();
     this.controls.update(dtReal, paused || away !== null);
+    // ashore: on foot the clock runs at real speed.
+    if (away?.real && this.rateIndex !== 0) { this.rateIndex = 0; this.hud.setRate(0); }
 
     // Fixed steps. Faster time just means more of them per frame.
     if (!paused) {
@@ -629,6 +633,7 @@ export class Session {
     if (away) this.boatPos.set(away.x, away.height, -away.y);
     else this.boatPos.set(x, pose.heave, z);
     drone.update(dtReal, this.boatPos, away ? away.heading : heading, (px, pz) => stage.seaLevel(px, pz, seaTime), boatView.solids, boatView.thin);
+    if (away) for (const f of this.features) f.camera?.(drone.camera, dtReal); // ashore
 
     const stream = world.current(sim.state.x, sim.state.y, sim.state.t);
     hud.update(sim.state, sim.out, {
