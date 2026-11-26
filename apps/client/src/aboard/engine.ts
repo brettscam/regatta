@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { KT } from '@slack-tide/sim';
 import type { AboardContext, Feature } from './feature';
+import { fuelText, leverName, leverSays } from './powerRules';
 import {
   BATTERY_LOW, BATTERY_VERY_LOW, FUEL_LOW, FUEL_VERY_LOW, RACE_NEUTRAL,
   batteryWarning, fuelWarning, panelShown, raceBarsEngine, throttleName, throttleSays, throttleStep,
@@ -57,6 +58,11 @@ export class Engine implements Feature {
   private tick: number;
   /** Seconds until the shore tops her up, once she is alongside. Below 0 there is nothing waiting. */
   private shore = -1;
+  /** A powerboat's lever runs up or down while its key is held: seconds the key has been down, and until the next step. */
+  private heldFor = 0;
+  private nextStep = 0;
+  /** True once a held key has brought the lever to neutral: it stops there until the key is let go. */
+  private stopped = false;
 
   constructor(private readonly ctx: AboardContext) {
     const s = ctx.sim.state;
@@ -140,11 +146,11 @@ export class Engine implements Feature {
         sim.stopEngine();
         this.wasOn = false;
         this.wasCranking = false;
-        this.ctx.say(s.hold === 'none' ? 'Engine off. She is under sail alone' : 'Engine off');
+        this.ctx.say(s.hold !== 'none' ? 'Engine off' : sim.boat.power ? 'Engine off. She will lie where the wind and the stream take her' : 'Engine off. She is under sail alone');
         return true;
       }
       const result = sim.startEngine();
-      if (result === 'dry') this.ctx.say('The tank is dry, so the engine will not start. A dock fills it: come alongside one with X', 7);
+      if (result === 'dry') this.ctx.say(sim.boat.power ? 'The tank is dry, so the engine will not start. U calls for a tow in to the nearest fuel dock' : 'The tank is dry, so the engine will not start. A dock fills it: come alongside one with X', 7);
       else if (result === 'flat') this.ctx.say('The battery is too flat to turn the engine over. Come alongside a dock with X to charge it', 7);
       else {
         this.wasCranking = true;
@@ -152,13 +158,28 @@ export class Engine implements Feature {
       }
       return true;
     }
-    const step = throttleStep({ engineOn: s.engineOn, cranking: s.engineCrank > 0, hold: s.hold, notch: s.throttle, barred: this.barred }, code === 'Period' ? 1 : -1);
+    this.stepThrottle(code === 'Period' ? 1 : -1, true);
+    return true;
+  }
+
+  /**
+   * Move the throttle one step and say where it is now.
+   * @param speak false while a held key is running the lever: then only where it ends up is said, not why it cannot go
+   * @returns false when it could not move
+   */
+  private stepThrottle(dir: 1 | -1, speak: boolean): boolean {
+    const { sim } = this.ctx;
+    const s = sim.state;
+    const engine = sim.boat.engine;
+    if (!engine) return false;
+    const power = sim.boat.power;
+    const step = throttleStep({ engineOn: s.engineOn, cranking: s.engineCrank > 0, hold: s.hold, notch: s.throttle, barred: this.barred, step: power?.leverStep }, dir);
     if (step.to === undefined) {
-      this.ctx.say(step.say ?? '', 6);
-      return true;
+      if (speak) this.ctx.say(step.say ?? '', 6);
+      return false;
     }
     sim.setThrottle(step.to);
-    this.ctx.say(throttleSays(engine, s.throttle), 4);
+    this.ctx.say(power ? leverSays(sim.boat, s.throttle) : throttleSays(engine, s.throttle), 4);
     return true;
   }
 
@@ -178,6 +199,21 @@ export class Engine implements Feature {
     const running = s.tick !== this.tick;
     this.tick = s.tick;
     const step = Math.min(dt, 0.2);
+    const power = sim.boat.power;
+
+    // A powerboat's lever has many positions: holding the key runs it up or down, and stops in neutral on the way through.
+    const dir = power && running ? (this.ctx.held('Period') ? 1 : 0) - (this.ctx.held('Comma') ? 1 : 0) : 0;
+    if (dir === 0) {
+      this.heldFor = 0;
+      this.stopped = false;
+    } else if (!this.stopped) {
+      this.heldFor += step;
+      this.nextStep -= step;
+      if (this.heldFor > 0.4 && this.nextStep <= 0) {
+        this.nextStep = 0.14;
+        if (!this.stepThrottle(dir > 0 ? 1 : -1, false) || s.throttle === 0) this.stopped = true;
+      }
+    }
 
     // What has happened since the last frame, said once.
     if (s.engineOn && !this.wasOn && this.wasCranking) {
@@ -185,7 +221,7 @@ export class Engine implements Feature {
         ? `Engine on, out of gear. Full stop puts her ahead, comma astern${this.barred ? '. Not in this race, though' : ''}`
         : 'Engine on, out of gear, ready to leave. X lets her go', 6);
     }
-    if (s.engineStops > this.stops) this.ctx.alarm('Out of fuel. The engine has stopped and she is under sail alone. A dock fills the tank');
+    if (s.engineStops > this.stops) this.ctx.alarm(power ? 'Out of fuel. The engine has stopped and she is adrift. U calls for a tow in to the nearest fuel dock' : 'Out of fuel. The engine has stopped and she is under sail alone. A dock fills the tank');
     if (s.batteryTrips > this.trips) this.ctx.alarm('The battery is too low for the autopilot. You have the helm. Start the engine with I to charge it');
     this.stops = s.engineStops;
     this.trips = s.batteryTrips;
@@ -200,7 +236,8 @@ export class Engine implements Feature {
 
     const fuel = this.fuelShare();
     const batt = sim.battery;
-    const warn = fuelWarning(engine, this.fuelWas, fuel) ?? batteryWarning(this.battWas, batt, s.engineOn);
+    // A powerboat's tank is her whole passage, and is spoken for in miles: `aboard/powerboat.ts` warns of it.
+    const warn = (power ? null : fuelWarning(engine, this.fuelWas, fuel)) ?? batteryWarning(this.battWas, batt, s.engineOn);
     if (warn) this.ctx.alarm(warn);
     this.fuelWas = fuel;
     this.battWas = batt;
@@ -224,7 +261,8 @@ export class Engine implements Feature {
 
     this.drawPanel(fuel, batt);
     const load = s.engineOn ? Math.abs(s.throttle) / 4 : 0;
-    this.ctx.sound.engine(o.engineRpm, load, !running);
+    // The diesel's sound is a diesel's. An outboard has its own (`aboard/powerboat.ts`).
+    this.ctx.sound.engine(power ? 0 : o.engineRpm, load, !running);
     this.drawWash(step, seaTime, running);
     this.drawExhaust(step, running);
   }
@@ -233,17 +271,21 @@ export class Engine implements Feature {
     const { sim } = this.ctx;
     const s = sim.state;
     const cranking = s.engineCrank > 0;
-    const show = panelShown({ engineOn: s.engineOn, cranking, fuel, battery: batt });
+    const power = sim.boat.power;
+    // Aboard a powerboat the engine is the boat: its row is always there.
+    const show = !!power || panelShown({ engineOn: s.engineOn, cranking, fuel, battery: batt });
     if (this.panel.hidden === show) this.panel.hidden = !show;
     if (!show) return;
     const litres = Math.round(sim.fuel);
-    const key = `${s.engineOn ? s.throttle : cranking ? 'c' : 'x'}|${litres}|${Math.round(batt * 100)}`;
+    const key = `${s.engineOn ? s.throttle : cranking ? 'c' : 'x'}|${litres}|${Math.round(batt * 100)}|${power ? Math.round(sim.out.burnLph) : ''}`;
     if (key === this.shown) return;
     this.shown = key;
-    this.revs.textContent = s.engineOn ? throttleName(s.throttle) : cranking ? 'Starting' : 'Off';
-    this.revsSub.textContent = s.engineOn ? `${sim.out.engineRpm} rpm${s.throttle === 0 ? ' · idling' : ''}` : cranking ? 'turning over' : 'I starts it';
+    this.revs.textContent = s.engineOn ? (power ? leverName(power, s.throttle) : throttleName(s.throttle)) : cranking ? 'Starting' : 'Off';
+    this.revsSub.textContent = s.engineOn
+      ? power ? `${(sim.out.burnLph / 3.785).toFixed(1)} gal/h${s.throttle === 0 ? ' · idling' : ''}` : `${sim.out.engineRpm} rpm${s.throttle === 0 ? ' · idling' : ''}`
+      : cranking ? 'turning over' : 'I starts it';
     (this.revs.parentElement as HTMLElement).classList.toggle('off', !s.engineOn);
-    this.fuelN.textContent = `${litres} L`;
+    this.fuelN.textContent = power ? fuelText(sim.fuel) : `${litres} L`;
     this.fuelBar.style.width = `${Math.round(fuel * 100)}%`;
     this.fuelBox.classList.toggle('low', fuel <= FUEL_LOW && fuel > FUEL_VERY_LOW);
     this.fuelBox.classList.toggle('out', fuel <= FUEL_VERY_LOW);
@@ -258,7 +300,8 @@ export class Engine implements Feature {
     const { sim, stage } = this.ctx;
     const s = sim.state;
     const loa = sim.boat.dimensions.loa;
-    if (running && sim.underPower) {
+    // Once she is planing her wake is all white anyway (`scene/wake.ts`): the propeller's patches are for slow work.
+    if (running && sim.underPower && !(sim.out.plane > 0.2)) {
       const push = Math.abs(s.throttle) / 4;
       this.sinceSpawn += dt;
       const every = 0.22 - 0.12 * push;
@@ -289,6 +332,8 @@ export class Engine implements Feature {
       p.mesh.scale.set(size, 1, size);
       p.mesh.position.set(p.x, stage.seaLevel(p.x, p.z, seaTime, 4) + 0.05, p.z);
       p.mat.opacity = 0.5 * (1 - k) * Math.min(1, p.age * 6);
+      // White water is only as white as the light on it: at night it must not glow.
+      p.mat.color.copy(stage.white);
     }
   }
 
@@ -310,7 +355,7 @@ export class Engine implements Feature {
 
   status(): string {
     const { sim } = this.ctx;
-    if (!sim.underPower) return '';
+    if (!sim.underPower || sim.boat.power) return '';
     if (sim.state.throttle < 0) return 'Under power, going astern';
     const o = sim.out;
     // With a sail full and pulling as well, she is motor-sailing.
@@ -326,7 +371,9 @@ export class Engine implements Feature {
   reboat(): void {
     const { boatView, spec } = this.ctx;
     const d = spec.dimensions;
-    this.exhaust.position.set(-d.beam * 0.22, 0.32, d.loa * 0.5);
+    // A diesel's cooling water leaves low on the port quarter. An outboard's tell-tale comes out of the side of its cowling.
+    if (spec.power) this.exhaust.position.set(0.24, d.freeboard + 0.32, d.loa * 0.5 + 0.28);
+    else this.exhaust.position.set(-d.beam * 0.22, 0.32, d.loa * 0.5);
     boatView.root.add(this.exhaust);
   }
 

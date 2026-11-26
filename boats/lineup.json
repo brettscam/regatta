@@ -23,5 +23,10 @@
     "id": "blue50",
     "file": "blue50.json",
     "status": "ready"
+  },
+  {
+    "id": "console22",
+    "file": "console22.json",
+    "status": "power"
   }
 ]

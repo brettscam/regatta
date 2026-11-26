@@ -771,7 +771,13 @@ export class Kayak implements Feature {
       this.unberth();
       this.berth = want;
       const d = ctx.spec.dimensions;
-      if (want === 'deck') {
+      // A boat with no side deck to lash her on says where she goes: a rack of her own (`tender_stow`, see `boat/buildConsole.ts`).
+      const rack = want === 'deck' ? ctx.boatView.model.nodes.tender_stow : undefined;
+      if (rack) {
+        rack.add(model.root);
+        model.root.position.set(0, 0, 0);
+        model.root.rotation.set(0, 0, 0);
+      } else if (want === 'deck') {
         // On her side against the stanchions, bow forward.
         ctx.boatView.root.add(model.root);
         model.root.position.set(-(d.beam * 0.5 - 0.42), d.freeboard + 0.2, -d.loa * 0.03);

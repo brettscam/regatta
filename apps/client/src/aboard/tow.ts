@@ -69,8 +69,11 @@ export class Tow implements Feature {
       this.ctx.say('She is made fast. U is for a tow when she is aground');
       return true;
     }
-    if (!sim.out.aground && (sim.out.underKeel === null || sim.out.underKeel > 0.3)) {
-      this.ctx.say('She is afloat. U calls for a tow when she is aground');
+    const power = !!sim.boat.power;
+    if (!sim.out.aground && (sim.out.underKeel === null || sim.out.underKeel > (power ? 0.1 : 0.3))) {
+      // A powerboat with a dry tank has no other way home.
+      if (power && sim.fuel <= 0) return this.towIn();
+      this.ctx.say(power ? 'She is afloat. U calls for a tow when she is aground, or when the tank is dry' : 'She is afloat. U calls for a tow when she is aground');
       return true;
     }
     const spot = deepWater(world, this.ctx.spec.dimensions.draft, s.x, s.y, s.t);
@@ -83,7 +86,27 @@ export class Tow implements Feature {
     leaveAt(sim, world, spot);
     this.stuck = 0;
     this.told = false;
-    this.ctx.alarm(`Towed off ${metres < 400 ? `${Math.round(metres / 10) * 10} m` : `${(metres / 1852).toFixed(1)} miles`} into ${Math.round(spot.depth)} m of water. She is head to wind: put the wheel over and sail her away`);
+    this.ctx.alarm(`Towed off ${metres < 400 ? `${Math.round(metres / 10) * 10} m` : `${(metres / 1852).toFixed(1)} miles`} into ${Math.round(spot.depth)} m of water. ${power ? 'She is lying stopped: start her with I if she is not running, and the full stop key puts her ahead' : 'She is head to wind: put the wheel over and sail her away'}`);
+    return true;
+  }
+
+  /** Out of fuel: towed in to lie off the nearest dock, with a can of fuel put aboard to bring her alongside. */
+  private towIn(): true {
+    const { sim, world } = this.ctx;
+    const s = sim.state;
+    const docks = this.ctx.places.filter((p) => p.kind === 'dock');
+    const dock = docks.sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y))[0];
+    const spot = dock ? deepWater(world, this.ctx.spec.dimensions.draft, dock.x, dock.y, s.t, 60) : null;
+    if (!dock || !spot) {
+      this.ctx.alarm('There is no fuel dock on this water to be towed to');
+      return true;
+    }
+    const miles = Math.hypot(spot.x - s.x, spot.y - s.y) / 1852;
+    leaveAt(sim, world, spot);
+    // Twenty litres from the towboat's can: enough to come alongside, not enough to go anywhere.
+    const tank = sim.boat.engine?.tankL ?? 0;
+    s.fuelUsed = Math.max(0, tank - Math.min(20, tank));
+    this.ctx.alarm(`Towed ${miles.toFixed(1)} miles in to ${dock.name}, with a can of fuel put aboard. Start her with I, come alongside the dock with X, and it fills the tank`);
     return true;
   }
 
@@ -93,7 +116,7 @@ export class Tow implements Feature {
       this.stuck += dt;
       if (this.stuck > 20 && !this.told) {
         this.told = true;
-        this.ctx.say('Hard aground. If she will not sail off, U calls for a tow to deep water', 8);
+        this.ctx.say(this.ctx.sim.boat.power ? 'Hard aground. If she will not back off, U calls for a tow to deep water' : 'Hard aground. If she will not sail off, U calls for a tow to deep water', 8);
       }
     } else if (this.stuck > 0) {
       this.stuck = 0;

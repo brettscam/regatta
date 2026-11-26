@@ -18,6 +18,7 @@ import { CrabPots } from './pots';
 import { Radio } from './radio';
 import { Residents } from './residents';
 import { Tips } from './tips';
+import { Powerboat } from './powerboat';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
 import { Ashore } from '../ashore/walk'; // ashore
@@ -42,6 +43,8 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new CrabPots(ctx),
     new Fishing(ctx),
     new Mooring(ctx),
+    // A powerboat's own: it says what she is doing before the engine does, and takes no keys. Nothing aboard a boat with sails.
+    new Powerboat(ctx),
     new Engine(ctx),
     new Tow(ctx),
     new FlowView(ctx),

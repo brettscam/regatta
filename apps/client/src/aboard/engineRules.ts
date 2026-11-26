@@ -55,12 +55,13 @@ export function throttleSays(engine: EngineSpec, notch: number): string {
  * Where the throttle goes for a step up (+1) or down (-1), and what to say when it cannot.
  * Nothing here moves the throttle: the caller does that when `to` is given.
  */
-export function throttleStep(now: { engineOn: boolean; cranking: boolean; hold: 'none' | 'anchor' | 'mooring'; notch: number; barred: boolean }, dir: 1 | -1): { to?: number; say?: string } {
+export function throttleStep(now: { engineOn: boolean; cranking: boolean; hold: 'none' | 'anchor' | 'mooring'; notch: number; barred: boolean; step?: number }, dir: 1 | -1): { to?: number; say?: string } {
   if (now.cranking) return { say: 'She is still turning over. Wait for the engine to fire' };
   if (!now.engineOn) return { say: 'The engine is off. I starts it' };
   if (now.hold !== 'none') return { say: `She is ${now.hold === 'anchor' ? 'at anchor' : 'made fast'}, so the engine stays out of gear. X lets her go` };
-  const to = now.notch + dir;
-  if (to > THROTTLE_MAX) return { say: 'Full ahead already' };
+  // A powerboat's lever moves in finer steps than an auxiliary's four notches (`step`, from her boat file).
+  const to = Math.round((now.notch + dir * (now.step ?? 1)) * 1e6) / 1e6;
+  if (to > THROTTLE_MAX) return { say: now.step ? 'Wide open already' : 'Full ahead already' };
   if (to < THROTTLE_MIN) return { say: 'Full astern already' };
   if (now.barred && to !== 0) return { say: RACE_REFUSAL };
   return { to };

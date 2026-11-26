@@ -74,6 +74,7 @@ export class Fishing implements Feature {
     };
     // In a holder on the stern rail, to starboard of the centreline and inboard of the lifebuoy.
     this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
+    this.stand();
     const carbon = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45 });
     const geo = new THREE.CylinderGeometry(0.005, 0.016, ROD_LENGTH, 6);
     geo.translate(0, ROD_LENGTH / 2 - ROD_BUTT, 0);
@@ -95,6 +96,14 @@ export class Fishing implements Feature {
     this.rig.add(this.rod, this.line);
     this.rig.visible = false;
     ctx.boatView.root.add(this.rig);
+  }
+
+  /** A boat built with rod holders (`rod_stbd`, see `boat/buildConsole.ts`) has the rod in her starboard one, not on a stern rail she does not have. */
+  private stand(): void {
+    const holder = this.ctx.boatView.model.nodes.rod_stbd;
+    if (!holder) return;
+    this.foot.copy(holder.position);
+    this.foot.y += 0.1;
   }
 
   private water(): Water {
@@ -254,6 +263,7 @@ export class Fishing implements Feature {
     // The rod goes to the same place on the new boat's stern rail.
     const d = this.ctx.spec.dimensions;
     this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
+    this.stand();
     this.rod.position.copy(this.foot);
     this.ctx.boatView.root.add(this.rig);
   }

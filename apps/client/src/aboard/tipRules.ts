@@ -48,6 +48,8 @@ export interface Snap {
   raceDone: number;
 
   // ---- wind and boat ----
+  /** True aboard a boat with no sails: a powerboat. The tips about sails, tacking and racing are not for her. */
+  power: boolean;
   windKt: number;
   /** True wind angle off the bow, degrees, 0 to 180. */
   twaDeg: number;
@@ -112,7 +114,7 @@ export function emptySnap(): Snap {
     t: 0, voice: false, shared: false, sails: 1, hours: 0, races: 0, rank: 0, xpGained: 0, lesson: false, news: 0,
     company: 0, nearBoat: Infinity, boatName: '', trafficCalls: 0,
     racing: false, raceOffered: false, countdown: null, raceDone: 0,
-    windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
+    power: false, windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
     hand: false, mistrim: false, aground: false, stuck: 0, knockdowns: 0,
     manoeuvre: false, knocked: false, hitAgo: Infinity, panel: false,
     hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, walking: null, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,

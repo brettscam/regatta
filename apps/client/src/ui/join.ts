@@ -1,7 +1,7 @@
-import { KT, R2D, polarSpeed } from '@slack-tide/sim';
+import { KT, R2D, leverFor, milesPerLitre, polarSpeed } from '@slack-tide/sim';
 import type { Waypoint } from '@slack-tide/nav';
 import type { ReplayWorld } from '@slack-tide/world';
-import { TOPSIDES, type LineupEntry, type YardBoat } from '../boat/yard';
+import { TOPSIDES, afloat, type LineupEntry, type YardBoat } from '../boat/yard';
 import { alone, onWeb } from '../net/platform';
 import type { CourseAbout } from '../world/loadCourse';
 import { inText, nextEvent, whenText } from '../race/events';
@@ -93,6 +93,8 @@ export class JoinFlow {
   private water: WaterView;
   /** A water being fetched: its id, until it is on the stage. */
   private loading: string | null = null;
+  /** True once the player has picked a boat here: a water's suggestion no longer changes it. */
+  private boatPicked = false;
 
   constructor(private readonly opts: JoinOptions) {
     this.water = opts;
@@ -143,6 +145,7 @@ export class JoinFlow {
     else if (d.gfx) graphics.choose(d.gfx as QualityChoice);
     else if (d.tutorial) this.choice.tutorial = d.tutorial === '1';
     else if (d.boat) {
+      this.boatPicked = true;
       this.choice.boat = d.boat;
       if (!this.named) this.choice.name = this.defaultName(d.boat);
     } else if (d.colour) this.choice.colour = d.colour;
@@ -165,6 +168,12 @@ export class JoinFlow {
       // The time of day this water is best met at, and its first start.
       this.choice.time = (water.times.find((t) => t.default) ?? water.times.find((t) => t.id === 'afternoon') ?? water.times[0]).id;
       this.choice.spot = water.spots[0].id;
+      // The boat this water is best met in, unless she has chosen her own.
+      const suggested = water.about.boat;
+      if (suggested && !this.boatPicked && this.opts.boats[suggested] && this.opts.lineup.some((e) => e.id === suggested && afloat(e))) {
+        this.choice.boat = suggested;
+        if (!this.named) this.choice.name = this.defaultName(suggested);
+      }
     } catch {
       // It could not be fetched: stay where we are.
     }
@@ -246,6 +255,10 @@ export class JoinFlow {
   private lesson(): string {
     const card = (on: boolean, title: string, text: string) =>
       `<button type="button" class="card" data-tutorial="${on ? 1 : 0}" aria-pressed="${this.choice.tutorial === on}"><b>${title}</b><span class="say">${text}</span></button>`;
+    // The lesson teaches sails. Aboard a boat with none there is nothing for it to teach, and it says so.
+    if (this.opts.boats[this.choice.boat]?.power) {
+      return `<h2>No lesson needed</h2><p class="soon">The lesson is a sailing lesson, and the boat you have chosen has no sails. She starts with her engine idling out of gear: the full stop key opens the throttle a step, the comma key closes it, and A and D turn the wheel. Choose a sailing boat on the next step if you would like the lesson.</p>`;
+    }
     return `<h2>Want a quick lesson first?</h2><div class="cards">
       ${card(true, 'Show me the ropes', 'A short guided sail: steering, trimming both sails, a tack, the autopilot and the chart. About five minutes. End it whenever you like.')}
       ${card(false, 'I know my way round a boat', 'Straight to sailing. You work her by pointing at the wheel, the boom and the winches and scrolling. The boat shows you what she needs.')}
@@ -253,15 +266,20 @@ export class JoinFlow {
   }
 
   private boat(): string {
-    const ready = this.opts.lineup.filter((e) => e.status === 'ready' && this.opts.boats[e.id]);
+    const ready = this.opts.lineup.filter((e) => afloat(e) && this.opts.boats[e.id]);
     const yard = this.opts.lineup.filter((e) => !ready.includes(e));
     const cards = ready.map((e) => {
       const spec = this.opts.boats[e.id];
       const d = spec.dimensions;
       const reach = polarSpeed(spec.polar, 100, 14);
+      // A powerboat has no reaching speed: what she cruises at, flat out, and how far the tank takes her.
+      const p = spec.power;
+      const pace = p
+        ? `cruises at ${p.cruiseKt} kt, ${Math.round(p.curve.kt[p.curve.kt.length - 1])} flat out · about ${Math.round((milesPerLitre(p, leverFor(p, p.cruiseKt)) * (spec.engine?.tankL ?? 0)) / 10) * 10} miles on a tank · no sails, so no racing`
+        : `${reach.toFixed(1)} kt reaching in 14 kt`;
       return `<button type="button" class="card" data-boat="${e.id}" aria-pressed="${e.id === this.choice.boat}">
         <b>${esc(spec.name)}</b><span class="say">${esc(spec.tagline ?? spec.role ?? '')}</span>
-        <span class="now">${spec.difficulty ? `${esc(spec.difficulty)} · ` : ''}${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${reach.toFixed(1)} kt reaching in 14 kt</span></button>`;
+        <span class="now">${spec.difficulty ? `${esc(spec.difficulty)} · ` : ''}${d.loa.toFixed(1)} m overall · draws ${d.draft.toFixed(1)} m · ${pace}</span></button>`;
     }).join('');
     const coming = yard.length ? `<p class="soon">Still in the yard: ${yard.map((e) => esc(e.name ?? e.id)).join(' and ')}.</p>` : '';
     const swatches = TOPSIDES.map((c) =>
