@@ -584,35 +584,56 @@ export class Stage {
   }
 
   /**
-   * Draw the scene about the floating origin. For the length of the draw the whole scene, and the eye with it, is moved
-   * by minus the origin, so every matrix the graphics card is handed (model, view, shadow) holds small numbers. The
-   * matrices are worked out here in double precision, so the shift itself costs nothing in precision. Straight after,
-   * everything is put back where it was, so picking, labels and anything else that reads a world matrix between frames
-   * sees true scene positions as before.
+   * Draw the scene about the floating origin. Every object's world matrix is worked out as usual, in double precision on
+   * the CPU, and then, for the length of the draw only, moved by minus the origin, and the eye with it. So every matrix
+   * the graphics card is handed (model, view, model-view, shadow) holds small numbers, and the shift itself costs
+   * nothing in precision. Straight after, each is moved back, so picking, labels and anything else that reads a world
+   * matrix between frames sees true scene positions as before. Moving a matrix is two additions: much cheaper than
+   * working the scene's matrices out a second time.
    */
   private draw(camera: THREE.PerspectiveCamera): void {
     const { x, z } = this.origin;
+    const { scene, renderer } = this;
     if (x === 0 && z === 0) {
-      this.renderer.render(this.scene, camera);
+      renderer.render(scene, camera);
       return;
     }
-    const scene = this.scene;
     // A camera that hangs in the scene is moved with it; one on its own is moved here.
     const loose = !camera.parent;
-    scene.position.set(-x, 0, -z);
+    scene.updateMatrixWorld();
+    this.shiftWorld(-x, -z);
     if (loose) {
       camera.position.x -= x;
       camera.position.z -= z;
       camera.updateMatrixWorld();
-    }
-    this.renderer.render(scene, camera);
-    scene.position.set(0, 0, 0);
-    scene.updateMatrixWorld();
+    } else camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    scene.matrixWorldAutoUpdate = false;
+    renderer.render(scene, camera);
+    scene.matrixWorldAutoUpdate = true;
+    this.shiftWorld(x, z);
     if (loose) {
       camera.position.x += x;
       camera.position.z += z;
       camera.updateMatrixWorld();
-    }
+    } else camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  }
+
+  private shiftX = 0;
+  private shiftZ = 0;
+  private readonly shiftOne = (o: THREE.Object3D): void => {
+    const e = o.matrixWorld.elements;
+    e[12] += this.shiftX;
+    e[14] += this.shiftZ;
+    // None today, but a skinned mesh bound where it stands keeps the inverse of that matrix too.
+    const skin = o as THREE.SkinnedMesh;
+    if (skin.isSkinnedMesh && skin.bindMode === 'attached') skin.bindMatrixInverse.copy(skin.matrixWorld).invert();
+  };
+
+  /** Move every world matrix in the scene by so much east and south. */
+  private shiftWorld(dx: number, dz: number): void {
+    this.shiftX = dx;
+    this.shiftZ = dz;
+    this.scene.traverse(this.shiftOne);
   }
 
   /** One frame seen from under the water. What is changed for it is put back straight after. */
