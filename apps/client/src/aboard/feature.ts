@@ -75,7 +75,7 @@ export interface Feature {
   readonly id: string;
   /**
    * A key was pressed that the game itself does not use. Return true if this feature took it.
-   * Taken already: Space P T H C M B R F G X Z K L O U N J V Y I Comma Period Slash Enter Escape Backquote, digits 1 to 4, W S A D Q E, the arrows, and each boat's own control keys.
+   * Taken already: Space P T H C M B R F G X Z K L O U N J V Y I Comma Period Slash Enter Escape Backquote, digits 1 to 6, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
   /**
@@ -88,7 +88,7 @@ export interface Feature {
    * ashore: the camera, after the drone has placed it for this frame and before the picture is drawn, for a feature
    * whose `focus` is in force and that has to keep the lens out of something the drone knows nothing of.
    */
-  camera?(camera: import('three').PerspectiveCamera, dt: number): void;
+  afterCamera?(camera: import('three').PerspectiveCamera, dt: number): void;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */
   step?(): void;
   /** Once a rendered frame, after the sim has stepped. `dt` is real seconds. `seaTime` is the time to pass to `stage.seaLevel`. */

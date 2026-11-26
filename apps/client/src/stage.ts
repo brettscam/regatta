@@ -22,6 +22,22 @@ import { Rain } from './scene/rain';
 import { SF_FOG_PATH, cloudCover, fogAt, fogReach, morningHaze, pathPoint, rainAt, solarHour, squallsAt, visibility, type FogPath, type Squall } from './scene/weatherRules';
 import type { LoadedCourse } from './world/loadCourse';
 
+/**
+ * A view from somewhere other than the drone: the mask of a diver (`aboard/dive.ts`). Whoever owns it sets
+ * `stage.eye` each frame it applies and clears it when done. With `wet` set the frame is drawn from under the water:
+ * the sea's top, the spray, the rain and the navigation lights are left out, the haze is the water's own, and the
+ * light is what is left of the sun at that depth. All of it is put back before the frame ends, so nothing has to be
+ * restored on surfacing.
+ */
+export interface EyeView {
+  camera: THREE.PerspectiveCamera;
+  wet: boolean;
+  /** The colour of the water at the eye, how far it can see through it in metres, and what is left of the sun's red, green and blue. */
+  water: THREE.Color;
+  see: number;
+  light: THREE.Color;
+}
+
 export interface StageBoat {
   /** Scene coordinates: X east, Z south. */
   x: number;
@@ -114,6 +130,11 @@ export class Stage {
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
   private camera: THREE.PerspectiveCamera | null = null;
+  /** Set while the frame is to be drawn from somewhere other than the drone. See `EyeView`. */
+  eye: EyeView | null = null;
+  private readonly keptColor = new THREE.Color();
+  private readonly keptSun = new THREE.Color();
+  private readonly keptFill = new THREE.Color();
 
   constructor(readonly canvas: HTMLCanvasElement, data: LoadedCourse, world: ReplayWorld) {
     canvas.tabIndex = 0;
@@ -380,6 +401,7 @@ export class Stage {
    * @param covered true when something covers most of the 3D view, so it only needs drawing now and then
    */
   frame(dtReal: number, rate: number, t: number, seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windKt: number, covered = false): void {
+    if (this.eye) camera = this.eye.camera;
     if (camera !== this.camera) {
       this.camera = camera;
       this.resize(camera);
@@ -454,6 +476,35 @@ export class Stage {
     this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));
 
     this.frameCount++;
-    if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);
+    if (covered && this.frameCount % 6 !== 0) return;
+    if (this.eye?.wet) this.drawUnder(camera, this.eye);
+    else this.renderer.render(this.scene, camera);
+  }
+
+  /** One frame seen from under the water. What is changed for it is put back straight after. */
+  private drawUnder(camera: THREE.PerspectiveCamera, eye: EyeView): void {
+    const { haze, scene, sky } = this;
+    const near = haze.near;
+    const far = haze.far;
+    const background = scene.background;
+    const hidden = [this.ocean.mesh, this.spray.points, this.navLights.points, this.rain.group, ...sky.backdrop].filter((o) => o.visible);
+    this.keptColor.copy(haze.color);
+    this.keptSun.copy(sky.sunLight.color);
+    this.keptFill.copy(sky.fill.color);
+    for (const o of hidden) o.visible = false;
+    haze.color.copy(eye.water);
+    haze.near = 0.2;
+    haze.far = eye.see * 1.5;
+    scene.background = eye.water;
+    sky.sunLight.color.multiply(eye.light);
+    sky.fill.color.copy(eye.water).multiplyScalar(4);
+    this.renderer.render(scene, camera);
+    for (const o of hidden) o.visible = true;
+    haze.color.copy(this.keptColor);
+    haze.near = near;
+    haze.far = far;
+    scene.background = background;
+    sky.sunLight.color.copy(this.keptSun);
+    sky.fill.color.copy(this.keptFill);
   }
 }

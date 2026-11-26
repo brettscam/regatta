@@ -238,6 +238,12 @@ export const TIPS: Tip[] = [
     when: (s) => !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
     done: ['KeyL', 'KeyK'],
   },
+  {
+    id: 'dive', icon: 'fish', title: 'Go over the side', keys: ['5'], priority: 13, hold: 40, cooldown: 3 * DAY, max: 2,
+    text: '5 puts you in the water with a mask, fins and a speargun, from the boat at anchor or from the tender. The arrow keys are your fins: up kicks, down puts your head down to dive. You have one breath, so kick, glide, and rest on the float between dives.',
+    when: (s) => !s.tender && !s.racing && !s.night && s.hold !== 'none' && s.heldFor > 150 && s.depth > 2 && s.depth < 30,
+    done: ['Digit5'],
+  },
 
   // ---- the board -------------------------------------------------------------------------------------
   {

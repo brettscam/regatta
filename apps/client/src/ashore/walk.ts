@@ -839,7 +839,7 @@ export class Ashore implements Feature {
   }
 
   /** The lens is kept on this side of the building, and she is not drawn when it is inside her head. */
-  camera(camera: THREE.PerspectiveCamera, dt: number): void {
+  afterCamera(camera: THREE.PerspectiveCamera, dt: number): void {
     const g = this.ground;
     if (!g) return;
     const z = floorUnder(g, this.at);

@@ -633,7 +633,7 @@ export class Session {
     if (away) this.boatPos.set(away.x, away.height, -away.y);
     else this.boatPos.set(x, pose.heave, z);
     drone.update(dtReal, this.boatPos, away ? away.heading : heading, (px, pz) => stage.seaLevel(px, pz, seaTime), boatView.solids, boatView.thin);
-    if (away) for (const f of this.features) f.camera?.(drone.camera, dtReal); // ashore
+    if (away) for (const f of this.features) f.afterCamera?.(drone.camera, dtReal); // ashore
 
     const stream = world.current(sim.state.x, sim.state.y, sim.state.t);
     hud.update(sim.state, sim.out, {

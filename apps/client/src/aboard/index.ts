@@ -2,6 +2,7 @@ import { BadAir } from './badair';
 import { ClubBanter } from './banter';
 import { CheatStrip } from './cheat';
 import { Contact } from './contact';
+import { Dive } from './dive';
 import { Dockside } from './dock';
 import { Engine } from './engine';
 import type { AboardContext, Feature } from './feature';
@@ -32,6 +33,8 @@ export function createFeatures(ctx: AboardContext): Feature[] {
   return [
     // Local knowledge comes first only so that it can keep the kayak aboard inside a wildlife refuge. It takes O nowhere else and gives no status.
     new Pilotage(ctx),
+    // Over the side with a mask and a speargun. Ahead of the tender and the anchor: while she is in the water every key is hers.
+    new Dive(ctx),
     // ashore: on foot at a place. Before the dock and the tender: while she is walking, the keys, the status and the camera are hers.
     new Ashore(ctx),
     new Dockside(ctx),
