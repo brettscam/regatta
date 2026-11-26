@@ -376,7 +376,7 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
       // After dark the walls keep a faint warmth, and one house in three shows a lit window across the water.
       onCityNight((n) => wallMat.emissive.setRGB(0.03 * n, 0.022 * n, 0.012 * n));
       spots.forEach((b, i) => {
-        if (i % 3 === 0) lights.push({ p: [b.x, b.y, b.z + b.h + 0.6], a: WARM, b: WARM, shape: SHAPE.glow, size: 1.8, min: 2.6 });
+        if (i % 3 === 0) lights.push({ p: [b.x, b.y, b.z + b.h + 1.5], a: WARM, b: WARM, shape: SHAPE.glow, size: 1.8, min: 2.6 });
       });
       counts.avalonHouses = spots.length;
       triangles += spots.length * 24;
