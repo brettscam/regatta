@@ -1,0 +1,14 @@
+[
+  { "id": "dawn", "name": "First light", "hours": 0.5,
+    "say": "Half past five and flat calm: two knots of air, a grey glassy channel and the island a shape on the horizon. The best hour of the day to run across, and the fish are feeding" },
+  { "id": "morning", "name": "Morning", "hours": 3, "default": true,
+    "say": "Eight o'clock. A light southerly, 7 to 10 knots in the channel and less under the island. Easy going in any direction" },
+  { "id": "midday", "name": "Midday", "hours": 7,
+    "say": "Noon, 7 or 8 knots from the south and the haze burning off. The westerly has not arrived yet" },
+  { "id": "afternoon", "name": "Afternoon westerly", "hours": 11,
+    "say": "Four o'clock and the sea breeze is in: 13 knots from the south-west at Queens Gate, 10 from the west in the channel, with a short chop on it. Avalon stays calm in the island's lee" },
+  { "id": "evening", "name": "Evening", "hours": 14.5,
+    "say": "Half past seven. The westerly is easing to 8 or 9 knots and the light is going gold. The evening bite, and a following sea home to Long Beach" },
+  { "id": "sunday", "name": "Sunday at dawn", "hours": 24.5,
+    "say": "Sunday, half past five. Five knots from the south-east and a whole day ahead" }
+]

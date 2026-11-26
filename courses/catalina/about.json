@@ -1,0 +1,17 @@
+{
+  "id": "catalina",
+  "name": "Long Beach to Catalina",
+  "where": "The San Pedro Channel, Southern California",
+  "say": "Out through Queens Gate at first light, 22 miles of open channel, and Avalon or the Isthmus on the far side. Glassy mornings, a westerly every afternoon, and fish on the way",
+  "order": 5,
+  "sea": { "openFetchKm": 250, "swell": { "height": 0.8, "period": 12, "fromDeg": 200 } },
+  "scenery": { "landCover": "gulf", "pieces": [] },
+  "layers": {
+    "wind": "Recorded. NOAA HRRR 3 km analyses, one an hour, from 05:00 PDT on Saturday 19 July 2025 for 36 hours: a calm dawn, a light southerly morning, and a 10 to 13 knot westerly from mid afternoon. Baked on a 4 km grid.",
+    "stream": "Recorded. NOAA's global tide model (STOFS-2D-Global) for the same hours, on a 1 km grid. The channel's stream is weak, a tenth of a knot or two, as it is in life.",
+    "tide": "Recorded. The same model's water level at the node nearest the Los Angeles Outer Harbor tide station.",
+    "depth": "The tide model's depths where it has water. 200 m grid, with 50 m insets over Long Beach harbor, Avalon and Two Harbors. Water deeper than 127 m is charted as 127 m.",
+    "land": "Terrarium elevation tiles. 200 m grid, with finer insets over Long Beach harbor (80 m), Avalon and Two Harbors (40 m).",
+    "swell": "A declaration, not a recording: a long, low south swell of 0.8 m at 12 s, usual for July. The breakwaters, the oil islands and the offshore platforms are not drawn."
+  }
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "shoreline",
+    "name": "Shoreline Marina",
+    "x": 10450,
+    "y": 23150,
+    "kind": "dock",
+    "say": "The city marina in downtown Long Beach, behind its own breakwater, with fuel and guest slips.",
+    "ashore": {
+      "name": "the waterfront village",
+      "say": "Fish tacos on the boardwalk, with the Queen Mary across the harbor.",
+      "kind": "marina",
+      "sign": "Shoreline"
+    }
+  },
+  {
+    "id": "alamitos",
+    "name": "Alamitos Bay",
+    "x": 16900,
+    "y": 21900,
+    "kind": "dock",
+    "say": "The marina at the east end of Long Beach, in through the jetties. Fuel dock and launch ramp.",
+    "ashore": {
+      "name": "the bait barge and the fuel dock",
+      "say": "A scoop of live sardines and a full tank before the sun is up.",
+      "kind": "marina",
+      "sign": "Alamitos Bay"
+    }
+  },
+  {
+    "id": "avalon",
+    "name": "Avalon",
+    "x": -2250,
+    "y": -22700,
+    "kind": "mooring",
+    "say": "The town harbor, full of moorings under the round white Casino. Sheltered from the westerly, open to a north-easter.",
+    "ashore": {
+      "name": "the green pier",
+      "say": "Swordfish on the scale at the end of the pier, and an ice cream on Crescent Avenue.",
+      "kind": "bar",
+      "sign": "Avalon"
+    }
+  },
+  {
+    "id": "isthmus",
+    "name": "Isthmus Cove, Two Harbors",
+    "x": -18250,
+    "y": -11750,
+    "kind": "mooring",
+    "say": "The cove on the front side of the Isthmus, with moorings and a pier. The island is half a mile wide here.",
+    "ashore": {
+      "name": "the bar at the head of the pier",
+      "say": "A buffalo milk on the deck, sand on the floor, and everybody's dinghy on the beach.",
+      "kind": "bar",
+      "sign": "Two Harbors"
+    }
+  },
+  {
+    "id": "catharbor",
+    "name": "Catalina Harbor",
+    "x": -19350,
+    "y": -13750,
+    "kind": "anchorage",
+    "say": "The long inlet on the back side of the Isthmus, the best all-weather anchorage on the island. Good mud, and a walk across to the bar."
+  }
+]
