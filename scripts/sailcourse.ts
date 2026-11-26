@@ -65,6 +65,6 @@ for (let i = 0; i < 60 * 3600 * LIMIT_HOURS && leg < marks.length; i++) {
     legStart = { x: next.x, y: next.y };
     if (marks[leg]) sim.setRoute(marks[leg], legStart);
   }
-  if (s.t - lastReport > 300 && process.env.TRACK) { lastReport = s.t; console.log(`   t=${(s.t / 60).toFixed(0)} x=${Math.round(s.x)} y=${Math.round(s.y)} ${(sim.out.sog / KT).toFixed(1)} kt hdg ${Math.round((s.heading * 180) / Math.PI)} depth ${world.depth(s.x, s.y, s.t).toFixed(0)}`); }
+  if (s.t - lastReport > 300 && process.env.TRACK) { lastReport = s.t; console.log(`   t=${(s.t / 60).toFixed(0)} x=${Math.round(s.x)} y=${Math.round(s.y)} ${(sim.out.sog / KT).toFixed(1)} kt hdg ${Math.round((s.heading * 180) / Math.PI)} depth ${world.depth(s.x, s.y, s.t).toFixed(0)} wind ${(sim.out.tws / KT).toFixed(0)} kt twa ${Math.round((sim.out.twa * 180) / Math.PI)} reef ${s.reef} spin ${s.spinHoist.toFixed(1)}${s.spinWrapped ? ' wrapped' : ''} knock ${s.knock.toFixed(1)} helm ${s.helmMode}`); }
 }
 console.log(leg >= marks.length ? `FINISHED ${race.name} in ${(sim.state.t / 60).toFixed(1)} min (${boatId}, starting ${hours} h into the season${Number(boost) !== 1 ? `, wind x${boost}` : ''}${world.seas ? `; sea up to ${worstSea.toFixed(1)} m, ${sim.state.slams} slams` : '; flat water'})` : `DID NOT FINISH: stopped on leg ${leg + 1} of ${marks.length}`);

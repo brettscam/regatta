@@ -4,9 +4,52 @@
     "name": "Long Beach to Avalon",
     "blurb": "The crossing: from Queens Gate straight across the San Pedro Channel to the mouth of Avalon Bay. 22 miles, most of it out of sight of anything but the island.",
     "marks": [
-      { "name": "Queens Gate", "x": 10750, "y": 19250 },
+      { "name": "Queens Gate", "x": 10750, "y": 19100 },
       { "name": "Mid channel", "x": 4500, "y": -1500 },
       { "name": "Avalon", "x": -1300, "y": -22500 }
+    ]
+  },
+  {
+    "id": "to-isthmus",
+    "name": "Long Beach to the Isthmus",
+    "blurb": "Out through Queens Gate and west-south-west across the channel to Two Harbors, 25 miles, crossing both shipping lanes. Bird Rock and Ship Rock mark the way in.",
+    "marks": [
+      { "name": "Queens Gate", "x": 10750, "y": 19100 },
+      { "name": "Mid channel", "x": -4000, "y": 4000 },
+      { "name": "Off the Isthmus", "x": -17200, "y": -10600 },
+      { "name": "Isthmus Cove", "x": -18100, "y": -11600 }
+    ]
+  },
+  {
+    "id": "avalon-isthmus",
+    "name": "Avalon to the Isthmus",
+    "blurb": "Up the front side of the island from the Casino, a mile off the cliffs all the way, to Isthmus Cove. Fourteen miles in the lee, where the breeze comes and goes. The marks keep you out of the calms under the cliffs: there is no wind in there, and nothing to anchor in.",
+    "marks": [
+      { "name": "Avalon", "x": -1300, "y": -22500 },
+      { "name": "Off Hamilton Cove", "x": -900, "y": -20700 },
+      { "name": "Off Frog Rock", "x": -2000, "y": -18600 },
+      { "name": "Off Willow Cove", "x": -3200, "y": -16400 },
+      { "name": "Off Long Point", "x": -4500, "y": -14400 },
+      { "name": "Off Goat Harbor", "x": -7200, "y": -13300 },
+      { "name": "Off Empire Landing", "x": -10000, "y": -12100 },
+      { "name": "Off Ripper's Cove", "x": -12800, "y": -10900 },
+      { "name": "Off Blue Cavern", "x": -15500, "y": -9900 },
+      { "name": "Off the Isthmus", "x": -17300, "y": -10100 },
+      { "name": "Isthmus Cove", "x": -18100, "y": -11600 }
+    ]
+  },
+  {
+    "id": "platforms",
+    "name": "Round the platforms",
+    "blurb": "From Queens Gate out to the Beta field: leave Edith and Ellen to port, round outside Eureka and come back up past Elly. Twenty-four miles, the rigs growing out of the haze for an hour before you reach them. Every mark is a quarter of a mile or more off the steel: they are solid.",
+    "marks": [
+      { "name": "Queens Gate", "x": 10750, "y": 19100 },
+      { "name": "Off Edith", "x": 14200, "y": 5000 },
+      { "name": "West of Ellen", "x": 15000, "y": 3200 },
+      { "name": "South of Eureka", "x": 16700, "y": 300 },
+      { "name": "East of Eureka", "x": 18000, "y": 1400 },
+      { "name": "East of Elly", "x": 17000, "y": 4300 },
+      { "name": "Queens Gate", "x": 10750, "y": 19100 }
     ]
   }
 ]

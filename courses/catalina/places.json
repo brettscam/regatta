@@ -5,6 +5,7 @@
     "x": 10450,
     "y": 23150,
     "kind": "dock",
+    "stop": "marina",
     "say": "The city marina in downtown Long Beach, behind its own breakwater, with fuel and guest slips.",
     "ashore": {
       "name": "the waterfront village",
@@ -19,6 +20,7 @@
     "x": 16900,
     "y": 21900,
     "kind": "dock",
+    "stop": "marina",
     "say": "The marina at the east end of Long Beach, in through the jetties. Fuel dock and launch ramp.",
     "ashore": {
       "name": "the bait barge and the fuel dock",
@@ -33,12 +35,61 @@
     "x": -2250,
     "y": -22700,
     "kind": "mooring",
+    "stop": "bar",
     "say": "The town harbor, full of moorings under the round white Casino. Sheltered from the westerly, open to a north-easter.",
     "ashore": {
       "name": "the green pier",
       "say": "Swordfish on the scale at the end of the pier, and an ice cream on Crescent Avenue.",
       "kind": "bar",
-      "sign": "Avalon"
+      "sign": "Avalon",
+      "town": "avalon"
+    }
+  },
+  {
+    "id": "avalon-fuel",
+    "name": "Avalon fuel dock",
+    "x": -2411,
+    "y": -22466,
+    "kind": "dock",
+    "stop": "marina",
+    "say": "The fuel float under the bluff on the Casino side of the bay, with the harbor patrol alongside. Fuel, water and ice.",
+    "ashore": {
+      "name": "the fuel dock, and the harbormaster on the pier",
+      "say": "Fill the tanks, then walk round the bay to the office at the end of the green pier to pay for the mooring.",
+      "kind": "marina",
+      "sign": "Avalon fuel",
+      "town": "avalon"
+    }
+  },
+  {
+    "id": "casino-point",
+    "name": "Casino Point",
+    "x": -2400,
+    "y": -22200,
+    "kind": "mooring",
+    "stop": "snorkel",
+    "say": "Descanso Bay, just round the point from the harbor, under the Casino. The dive park is the roped-off water on the point itself.",
+    "ashore": {
+      "name": "the Casino and the dive park",
+      "say": "Up the stairs from the dive park to the Casino terrace: twelve storeys of white wall and a red roof, and kelp and garibaldi in the water below.",
+      "kind": "park",
+      "sign": "Casino Point",
+      "town": "avalon"
+    }
+  },
+  {
+    "id": "whites",
+    "name": "White's Landing",
+    "x": -6350,
+    "y": -17450,
+    "kind": "mooring",
+    "stop": "beach",
+    "say": "The longest sand beach on the front side, three miles up from Avalon, with moorings off it and a camp at each end.",
+    "ashore": {
+      "name": "the beach at White's Landing",
+      "say": "White sand, a volleyball net and nobody much. Swim in off the boat.",
+      "kind": "park",
+      "sign": "White's Landing"
     }
   },
   {
@@ -47,12 +98,30 @@
     "x": -18250,
     "y": -11750,
     "kind": "mooring",
+    "stop": "bar",
     "say": "The cove on the front side of the Isthmus, with moorings and a pier. The island is half a mile wide here.",
     "ashore": {
       "name": "the bar at the head of the pier",
       "say": "A buffalo milk on the deck, sand on the floor, and everybody's dinghy on the beach.",
       "kind": "bar",
-      "sign": "Two Harbors"
+      "sign": "Two Harbors",
+      "town": "isthmus"
+    }
+  },
+  {
+    "id": "isthmus-pier",
+    "name": "Two Harbors pier",
+    "x": -18274,
+    "y": -11972,
+    "kind": "dock",
+    "stop": "marina",
+    "say": "The float at the end of the pier in Isthmus Cove. Fuel, water, and the shoreboat.",
+    "ashore": {
+      "name": "the pier at Two Harbors",
+      "say": "Up the pier past the dinghies to the only street in town, which is sand.",
+      "kind": "marina",
+      "sign": "Two Harbors",
+      "town": "isthmus"
     }
   },
   {
@@ -61,6 +130,29 @@
     "x": -19350,
     "y": -13750,
     "kind": "anchorage",
-    "say": "The long inlet on the back side of the Isthmus, the best all-weather anchorage on the island. Good mud, and a walk across to the bar."
+    "stop": "beach",
+    "say": "The long inlet on the back side of the Isthmus, the best all-weather anchorage on the island. Good mud, and a walk across to the bar.",
+    "ashore": {
+      "name": "the head of Cat Harbor",
+      "say": "Pull the dinghy up on the mud and walk the half mile across the Isthmus to the bar.",
+      "kind": "park",
+      "sign": "Catalina Harbor",
+      "town": "isthmus"
+    }
+  },
+  {
+    "id": "emerald",
+    "name": "Emerald Bay",
+    "x": -20800,
+    "y": -9200,
+    "kind": "mooring",
+    "stop": "snorkel",
+    "say": "A shallow green bay toward the West End, behind Indian Rock, with moorings over sand and the clearest water on the island.",
+    "ashore": {
+      "name": "the beach at Emerald Bay",
+      "say": "Over the side with a mask: sand, eelgrass and bat rays under the boat.",
+      "kind": "park",
+      "sign": "Emerald Bay"
+    }
   }
 ]
