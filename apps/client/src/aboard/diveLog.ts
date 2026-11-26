@@ -10,6 +10,8 @@ export interface DiveLog {
   longest: number;
   /** Best of each kind taken: its name, how many, and the biggest in centimetres (lobster: millimetres across the carapace). */
   species: Record<string, { name: string; n: number; best: number; unit: 'cm' | 'mm' }>;
+  /** Every kind met under water, taken or not: the species count. A young one or a big male counts as its own find. */
+  seen: string[];
 }
 
 const num = (v: unknown, most: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.min(most, v) : 0);
@@ -26,7 +28,8 @@ export function cleanDiveLog(raw: unknown): DiveLog {
       species[id.slice(0, 24)] = { name: s.name.slice(0, 40), n, best: Math.round(num(s.best, 400)), unit: s.unit === 'mm' ? 'mm' : 'cm' };
     }
   }
-  return { dives: Math.floor(num(r.dives, 1e6)), deepest: num(r.deepest, 40), longest: num(r.longest, 600), species };
+  const seen = Array.isArray(r.seen) ? [...new Set((r.seen as unknown[]).filter((s): s is string => typeof s === 'string' && /^[a-z0-9-]{1,32}$/.test(s)))].slice(0, 200) : [];
+  return { dives: Math.floor(num(r.dives, 1e6)), deepest: num(r.deepest, 40), longest: num(r.longest, 600), species, seen };
 }
 
 export function diveLog(): DiveLog {
@@ -57,6 +60,15 @@ export function logDive(depth: number, seconds: number): void {
   log.deepest = Math.max(log.deepest, Math.round(depth * 10) / 10);
   log.longest = Math.max(log.longest, Math.round(seconds));
   keep(log);
+}
+
+/** A kind met under water. Returns true the first time ever. */
+export function logSeen(id: string): boolean {
+  const log = diveLog();
+  if (log.seen.includes(id)) return false;
+  log.seen.push(id);
+  keep(log);
+  return true;
 }
 
 /** Something has been kept. Returns true if it is the first of its kind she has ever taken. */

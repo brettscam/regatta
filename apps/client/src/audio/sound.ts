@@ -232,37 +232,70 @@ export class Sound {
 
   /**
    * The noises of a dive, all made here: `breath` her own breathing out through the snorkel, `crackle` the snapping
-   * of the reef, `pulse` a contraction when the urge to breathe comes, `kick` the wash of a fin stroke. `level` 0 to 1.
+   * of the reef, `pulse` a contraction when the urge to breathe comes, `kick` the wash of a fin stroke, `heart` one
+   * lub-dub in her ears, `thunk` the bands of the speargun letting go, `thrash` a fish fighting on the line, `exhale` the
+   * blow through the snorkel at the top, `engine` a second of a boat's engine heard through the water. `level` 0 to 1.
    */
-  diving(kind: 'breath' | 'crackle' | 'pulse' | 'kick', level = 0.5): void {
+  diving(kind: 'breath' | 'crackle' | 'pulse' | 'kick' | 'heart' | 'thunk' | 'thrash' | 'exhale' | 'engine', level = 0.5): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const t = ctx.currentTime;
     const k = Math.min(1, Math.max(0, level));
-    if (kind === 'pulse') {
+    if (kind === 'pulse' || kind === 'heart' || kind === 'thunk') {
+      // Low thumps: a contraction; a heartbeat, two of them close; the gun's bands.
+      const beats = kind === 'heart' ? [0, 0.16] : [0];
+      for (const at of beats) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        const top = kind === 'thunk' ? 110 : kind === 'heart' ? 52 : 58;
+        osc.frequency.setValueAtTime(top, t + at);
+        osc.frequency.exponentialRampToValueAtTime(top * 0.68, t + at + 0.18);
+        const g = ctx.createGain();
+        const peak = (kind === 'heart' ? 0.06 + 0.2 * k : kind === 'thunk' ? 0.4 * k + 0.1 : 0.15 + 0.5 * k) * (at > 0 ? 0.7 : 1);
+        g.gain.setValueAtTime(0.0001, t + at);
+        g.gain.exponentialRampToValueAtTime(peak, t + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + at + (kind === 'thunk' ? 0.2 : 0.26));
+        osc.connect(g).connect(this.master);
+        osc.start(t + at);
+        osc.stop(t + at + 0.32);
+      }
+      if (kind !== 'thunk') return;
+    }
+    if (kind === 'engine') {
+      // A boat going by, heard through the water: a buzz with the beat of its propeller in it.
       const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(58, t);
-      osc.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+      osc.type = 'sawtooth';
+      osc.frequency.value = 72 + 30 * k;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 420;
+      const beat = ctx.createGain();
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 11;
+      const depth = ctx.createGain();
+      depth.gain.value = 0.5;
+      lfo.connect(depth).connect(beat.gain);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.15 + 0.5 * k, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-      osc.connect(g).connect(this.master);
+      g.gain.exponentialRampToValueAtTime(0.02 + 0.08 * k, t + 0.3);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
+      osc.connect(lp).connect(beat).connect(g).connect(this.master);
       osc.start(t);
-      osc.stop(t + 0.35);
+      lfo.start(t);
+      osc.stop(t + 1.25);
+      lfo.stop(t + 1.25);
       return;
     }
-    const long = kind === 'breath' ? 1.3 : kind === 'kick' ? 0.5 : 0.03;
+    const long = kind === 'breath' || kind === 'exhale' ? 1.3 : kind === 'kick' || kind === 'thrash' ? 0.5 : kind === 'thunk' ? 0.25 : 0.03;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuffer(ctx, long);
     const f = ctx.createBiquadFilter();
     f.type = kind === 'crackle' ? 'highpass' : 'bandpass';
-    f.frequency.value = kind === 'breath' ? 900 : kind === 'kick' ? 240 : 3200;
-    f.Q.value = kind === 'breath' ? 1.2 : 0.7;
+    f.frequency.value = kind === 'breath' ? 900 : kind === 'exhale' ? 1300 : kind === 'kick' ? 240 : kind === 'thrash' ? 420 : kind === 'thunk' ? 1800 : 3200;
+    f.Q.value = kind === 'breath' || kind === 'exhale' ? 1.2 : 0.7;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime((kind === 'breath' ? 0.1 : kind === 'kick' ? 0.12 : 0.05) * (0.4 + k), t + long * 0.3);
+    g.gain.exponentialRampToValueAtTime((kind === 'breath' ? 0.1 : kind === 'exhale' ? 0.16 : kind === 'kick' ? 0.12 : kind === 'thrash' ? 0.14 : kind === 'thunk' ? 0.1 : 0.05) * (0.4 + k), t + long * 0.3);
     g.gain.exponentialRampToValueAtTime(0.0001, t + long);
     src.connect(f).connect(g).connect(this.master);
     src.start(t);

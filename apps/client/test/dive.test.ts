@@ -36,7 +36,7 @@ describe('the data', () => {
         expect(s.size[0]).toBeLessThan(s.size[1]);
         expect(s.wary).toBeGreaterThanOrEqual(0);
         expect(s.colour).toMatch(/^#[0-9a-f]{6}$/);
-        expect(['bass', 'jack', 'disc', 'flat', 'big', 'lion', 'ray', 'shark', 'eel', 'seal', 'turtle']).toContain(s.shape);
+        expect(['bass', 'jack', 'disc', 'flat', 'big', 'lion', 'ray', 'shark', 'eel', 'seal', 'turtle', 'needle', 'mola']).toContain(s.shape);
         // A protected fish has no size or bag to tempt anyone with.
         if (s.protected || s.spare) expect(s.minCm).toBeUndefined();
         expect(s.say.length).toBeGreaterThan(20);
@@ -351,8 +351,10 @@ describe('who lives where', () => {
   it('every size is inside its species\' range and every fish is in the water', () => {
     for (let shift = 0; shift < 40; shift++) {
       for (const f of populate(catalina, ground, site.x, site.y, shift, conditions)) {
-        expect(f.cm).toBeGreaterThanOrEqual(f.species.size[0]);
-        expect(f.cm).toBeLessThanOrEqual(f.species.size[1]);
+        // A young one has its own, smaller, range.
+        const range = f.young ? f.species.young!.size : f.species.size;
+        expect(f.cm).toBeGreaterThanOrEqual(range[0]);
+        expect(f.cm).toBeLessThanOrEqual(range[1]);
         expect(f.d).toBeGreaterThan(0.5);
         expect(f.d).toBeLessThanOrEqual(ground.floor(f.x, f.y) + 0.01);
         expect(Math.hypot(f.x - site.x, f.y - site.y)).toBeLessThan(40);
@@ -486,8 +488,8 @@ describe('stalking', () => {
     for (let t = 0; t < 8 && !gone; t += 0.05) { stepFish(fish, diver, 0.05, t, flat(12), false); gone = fish.mode === 'gone'; }
     expect(gone).toBe(true);
     expect(Math.hypot(fish.x, fish.y - 0)).toBeGreaterThan(GUN.max);
-    // And it comes back to its ground once things have been quiet a while.
-    for (let t = 0; t < 120; t += 0.5) stepFish(fish, still(200, 200, 2), 0.5, t, flat(12), false);
+    // And it comes back to its ground once things have been quiet a long while: a ghost of a fish stays away four minutes.
+    for (let t = 0; t < 300; t += 0.5) stepFish(fish, still(200, 200, 2), 0.5, t, flat(12), false);
     expect(fish.mode).toBe('cruise');
   });
 
@@ -592,7 +594,7 @@ describe('what becomes of a speared fish', () => {
     const plain = judge(fish(calico, 40), 0, 1.5, false);
     expect(plain.keep).toBe(true);
     expect(plain.awards).toEqual([]);
-    expect(plain.say).toMatch(/calico bass, 40 cm/);
+    expect(plain.say).toMatch(/kelp bass, 40 cm/);
     const good = judge(fish(calico, 40), 0, 3.2, true);
     expect(good.awards.map((a) => a.points)).toEqual([DIVE_POINTS.longShot, DIVE_POINTS.first]);
     expect(good.awards.every((a) => a.kind === 'dive')).toBe(true);
@@ -754,9 +756,10 @@ describe('other boats', () => {
 
 describe('the dive log', () => {
   it('keeps what is sound and drops what is not', () => {
-    const log = cleanDiveLog({ dives: 3.7, deepest: 14.2, longest: 71, species: { calico: { name: 'calico bass', n: 2, best: 44, unit: 'cm' }, junk: { n: 'x' }, lobster: { name: 'lobster', n: 1, best: 88, unit: 'mm' } } });
-    expect(log).toEqual({ dives: 3, deepest: 14.2, longest: 71, species: { calico: { name: 'calico bass', n: 2, best: 44, unit: 'cm' }, lobster: { name: 'lobster', n: 1, best: 88, unit: 'mm' } } });
-    expect(cleanDiveLog('nonsense')).toEqual({ dives: 0, deepest: 0, longest: 0, species: {} });
+    const log = cleanDiveLog({ dives: 3.7, deepest: 14.2, longest: 71, species: { calico: { name: 'calico bass', n: 2, best: 44, unit: 'cm' }, junk: { n: 'x' }, lobster: { name: 'lobster', n: 1, best: 88, unit: 'mm' } }, seen: [] });
+    expect(log).toEqual({ dives: 3, deepest: 14.2, longest: 71, species: { calico: { name: 'calico bass', n: 2, best: 44, unit: 'cm' }, lobster: { name: 'lobster', n: 1, best: 88, unit: 'mm' } }, seen: [] });
+    expect(cleanDiveLog('nonsense')).toEqual({ dives: 0, deepest: 0, longest: 0, species: {}, seen: [] });
+    expect(cleanDiveLog({ seen: ['garibaldi', 'garibaldi', 'gsb', 7, '<b>'] }).seen).toEqual(['garibaldi', 'gsb']);
     expect(cleanDiveLog({ deepest: -4, longest: Infinity, dives: NaN }).deepest).toBe(0);
   });
   it('names are numbers the hashes can use', () => {

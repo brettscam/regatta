@@ -789,3 +789,16 @@ body.lobby .dive { display: none; }
 .dive-mask { position: fixed; inset: 0; pointer-events: none; z-index: 2; display: none; background: radial-gradient(ellipse 78% 82% at 50% 46%, rgba(0, 0, 0, 0) 62%, rgba(0, 6, 10, 0.5) 88%, rgba(0, 4, 8, 0.86) 100%); }
 body.diving.under .dive-mask { display: block; }
 body.lobby .dive-veil { display: none; }
+.dive .goal { font-size: 12px; color: #d9c98a; }
+.dive .goal:empty { display: none; }
+/* The lock (Q): four soft corners round what the view is held on. Green when a shot let go now would find it. */
+.dive-lock { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 2; box-sizing: border-box; --c: rgba(226, 240, 240, 0.6);
+  background: linear-gradient(var(--c), var(--c)) top left / 12px 1.5px no-repeat, linear-gradient(var(--c), var(--c)) top left / 1.5px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 12px 1.5px no-repeat, linear-gradient(var(--c), var(--c)) top right / 1.5px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 12px 1.5px no-repeat, linear-gradient(var(--c), var(--c)) bottom left / 1.5px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 12px 1.5px no-repeat, linear-gradient(var(--c), var(--c)) bottom right / 1.5px 12px no-repeat; }
+.dive-lock[hidden] { display: none; }
+.dive-lock[data-state="range"] { --c: rgba(240, 200, 90, 0.75); }
+.dive-lock[data-state="on"] { --c: rgba(120, 240, 150, 0.85); }
+.dive-lock[data-state="no"] { --c: rgba(255, 150, 120, 0.6); }
+body.lobby .dive-lock { display: none; }
