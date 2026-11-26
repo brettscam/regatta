@@ -19,8 +19,19 @@ const weightWords = (kg: number) => (kg >= 1 ? `${kg.toFixed(1)} kg` : `${Math.m
 
 // ---- the data, as each water's dives.json gives it ---------------------------------------------------
 
-export type Habitat = 'kelp' | 'reef' | 'sand' | 'open';
-export type FishShape = 'bass' | 'jack' | 'disc' | 'flat' | 'big' | 'lion' | 'ray' | 'shark' | 'eel' | 'seal' | 'turtle';
+export type Habitat = 'kelp' | 'reef' | 'sand' | 'open' | 'blue';
+export type FishShape = 'bass' | 'jack' | 'disc' | 'flat' | 'big' | 'lion' | 'ray' | 'shark' | 'eel' | 'seal' | 'turtle' | 'needle' | 'mola';
+/**
+ * How it moves and how it takes flight. `hold` keeps station over the reef and hovers; `dart` is small life that
+ * bursts and coasts; `circle` is a pack that passes, and circles a diver who keeps still; `streak` passes straight
+ * through near the top, fast, and comes round again later; `ghost` drifts through the kelp and is gone for a long
+ * while once it has seen her; `bury` lies on the sand until she is close, then lifts off in a cloud of silt and
+ * settles a few metres on; `hole` stays in its hole; `loop` loops and corkscrews round her; `glide` flies over the
+ * sand; `sweep` makes long slow turns; `drift` hangs in the water and comes to look.
+ */
+export type Flight = 'hold' | 'dart' | 'circle' | 'streak' | 'ghost' | 'bury' | 'hole' | 'loop' | 'glide' | 'sweep' | 'drift';
+/** Where a speared fish heads when it is not stopped dead: into the kelp to wrap the line, into a hole in the reef, or off into open water. */
+export type Bolthole = 'kelp' | 'hole' | 'run';
 
 export interface DiveSpecies {
   id: string;
@@ -56,6 +67,8 @@ export interface DiveSpecies {
   curious?: boolean;
   /** Met away from the named sites too. */
   anywhere?: boolean;
+  /** Sites it lives at besides the ones whose `life` names it: a list of site ids, or every site of the water. */
+  sites?: string[] | 'all';
   /** Set when it may never be taken, with the reason as the warden would give it. */
   protected?: string;
   /** Set for an animal the gun is not for, though no law says so: a ray, a resting shark, an eel. The words say why. */
@@ -65,6 +78,39 @@ export interface DiveSpecies {
   /** Set when taking it is a good deed, with the reason. */
   encouraged?: string;
   /** What is said the first time she comes close to one: how to know it, and the rule. */
+  say: string;
+  /** How it moves and flees. Without it, the way every fish moved before there were kinds of flight. */
+  flight?: Flight;
+  /** Where it heads with a shaft in it. Without it, the kelp for a kelp fish, a hole for a reef fish, a run for the rest. */
+  bolthole?: Bolthole;
+  /** Never comes closer than this, metres: a shark in the blue that only circles, or a big fish that keeps a polite distance. */
+  keepOff?: number;
+  /** A sea lion or a seal that will take a fish off a stringer left on the float. */
+  thief?: boolean;
+  /** Meeting one is a moment: said as an alarm, the first time on each dive. */
+  moment?: string;
+  /** Over this size a fish is a trophy, worth more. */
+  trophy?: number;
+  /** The big ones are males and look it: a sheephead goes from pink to black, red and black. */
+  male?: { over: number; pattern: string; colour: string; say?: string };
+  /** Now and then a young one, with its own colours: a garibaldi's blue spots. A find for the logbook. */
+  young?: { chance: number; size: [number, number]; pattern: string; colour: string; say: string };
+}
+
+/** Taken by hand from the bottom: a scallop off the rock, an urchin, a conch off the sand. Or only to look at, like an abalone. */
+export interface HandSpec {
+  id: string;
+  name: string;
+  kind: 'scallop' | 'urchin' | 'abalone' | 'conch';
+  on: 'rock' | 'sand';
+  /** Smallest and largest, centimetres across the shell or the test. */
+  size: [number, number];
+  minCm?: number;
+  bag?: number;
+  /** How many a good site holds. */
+  common: number;
+  protected?: string;
+  colour: string;
   say: string;
 }
 
@@ -106,6 +152,8 @@ export interface DiveFile {
   water: { visibility: [number, number]; tempC: number; tint: [number, number, number]; cover: 'kelp' | 'coral' | 'none'; say: string };
   lobster?: LobsterRule;
   species: DiveSpecies[];
+  /** Taken by hand, or only looked at. */
+  hand?: HandSpec[];
   zones: DiveZone[];
   sites: DiveSite[];
 }
@@ -440,6 +488,17 @@ export interface Fish {
   left: number;
   /** Its own beat, so no two swim in step. */
   phase: number;
+  /** How fast it is turning, radians a second, eased: for the bank into a turn. */
+  turn?: number;
+  /** A seal's corkscrew: how far over it has rolled. */
+  roll?: number;
+  /** Seconds it stays on edge after a fright: a spooked fish or school will not let her close for a while. */
+  shy?: number;
+  /** Set when it has just lifted off the bottom, for the cloud of silt. Whoever draws it clears it. */
+  kicked?: number;
+  /** A young one in its own colours, or a big male in his. */
+  young?: boolean;
+  male?: boolean;
 }
 
 export interface Conditions { night: boolean; dawn: boolean }
@@ -452,7 +511,7 @@ export interface Conditions { night: boolean; dawn: boolean }
 export function populate(file: DiveFile, ground: Ground, cx: number, cy: number, shift: number, c: Conditions): Fish[] {
   const site = ground.site;
   const key = site ? nameKey(site.id) : hash01(Math.floor(cx / 250), Math.floor(cy / 250), 40) * 1e6;
-  const list = site ? site.life.map((id) => file.species.find((s) => s.id === id)).filter((s): s is DiveSpecies => !!s) : file.species.filter((s) => s.anywhere);
+  const list = site ? castOf(file, site) : file.species.filter((s) => s.anywhere);
   const out: Fish[] = [];
   let index = 0;
   for (const sp of list) {
@@ -467,7 +526,8 @@ export function populate(file: DiveFile, ground: Ground, cx: number, cy: number,
     const pack = sp.group ? index : -1;
     for (let i = 0; i < n; i++, index++) {
       const [lo, hi] = sp.size;
-      const cm = Math.round(lo + (hi - lo) * Math.pow(hash01(key, shift, index, 45), 1.6));
+      const young = !!sp.young && hash01(key, shift, index, 47) < sp.young.chance;
+      const cm = young ? Math.round(sp.young!.size[0] + (sp.young!.size[1] - sp.young!.size[0]) * hash01(key, shift, index, 45)) : Math.round(lo + (hi - lo) * Math.pow(hash01(key, shift, index, 45), 1.6));
       const place = homeFor(sp, ground, cx, cy, key, shift, pack >= 0 ? pack : index);
       const off = pack >= 0 ? i * 1.3 : 0;
       const phase = hash01(key, shift, index, 46) * Math.PI * 2;
@@ -475,12 +535,20 @@ export function populate(file: DiveFile, ground: Ground, cx: number, cy: number,
         index, species: sp, cm, kg: sp.kgPerCm3 * cm * cm * cm, count: sp.school ?? 1,
         x: place.x + Math.sin(phase) * off, y: place.y + Math.cos(phase) * off, d: Math.max(0.6, Math.min(place.d, ground.floor(place.x + Math.sin(phase) * off, place.y + Math.cos(phase) * off) - 0.06)),
         hx: place.x, hy: place.y, hd: place.d, vx: 0, vy: 0, vd: 0, heading: phase, mode: 'cruise', fear: 0, left: 0, phase,
+        turn: 0, roll: 0, shy: 0, kicked: 0, young, male: !young && !!sp.male && cm >= sp.male.over,
       });
     }
   }
   // The hunters work the bait: a pack of them is never far from the school.
   const bait = out.find((f) => f.species.bait);
   if (bait) for (const f of out) if (f.species.strong && f.species.habitat === 'open') { f.hx = bait.hx + 5 * Math.sin(f.phase); f.hy = bait.hy + 5 * Math.cos(f.phase); f.hd = Math.max(0.6, Math.min(bait.hd, ground.floor(f.hx, f.hy) - 0.5)); f.x = f.hx; f.y = f.hy; f.d = f.hd; }
+  return out;
+}
+
+/** Who lives at a site: the kinds its `life` names, then the kinds that name it (or every site) themselves. */
+export function castOf(file: DiveFile, site: DiveSite): DiveSpecies[] {
+  const out = site.life.map((id) => file.species.find((s) => s.id === id)).filter((s): s is DiveSpecies => !!s);
+  for (const sp of file.species) if (!out.includes(sp) && (sp.sites === 'all' || sp.sites?.includes(site.id))) out.push(sp);
   return out;
 }
 
@@ -504,7 +572,15 @@ function homeFor(sp: DiveSpecies, g: Ground, cx: number, cy: number, key: number
     else if (sp.habitat === 'sand') { d = floor - 0.06; if (rock < 0.25) break; }
     else if (sp.habitat === 'reef') { d = floor - (0.5 + 0.9 * h); if (rock > 0.5) break; }
     else if (sp.habitat === 'kelp') { d = clamp(2 + h * (floor - 3.5), 1.5, floor - 0.8); if (g.grows(x, y) || (g.cover !== 'kelp' && rock > 0.5)) break; }
-    else { d = clamp(2 + h * Math.min(7, floor - 3), 1.5, Math.max(1.5, floor - 1)); break; }
+    else if (sp.habitat === 'blue') {
+      // Out at the edge of what she can see, in mid-water.
+      const a2 = hash01(key, shift, index, 95) * Math.PI * 2;
+      const far2 = 18 + 8 * hash01(key, shift, index, 96);
+      x = cx + Math.sin(a2) * far2;
+      y = cy + Math.cos(a2) * far2;
+      d = clamp(3 + h * 6, 1.5, Math.max(1.5, g.floor(x, y) - 2));
+      break;
+    } else { d = clamp(2 + h * Math.min(7, floor - 3), 1.5, Math.max(1.5, floor - 1)); break; }
   }
   return { x, y, d: Math.max(0.6, d) };
 }
@@ -523,6 +599,8 @@ export interface Lobster {
   mode: 'there' | 'fled' | 'caught';
   /** Seconds until one that shot off backwards settles again. */
   left: number;
+  /** How far back in its hole, 0 at the mouth to 1 out of reach. A careless approach sends it back; a patient one lets it come forward. */
+  back?: number;
 }
 
 /** The lobster at a place for one half hour: under the ledges where the bottom is rock. More of them at a good site. */
@@ -548,7 +626,7 @@ export function lobstersAt(file: DiveFile, ground: Ground, cx: number, cy: numbe
     const [lo, hi] = rule.sizeMm;
     const mm = Math.round(lo + (hi - lo) * Math.pow(hash01(key, shift, index, 62), 1.3));
     const out2 = night && hash01(key, shift, index, 63) < 0.75;
-    out.push({ index, x, y, d: ground.floor(x, y) - 0.12, heading: hash01(key, shift, index, 64) * Math.PI * 2, mm, deep: !night && hash01(key, shift, index, 65) < 0.4, out: out2, mode: 'there', left: 0 });
+    out.push({ index, x, y, d: ground.floor(x, y) - 0.12, heading: hash01(key, shift, index, 64) * Math.PI * 2, mm, deep: !night && hash01(key, shift, index, 65) < 0.4, out: out2, mode: 'there', left: 0, back: !night && hash01(key, shift, index, 65) < 0.4 ? 1 : 0 });
   }
   return out;
 }
@@ -562,7 +640,7 @@ export interface Diver { x: number; y: number; d: number; vx: number; vy: number
  * at it brings that out further; keeping still, coming down from above, coming up behind it, or having kelp or a
  * rock between them each bring it in, and that is the whole game of stalking.
  */
-export function alarm(f: Pick<Fish, 'x' | 'y' | 'd' | 'heading' | 'species'>, diver: Diver, cover: boolean): number {
+export function alarm(f: Pick<Fish, 'x' | 'y' | 'd' | 'heading' | 'species' | 'shy'>, diver: Diver, cover: boolean): number {
   const dx = f.x - diver.x;
   const dy = f.y - diver.y;
   const dd = f.d - diver.d;
@@ -576,6 +654,8 @@ export function alarm(f: Pick<Fish, 'x' | 'y' | 'd' | 'heading' | 'species'>, di
   // Behind it: the fish is heading away from her.
   if ((Math.sin(f.heading) * -dx + Math.cos(f.heading) * -dy) / Math.max(1e-6, Math.hypot(dx, dy)) < -0.5) reach *= 0.7;
   if (cover) reach *= 0.7;
+  // Frightened once already, it keeps her further off for a minute.
+  reach *= 1 + 0.8 * clamp01((f.shy ?? 0) / 30);
   if (!(reach > 0)) return 0;
   return clamp01((reach - dist) / (0.4 * reach));
 }
@@ -588,9 +668,13 @@ export function spook(fish: Fish[], x: number, y: number, d: number): number {
     const dist = Math.hypot(f.x - x, f.y - y, f.d - d);
     if (f.species.wary <= 0) continue;
     if (dist < 8) { f.fear = 1; n++; } else if (dist < 16) f.fear = Math.max(f.fear, 0.6);
+    if (dist < 16) f.shy = SHY;
   }
   return n;
 }
+
+/** Seconds a fish stays shy after a fright. */
+export const SHY = 60;
 
 /** Move one fish on by `dt` seconds. `t` is any steady clock. */
 export function stepFish(f: Fish, diver: Diver, dt: number, t: number, floorAt: (x: number, y: number) => number, cover: boolean): void {
@@ -601,37 +685,67 @@ export function stepFish(f: Fish, diver: Diver, dt: number, t: number, floorAt: 
     return;
   }
   const sp = f.species;
+  const flight = sp.flight;
+  const onBottom = sp.habitat === 'sand' || !!sp.rests;
   const dx = f.x - diver.x;
   const dy = f.y - diver.y;
   const dd = f.d - diver.d;
   const dist = Math.max(1e-3, Math.hypot(dx, dy, dd));
+  if (f.shy) f.shy = Math.max(0, f.shy - dt);
   f.fear = Math.max(f.fear - dt * 0.3, alarm(f, diver, cover));
   let tx: number;
   let ty: number;
   let td: number;
   let pace = sp.speed;
   const still = Math.hypot(diver.vx, diver.vy, diver.vd) < 0.25;
-  if (f.mode !== 'bolt' && f.fear >= 1) { f.mode = 'bolt'; f.left = 3.5; }
+  if (f.mode !== 'bolt' && f.fear >= 1) {
+    f.mode = 'bolt';
+    f.left = flight === 'bury' ? 2.2 : 3.5;
+    if (onBottom) f.kicked = 1;
+  }
   if (f.mode === 'bolt') {
     // Straight away from her, and a little down toward the bottom.
-    // A ray or a shark off the sand lifts as it goes.
-    tx = f.x + (dx / dist) * 10; ty = f.y + (dy / dist) * 10; td = f.d + (sp.habitat === 'sand' || sp.rests ? -2.5 : 1.5);
+    // A ray, a halibut or a shark off the sand lifts as it goes.
+    tx = f.x + (dx / dist) * 10; ty = f.y + (dy / dist) * 10; td = f.d + (onBottom ? (flight === 'bury' ? -1.1 : -2.5) : 1.5);
     pace = Math.max(1.8, sp.speed * 3);
     f.left -= dt;
     if (f.left <= 0) {
-      if (sp.wary > 0.5 && dist > 9) { f.mode = 'gone'; f.left = 40 + 60 * sp.wary; return; }
+      if ((sp.wary > 0.5 || flight === 'ghost') && dist > 9) { f.mode = 'gone'; f.left = flight === 'ghost' ? 240 : 40 + 60 * sp.wary; return; }
       f.mode = 'cruise';
       f.fear = 0.5;
+      // A flatfish settles where it comes down, and that is its place now.
+      if (flight === 'bury' || flight === 'glide') { f.hx = f.x; f.hy = f.y; }
     }
+  } else if (sp.keepOff && !sp.curious) {
+    // Out in the blue, circling at the edge of what she can see, and never closer.
+    const a = f.phase + t * (sp.speed / sp.keepOff);
+    tx = diver.x + Math.sin(a) * sp.keepOff; ty = diver.y + Math.cos(a) * sp.keepOff; td = f.hd;
+  } else if (flight === 'loop' && dist < 22 && f.fear < 0.6) {
+    // A seal or a sea lion plays: loops round her, up and down, turning over as it goes.
+    const a = f.phase + t * 0.85;
+    tx = diver.x + Math.sin(a) * 3.4; ty = diver.y + Math.cos(a) * 3.4; td = Math.max(1, diver.d + 1.6 * Math.sin(t * 0.7 + f.phase));
+    pace = sp.speed * 1.1;
+    f.roll = ((f.roll ?? 0) + dt * 2.2) % (Math.PI * 2);
   } else if (sp.curious && still && f.fear < 0.3 && dist < 14) {
     // Come and have a look: the bold ones right up to the mask, the wary ones round her at a few metres.
-    const ring = sp.wary > 0.5 ? 3.2 : 1.7;
-    const a = f.phase + t * (sp.wary > 0.5 ? 0.35 : 0.12 + 0.3 * Math.max(0, sp.speed - 0.6));
+    const ring = sp.keepOff ?? (sp.wary > 0.5 ? 3.2 : 1.7);
+    const a = f.phase + t * (sp.wary > 0.5 ? 0.35 : 0.12 + 0.3 * Math.max(0, sp.speed - 0.6)) * (flight === 'drift' ? 0.4 : 1);
     tx = diver.x + Math.sin(a) * ring; ty = diver.y + Math.cos(a) * ring; td = diver.d + 0.3 * Math.sin(t * 0.4 + f.phase);
+    if (flight === 'drift') pace = Math.min(pace, 0.35);
+  } else if (flight === 'streak') {
+    // Straight through, near the top, fast; out of sight and round again.
+    const hx = Math.sin(f.phase);
+    const hy = Math.cos(f.phase);
+    const along = (f.x - f.hx) * hx + (f.y - f.hy) * hy;
+    if (along > 36) { f.x -= hx * 72; f.y -= hy * 72; }
+    tx = f.x + hx * 6; ty = f.y + hy * 6; td = f.hd;
+    pace = sp.speed * (1 + f.fear);
   } else {
-    const roam = sp.habitat === 'open' ? 9 : sp.habitat === 'sand' || sp.rests ? 0.4 : 2.5;
-    const w = sp.speed / Math.max(2, roam) * 0.8;
-    tx = f.hx + Math.sin(t * w + f.phase) * roam; ty = f.hy + Math.cos(t * w * 0.83 + f.phase * 1.7) * roam; td = f.hd + (sp.habitat === 'sand' || sp.rests ? 0 : 0.5 * Math.sin(t * 0.21 + f.phase));
+    const roam = flight === 'hold' ? 1.3 : flight === 'dart' ? 2 : flight === 'ghost' ? 6 : flight === 'sweep' ? 11 : flight === 'circle' ? 7 : flight === 'glide' ? 3 : sp.habitat === 'open' ? 9 : onBottom ? 0.4 : 2.5;
+    const w = (sp.speed / Math.max(2, roam)) * 0.8 * (flight === 'ghost' || flight === 'sweep' ? 0.5 : 1);
+    tx = f.hx + Math.sin(t * w + f.phase) * roam; ty = f.hy + Math.cos(t * w * 0.83 + f.phase * 1.7) * roam; td = f.hd + (onBottom ? 0 : (flight === 'hold' ? 0.25 : 0.5) * Math.sin(t * 0.21 + f.phase));
+    // Small fish go in bursts and coast between.
+    if (flight === 'dart') pace *= 0.3 + 2.2 * Math.max(0, Math.sin(t * 1.7 + f.phase * 3)) ** 4;
     if (f.fear > 0) {
       // On edge: it gives ground, keeping its distance.
       tx += (dx / dist) * 6 * f.fear; ty += (dy / dist) * 6 * f.fear;
@@ -649,12 +763,21 @@ export function stepFish(f: Fish, diver: Diver, dt: number, t: number, floorAt: 
   f.vd += ((ed / Math.max(el, 1e-3)) * want - f.vd) * k;
   f.x += f.vx * dt;
   f.y += f.vy * dt;
+  if (sp.keepOff && !sp.curious) {
+    // However it was got there, it is not closer than its distance.
+    const ox = f.x - diver.x;
+    const oy = f.y - diver.y;
+    const o = Math.hypot(ox, oy);
+    if (o < sp.keepOff - 0.5) { const k2 = (sp.keepOff - 0.5) / Math.max(o, 1e-3); f.x = diver.x + ox * k2; f.y = diver.y + oy * k2; }
+  }
   const floor = floorAt(f.x, f.y);
-  f.d = (sp.habitat === 'sand' || sp.rests) && f.mode !== 'bolt' ? Math.max(0.3, floor - 0.06) : clamp(f.d + f.vd * dt, 0.6, Math.max(0.6, floor - 0.2));
+  f.d = onBottom && f.mode !== 'bolt' && flight !== 'glide' ? Math.max(0.3, floor - 0.06) : clamp(f.d + f.vd * dt, 0.6, Math.max(0.6, floor - (onBottom ? 0.08 : 0.2)));
   if (Math.hypot(f.vx, f.vy) > 0.04) {
     const to = Math.atan2(f.vx, f.vy);
-    f.heading += Math.atan2(Math.sin(to - f.heading), Math.cos(to - f.heading)) * Math.min(1, dt * 5);
-  }
+    const step = Math.atan2(Math.sin(to - f.heading), Math.cos(to - f.heading)) * Math.min(1, dt * 5);
+    f.heading += step;
+    f.turn = (f.turn ?? 0) + (step / Math.max(dt, 1e-3) - (f.turn ?? 0)) * Math.min(1, dt * 4);
+  } else f.turn = (f.turn ?? 0) * (1 - Math.min(1, dt * 4));
 }
 
 // ---- the speargun --------------------------------------------------------------------------------------
@@ -804,19 +927,42 @@ export type GrabResult = 'caught' | 'far' | 'deep' | 'fled';
  * A hand for a lobster. They shoot off backwards with a flick of the tail, so the hand has to come from in front and
  * pin them down: from the side or behind, or coming in fast, it is gone. One far back in its hole by day cannot be reached.
  */
-export function grab(l: Pick<Lobster, 'x' | 'y' | 'd' | 'heading' | 'deep' | 'mode'>, diver: Diver): GrabResult {
+export function grab(l: Pick<Lobster, 'x' | 'y' | 'd' | 'heading' | 'deep' | 'mode' | 'back'>, diver: Diver): GrabResult {
   if (l.mode !== 'there') return 'far';
   const dx = diver.x - l.x;
   const dy = diver.y - l.y;
   const dist = Math.hypot(dx, dy, diver.d - l.d);
   if (dist > GRAB.reach) return 'far';
-  if (l.deep) return 'deep';
+  if (l.deep || (l.back ?? 0) > 0.6) return 'deep';
   const flat = Math.max(1e-6, Math.hypot(dx, dy));
   const ahead = (Math.sin(l.heading) * dx + Math.cos(l.heading) * dy) / flat;
   // Straight down on top of it counts as in front: there is nowhere for it to go.
   const fromFront = flat < 0.35 || ahead >= Math.cos(GRAB.front);
   if (!fromFront || Math.hypot(diver.vx, diver.vy, diver.vd) > GRAB.lunge) return 'fled';
   return 'caught';
+}
+
+/**
+ * A lobster in its hole minds the diver. Within a couple of metres, a hand coming from the side or behind, or coming
+ * fast, sends it backwards into the dark a little at a time; a slow approach from in front, or keeping still, lets it
+ * creep back to the mouth with its feelers out. Once it is right back (`back` over 0.6) it cannot be reached.
+ * A lobster deep in its hole by day stays there however she comes at it.
+ */
+export function lobsterShies(l: Lobster, diver: Diver, dt: number): void {
+  if (l.mode !== 'there' || l.deep || l.out) return;
+  const dx = diver.x - l.x;
+  const dy = diver.y - l.y;
+  const dist = Math.hypot(dx, dy, diver.d - l.d);
+  const speed = Math.hypot(diver.vx, diver.vy, diver.vd);
+  let back = l.back ?? 0;
+  if (dist < 2.2) {
+    const flat = Math.max(1e-6, Math.hypot(dx, dy));
+    const ahead = (Math.sin(l.heading) * dx + Math.cos(l.heading) * dy) / flat;
+    const front = flat < 0.35 || ahead >= Math.cos(GRAB.front);
+    if (!front || speed > 0.5) back += dt * (0.25 + speed * 0.9);
+    else if (speed < 0.2) back -= dt * 0.12;
+  } else back -= dt * 0.05;
+  l.back = clamp01(back);
 }
 
 /**

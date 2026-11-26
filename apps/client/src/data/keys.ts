@@ -59,7 +59,9 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['Shift', '+', 'L'], name: 'Fishing card', what: 'Off Long Beach and Catalina: what is biting here and why, the lure or the bait, the day\'s catch and points, and fishing tournaments to call or join. With a fish at the rail, L keeps it and Shift+L lets it go.' },
     { keys: ['5'], name: 'Go diving', what: 'Anchored or on a mooring, or stopped in the tender: over the side with mask, fins, a speargun and a float with a dive flag. You swim on your fins with the arrow keys: each press of the up arrow is a kick, and you glide between kicks; left and right turn you; down puts your head down for a duck dive; E turns it up again; drag to look about. W A S D work the same. Kicking hard burns breath: kick, glide, and come up with air in hand. Rest on the float between dives, and wait for "breathed up" before the next. 5 under water heads for the surface, and 5 beside the boat climbs out. Clean dives grow your lungs: the logbook keeps your freediving level.' },
     { keys: ['F'], name: 'Speargun', what: 'Under water: fires the shaft where you are looking. It is good for three or four metres, so stalk close and slowly. The panel names the fish you are looking at and its rule: a protected fish, a short one or one over the limit costs a citation, and the gun stays on safe in a reserve.' },
-    { keys: ['G'], name: 'Grab a lobster', what: 'Under water, within arm\'s reach of a lobster: takes it by hand, which is the only way allowed. Come at it from the front and slowly or it shoots off backwards. Each one is measured: short ones go back, and so do all of them out of season.' },
+    { keys: ['G'], name: 'Take by hand', what: 'Under water, within arm\'s reach: takes a lobster, a scallop, an urchin or a conch by hand, which is the only way allowed. Come at a lobster from the front and slowly or it backs into its hole or shoots off backwards; wait still in front of it and it creeps back out. Each one is measured: short ones go back, and so do lobster out of season. Abalone are only to look at.' },
+    { keys: ['Q'], name: 'Lock on', what: 'Under water: holds the view on the fish, lobster or shellfish you are looking at, and turns you to keep it in front of you. Q again moves to the next; Shift+Q lets go. While locked, left and right lead the aim ahead of a moving fish. The lock only does the looking: a wary fish still keeps its distance, and the muzzle bead turns green only when a shot would find it.' },
+    { keys: ['1', '2'], name: 'Mask or chase view', what: 'In the water: 1 is the view through your mask, 2 follows you from behind and a little above, so you can watch yourself swim. The gun points where the view points in both; in the chase view a faint line shows where the shaft would go. Your choice is remembered.' },
     { keys: ['6'], name: 'Lobster season practice', what: 'Where the water\'s own day is outside the lobster season: treats the season as open on your dives, and the water below as night, when lobster walk the reef. Only for you: nobody else\'s day changes. Press again to turn it off.' },
   ] },
   { id: 'views', title: 'Views', rows: [
@@ -153,8 +155,9 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['↑'], 'kick, then glide'],
     [['←', '→'], 'turn'],
     [['↓', 'E'], 'head down, up'],
-    [['F'], 'fire'],
-    [['G'], 'grab a lobster'],
+    [['F', 'G'], 'fire, take by hand'],
+    [['Q'], 'lock on'],
+    [['1', '2'], 'mask, chase view'],
     [['5'], 'surface; climb out'],
   ],
 };
