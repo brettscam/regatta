@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { WAVE_COUNT, WAVE_GEOM_COUNT, type Wave } from './waves';
+import { WAVE_COUNT, WAVE_GEOM_COUNT, wavePhases, type Wave } from './waves';
+import { wrap, type Origin } from './origin';
 import { AIR_GLSL, GUSTINESS_GLSL, type SeaField } from './seaField';
 import type { Wake } from './wake';
 
@@ -123,10 +124,12 @@ function makeRadialGrid(rings = 230, segments = 288, maxRadius = 16000): THREE.B
 const vertexShader = /* glsl */ `
   #define NW ${WAVE_COUNT}
   #define NG ${WAVE_GEOM_COUNT}
-  uniform float uTime;
+  // Everything here is in the scene's local frame, about its floating origin (see scene/origin.ts), so the numbers the
+  // card works with stay small. uOriginEN puts a local point back on the course, for the coarse grids.
   uniform vec3 uCenter;
+  uniform vec2 uOriginEN;  // the origin, metres east and north
   uniform vec4 uWaveA[NW]; // dir.x, dir.z, wavenumber, amplitude
-  uniform vec4 uWaveB[NW]; // omega, steepness, phase, wavelength
+  uniform vec4 uWaveB[NW]; // omega, steepness, phase at the origin now (from wavePhases), wavelength
   uniform vec4 uBoat;      // x, z, sin(heading), cos(heading)
   uniform vec2 uWind;      // unit vector the wind blows toward, world x and z
   uniform sampler2D uDepth;
@@ -139,13 +142,13 @@ const vertexShader = /* glsl */ `
   varying float vLee;      // 1 close under a weather shore, where the wind has had no room to raise a sea
 
   float landAt(vec2 xz) {
-    vec2 uv = ((vec2(xz.x, -xz.y) - uDepthGrid.xy) / uDepthGrid.z + 0.5) / uDepthSize;
+    vec2 uv = ((vec2(xz.x, -xz.y) + uOriginEN - uDepthGrid.xy) / uDepthGrid.z + 0.5) / uDepthSize;
     return 1.0 - smoothstep(0.0, 1.2, texture2D(uDepth, uv).r * uDepthGrid.w);
   }
 
   void main() {
     vec2 base = position.xz + uCenter.xz;
-    vAir = airAt(vec2(base.x, -base.y));
+    vAir = airAt(vec2(base.x, -base.y) + uOriginEN);
     vLee = max(landAt(base - uWind * 140.0), max(landAt(base - uWind * 380.0) * 0.8, landAt(base - uWind * 800.0) * 0.5));
     float r = length(position.xz);
     // Roughly how far apart the vertices are out here. A wave is only drawn where the mesh can carry it.
@@ -163,7 +166,7 @@ const vertexShader = /* glsl */ `
       vec4 b = uWaveB[i];
       float fade = 1.0 - smoothstep(b.w * 0.16, b.w * 0.45, spacing);
       if (i >= 2) fade *= calm;
-      float ph = a.z * dot(a.xy, base) - b.x * uTime + b.z;
+      float ph = a.z * dot(a.xy, base) + b.z;
       p.xz += a.xy * (b.y * a.w * cos(ph) * fade);
       p.y += a.w * sin(ph) * fade;
     }
@@ -175,7 +178,11 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   #define NW ${WAVE_COUNT}
-  uniform float uTime;
+  uniform float uTime;     // sea time modulo 1000 s: every texture drift below comes round to a whole tile in that
+  uniform vec2 uOriginEN;
+  // Where each tiled pattern stands at the origin, as a share of a tile (worked out in double precision by Ocean),
+  // so a pattern laid over the world has the same look whichever origin it is drawn about.
+  uniform vec4 uTile[6];
   uniform vec4 uWaveA[NW];
   uniform vec4 uWaveB[NW];
   uniform samplerCube uSky;
@@ -252,7 +259,7 @@ const fragmentShader = /* glsl */ `
       vec4 a = uWaveA[i];
       vec4 b = uWaveB[i];
       float fade = 1.0 - smoothstep(0.18, 0.5, footprint / b.w);
-      float ph = a.z * dot(a.xy, vBase) - b.x * uTime + b.z;
+      float ph = a.z * dot(a.xy, vBase) + b.z;
       float ka = a.z * a.w * fade;
       slope += a.xy * (ka * cos(ph));
       pinch += b.y * ka * sin(ph);
@@ -268,7 +275,7 @@ const fragmentShader = /* glsl */ `
     // The same sum as ReplayWorld.gustyWind, so dark water is where the sim will find more wind.
     float airSpeed = length(vAir.xy);
     vec2 airDir = vAir.xy / max(airSpeed, 0.05);
-    vec2 en = vec2(vBase.x, -vBase.y);
+    vec2 en = vec2(vBase.x, -vBase.y) + uOriginEN;
     float along = dot(en, airDir) - airSpeed * 0.7 * uSeason;
     float across = en.x * airDir.y - en.y * airDir.x;
     float puff = 0.085 * sin(along / 310.0 + across / 520.0) + 0.055 * sin(along / 127.0 - across / 210.0 + 1.7) + 0.03 * sin(uSeason / 9.3 + along / 60.0);
@@ -301,11 +308,11 @@ const fragmentShader = /* glsl */ `
     // Under five knots the water goes glassy. In the lee of the land it is smoother than the wind alone would have it.
     float breeze = clamp(kt / 14.0, 0.0, 2.4) * smoothstep(0.8, 6.5, kt);
     // Cat's-paws: finer patchiness inside the gusts, drifting downwind with them.
-    float paws = texture2D(uDetail, wUV / 310.0 - vec2(uTime * 0.021, 0.0)).b;
-    paws = mix(paws, texture2D(uDetail, wUV.yx / 870.0 + vec2(0.0, uTime * 0.004)).a, 0.35);
-    vec4 d1 = texture2D(uDetail, wUV / 7.3 - vec2(uTime * 0.11, 0.0));
-    vec4 d2 = texture2D(uDetail, wUV.yx / 2.3 + vec2(0.31, uTime * 0.19));
-    vec4 d3 = texture2D(uDetail, wUV / 29.0 - vec2(uTime * 0.045, 0.17));
+    float paws = texture2D(uDetail, wUV / 310.0 + uTile[0].xy - vec2(uTime * 0.021, 0.0)).b;
+    paws = mix(paws, texture2D(uDetail, wUV.yx / 870.0 + uTile[0].zw + vec2(0.0, uTime * 0.004)).a, 0.35);
+    vec4 d1 = texture2D(uDetail, wUV / 7.3 + uTile[1].xy - vec2(uTime * 0.11, 0.0));
+    vec4 d2 = texture2D(uDetail, wUV.yx / 2.3 + uTile[1].zw + vec2(0.31, uTime * 0.19));
+    vec4 d3 = texture2D(uDetail, wUV / 29.0 + uTile[2].xy - vec2(uTime * 0.045, 0.17));
     vec2 rip = (d1.rg - 0.5) * 0.55 + vec2(d2.g - 0.5, d2.r - 0.5) * 0.4 + (d3.rg - 0.5) * 0.5;
     float ripAmt = breeze * mix(0.75, 1.1, smoothstep(0.34, 0.72, paws)) * (1.0 + 0.45 * gust - 0.3 * lull) * (1.0 - 0.45 * vLee) * (1.0 - 0.7 * wk.b) / (1.0 + dist * 0.0035);
     slope += (uWind * rip.x + vec2(-uWind.y, uWind.x) * rip.y) * ripAmt;
@@ -373,8 +380,7 @@ const fragmentShader = /* glsl */ `
     }
     // Cloud shadows: the same clouds the sky draws, thrown down-sun onto the water.
     if (uCloudShift.z > 0.01) {
-      vec2 cp = vBase + uCloudShift.xy;
-      float cn = texture2D(uDetail, cp / 9000.0).b * 0.62 + texture2D(uDetail, cp / 2300.0 + 0.37).a * 0.28 + 0.05;
+      float cn = texture2D(uDetail, vBase / 9000.0 + uTile[5].xy).b * 0.62 + texture2D(uDetail, vBase / 2300.0 + uTile[5].zw + 0.37).a * 0.28 + 0.05;
       float cedge = 0.5 + (0.5 - uCover) * 0.42;
       shade = max(shade, smoothstep(cedge - 0.03, cedge + 0.09, cn) * uCloudShift.z);
     }
@@ -387,10 +393,10 @@ const fragmentShader = /* glsl */ `
     col += uSunColor * uSunPower * (pow(rl, 1400.0) * 1.0 + pow(rl, 180.0) * 0.045) * (0.25 + 0.75 * fresnel) * sunUp * (1.0 - shade);
 
     // Whitecaps. None under about ten knots, a few at twelve, and in a hard blow the sea is streaked with them.
-    float foamTex = texture2D(uDetail, vBase / 5.5 + vec2(0.0, uTime * 0.02)).a;
-    float foamFine = texture2D(uDetail, vBase / 1.7).b;
+    float foamTex = texture2D(uDetail, vBase / 5.5 + uTile[3].xy + vec2(0.0, uTime * 0.02)).a;
+    float foamFine = texture2D(uDetail, vBase / 1.7 + uTile[3].zw).b;
     float noise = foamTex * 0.55 + foamFine * 0.45;
-    float patch_ = texture2D(uDetail, vBase / 23.0 + vec2(uTime * 0.012, 0.0)).a;
+    float patch_ = texture2D(uDetail, vBase / 23.0 + uTile[4].xy + vec2(uTime * 0.012, 0.0)).a;
     // The wind starts them; a steep sea, wind against tide, makes more of them, and a sea that is breaking is white.
     float cover = clamp((kt * (1.0 - 0.3 * vLee) - 9.5) / 22.0 * mix(0.6, 1.4, smoothstep(0.02, 0.07, uSeaState.x)) + 0.55 * uSeaState.y, 0.0, 1.0);
     float thr = mix(0.98, 0.2, pow(cover, 0.6));
@@ -404,7 +410,7 @@ const fragmentShader = /* glsl */ `
     // Far off, single crests are smaller than a pixel: show how white the sea is on average instead.
     caps = mix(caps, cover * cover * 0.3 * (0.6 + 0.8 * patch_), smoothstep(1.5, 9.0, footprint));
     // Streaks of old foam lined up with the wind, and above thirty knots the tops blown off as spindrift.
-    float streak = texture2D(uDetail, vec2(wUV.x / 90.0, wUV.y / 6.0) - vec2(uTime * 0.01, 0.0)).a;
+    float streak = texture2D(uDetail, vec2(wUV.x / 90.0, wUV.y / 6.0) + uTile[2].zw - vec2(uTime * 0.01, 0.0)).a;
     float streaks = smoothstep(0.66, 0.92, streak) * smoothstep(0.42, 0.7, foamTex) * clamp((kt - 17.0) / 13.0, 0.0, 0.75) * (0.4 + 0.6 * foamFine);
     float foam = max(caps, streaks) + 0.07 * smoothstep(27.0, 38.0, kt);
 
@@ -437,7 +443,7 @@ const fragmentShader = /* glsl */ `
     if (uRain > 0.01) {
       // Rain on the water: close to, each drop's ring shows for an instant; further off it only beats the sea flat and grey.
       float beat = floor(uTime * 10.0);
-      float cell = texture2D(uDetail, vBase / 0.8 + vec2(beat * 0.37, beat * 0.61)).a;
+      float cell = texture2D(uDetail, vBase / 0.8 + uTile[4].zw + vec2(beat * 0.37, beat * 0.61)).a;
       foam += smoothstep(0.78 - 0.1 * uRain, 0.9, cell) * uRain * 0.6 * (1.0 - smoothstep(25.0, 130.0, dist));
       col = mix(col, uFogColor * 0.75, uRain * 0.3 * smoothstep(30.0, 500.0, dist));
     }
@@ -459,6 +465,11 @@ const fragmentShader = /* glsl */ `
 export class Ocean {
   readonly mesh: THREE.Mesh;
   private readonly uniforms: Record<string, THREE.IUniform>;
+  private readonly wake: Wake;
+  private waves: Wave[] = [];
+  private readonly phases: number[] = [];
+  /** The shoal map's corner and size as given, in scene metres. The shader gets it about the origin. */
+  private readonly shoalBox = new THREE.Vector4(0, 0, 1, 1);
 
   /**
    * @param wake the maps of what the vessels leave on the water
@@ -466,9 +477,12 @@ export class Ocean {
    */
   constructor(skyCube: THREE.Texture, wake: Wake, private readonly field: SeaField) {
     const vec4s = (n: number) => Array.from({ length: n }, () => new THREE.Vector4());
+    this.wake = wake;
     this.uniforms = {
       uTime: { value: 0 },
       uCenter: { value: new THREE.Vector3() },
+      uOriginEN: { value: new THREE.Vector2() },
+      uTile: { value: vec4s(6) },
       uWaveA: { value: vec4s(WAVE_COUNT) },
       uWaveB: { value: vec4s(WAVE_COUNT) },
       uSky: { value: skyCube },
@@ -498,8 +512,8 @@ export class Ocean {
       uDepthSize: { value: field.depthSize },
       uWakeNear: { value: wake.near.texture },
       uWakeFar: { value: wake.far.texture },
-      uWakeNearRect: { value: wake.nearRect },
-      uWakeFarRect: { value: wake.farRect },
+      uWakeNearRect: { value: new THREE.Vector4().copy(wake.nearRect) },
+      uWakeFarRect: { value: new THREE.Vector4().copy(wake.farRect) },
       // Bay water: green-grey rather than tropical blue.
       uDeep: { value: new THREE.Color(0.012, 0.05, 0.062) },
       uScatter: { value: new THREE.Color(0.03, 0.15, 0.13) },
@@ -525,9 +539,11 @@ export class Ocean {
   setWaves(waves: Wave[], windFrom: number): void {
     const a = this.uniforms.uWaveA.value as THREE.Vector4[];
     const b = this.uniforms.uWaveB.value as THREE.Vector4[];
+    this.waves = waves;
     waves.forEach((w, i) => {
       a[i].set(w.dx, w.dz, w.k, w.amp);
-      b[i].set(w.omega, w.q, w.phase, w.length);
+      // The phase slot is filled each frame by `update`, for the origin and the moment.
+      b[i].set(w.omega, w.q, b[i].z, w.length);
     });
     const toward = windFrom + Math.PI;
     (this.uniforms.uWind.value as THREE.Vector2).set(Math.sin(toward), -Math.cos(toward));
@@ -544,7 +560,7 @@ export class Ocean {
     if (old && old !== map) old.dispose();
     this.uniforms.uShoal.value = map;
     this.uniforms.uShoalOn.value = map ? 1 : 0;
-    (this.uniforms.uShoalBox.value as THREE.Vector4).set(x, z, 1 / width, 1 / depth);
+    this.shoalBox.set(x, z, 1 / width, 1 / depth);
   }
 
   /**
@@ -598,15 +614,45 @@ export class Ocean {
   }
 
   /**
+   * Everything the shader is given about places is given about the scene's floating origin (`scene/origin.ts`), worked
+   * out here in double precision, so the card only sees small numbers however far out the boat is.
    * @param time sea time in seconds
    * @param camera the mesh is re-centred under it
    * @param boat world x, world z, heading (radians, compass), speed (m/s), heel (radians)
+   * @param origin the scene's origin, scene metres
    */
-  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number; hulls?: number }): void {
+  update(time: number, camera: THREE.Camera, boat: { x: number; z: number; heading: number; speed: number; heel: number; hulls?: number }, origin: Origin = { x: 0, z: 0 }): void {
     const u = this.uniforms;
-    u.uTime.value = time;
-    (u.uCenter.value as THREE.Vector3).set(camera.position.x, 0, camera.position.z);
-    (u.uBoat.value as THREE.Vector4).set(boat.x, boat.z, Math.sin(boat.heading), Math.cos(boat.heading));
+    const ox = origin.x;
+    const oz = origin.z;
+    // Every drift of a texture below is a whole number of tiles in 1000 s, so the clock can come round.
+    u.uTime.value = wrap(time, 1000);
+    const phases = wavePhases(this.waves, ox, oz, time, this.phases);
+    const b = u.uWaveB.value as THREE.Vector4[];
+    for (let i = 0; i < phases.length; i++) b[i].z = phases[i];
+    (u.uOriginEN.value as THREE.Vector2).set(ox, -oz);
+    (u.uCenter.value as THREE.Vector3).set(camera.position.x - ox, 0, camera.position.z - oz);
+    (u.uBoat.value as THREE.Vector4).set(boat.x - ox, boat.z - oz, Math.sin(boat.heading), Math.cos(boat.heading));
+    const near = this.wake.nearRect;
+    const far = this.wake.farRect;
+    (u.uWakeNearRect.value as THREE.Vector4).set(near.x - ox, near.y - oz, near.z, near.w);
+    (u.uWakeFarRect.value as THREE.Vector4).set(far.x - ox, far.y - oz, far.z, far.w);
+    const sb = this.shoalBox;
+    (u.uShoalBox.value as THREE.Vector4).set(sb.x - ox, sb.y - oz, sb.z, sb.w);
+    // Where each tiled pattern stands at the origin. The ripples are laid along the wind: the same axes as the shader's.
+    const wind = u.uWind.value as THREE.Vector2;
+    const wx = Math.fround(wind.x);
+    const wz = Math.fround(wind.y);
+    const along = ox * wx + oz * wz;
+    const across = -ox * wz + oz * wx;
+    const shift = u.uCloudShift.value as THREE.Vector3;
+    const t = u.uTile.value as THREE.Vector4[];
+    t[0].set(wrap(along / 310, 1), wrap(across / 310, 1), wrap(across / 870, 1), wrap(along / 870, 1));
+    t[1].set(wrap(along / 7.3, 1), wrap(across / 7.3, 1), wrap(across / 2.3, 1), wrap(along / 2.3, 1));
+    t[2].set(wrap(along / 29, 1), wrap(across / 29, 1), wrap(along / 90, 1), wrap(across / 6, 1));
+    t[3].set(wrap(ox / 5.5, 1), wrap(oz / 5.5, 1), wrap(ox / 1.7, 1), wrap(oz / 1.7, 1));
+    t[4].set(wrap(ox / 23, 1), wrap(oz / 23, 1), wrap(ox / 0.8, 1), wrap(oz / 0.8, 1));
+    t[5].set(wrap((ox + shift.x) / 9000, 1), wrap((oz + shift.y) / 9000, 1), wrap((ox + shift.x) / 2300, 1), wrap((oz + shift.y) / 2300, 1));
     u.uBoatSpeed.value = boat.speed;
     u.uBoatHeel.value = boat.heel;
     u.uHulls.value = boat.hulls ?? 0;

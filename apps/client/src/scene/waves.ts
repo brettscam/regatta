@@ -93,6 +93,40 @@ export function setSea(waves: Wave[], height: number, steepness: number): void {
   }
 }
 
+const TAU = Math.PI * 2;
+
+/**
+ * Each wave's phase at a point and a moment, reduced to [0, 2π) in double precision: what the sea's shader adds to
+ * `k (d · r)` for a point `r` metres from that point. The shader is handed small numbers only, so the water it draws
+ * twenty or fifty kilometres out is as steady as at the origin, and still agrees with `waveHeight`.
+ * @param ox, oz the point, scene metres (x east, z south): the scene's floating origin (`scene/origin.ts`)
+ * @param t sea time, seconds
+ */
+export function wavePhases(waves: Wave[], ox: number, oz: number, t: number, out: number[]): number[] {
+  for (let i = 0; i < waves.length; i++) {
+    const w = waves[i];
+    const p = (w.k * (w.dx * ox + w.dz * oz) - w.omega * t + w.phase) % TAU;
+    out[i] = p < 0 ? p + TAU : p;
+  }
+  out.length = waves.length;
+  return out;
+}
+
+/**
+ * Height of the long waves as the sea's shader works it out: from the phases at the origin (`wavePhases`) and the
+ * point's place relative to it. With `single` every step is rounded to single precision, as the graphics card does.
+ */
+export function localWaveHeight(waves: Wave[], phases: number[], rx: number, rz: number, count = 4, single = false): number {
+  const f = single ? Math.fround : (v: number) => v;
+  let y = 0;
+  for (let i = 0; i < count && i < waves.length; i++) {
+    const w = waves[i];
+    const ph = f(f(f(w.k) * f(f(f(w.dx) * f(rx)) + f(f(w.dz) * f(rz)))) + f(phases[i]));
+    y = f(y + f(f(w.amp) * f(Math.sin(ph))));
+  }
+  return y;
+}
+
 /** Height of the long waves at a point. Good enough for floating the hull and keeping the camera dry. */
 export function waveHeight(waves: Wave[], x: number, z: number, t: number, count = 4): number {
   let y = 0;
