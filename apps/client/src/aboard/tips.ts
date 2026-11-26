@@ -389,6 +389,7 @@ export class Tips implements Feature {
       manoeuvre: s.maneuver !== null, knocked: o.knockedDown || s.knock > 0.05, hitAgo: this.clock - this.hitAt, panel,
       hold: s.hold, heldFor: this.heldFor, berth, ashore,
       tender: !!ctx.feature('kayak')?.focus?.(), night: this.night,
+      walking: (ctx.feature('ashore') as { snap?: () => Snap['walking'] } | undefined)?.snap?.() ?? null, // ashore
       // The tender she carries, and what Shift+O would give instead (`aboard/kayak.ts`).
       tenderName: (ctx.feature('kayak') as { tenderName?: () => string } | undefined)?.tenderName?.() ?? 'Kayak',
       tenderOthers: (ctx.feature('kayak') as { tenderOthers?: () => string[] } | undefined)?.tenderOthers?.() ?? [],

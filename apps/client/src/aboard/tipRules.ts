@@ -90,6 +90,8 @@ export interface Snap {
   ashore: { name: string; where: string; d: number; dock: boolean } | null;
   /** The tender is out. */
   tender: boolean;
+  /** ashore: on foot at a place (`ashore/walk.ts`): its name, how many other players are there, whether it sells anything, and whether she is sitting, leaning or dancing. */
+  walking: { where: string; friends: number; menu: boolean; posed: boolean } | null;
   /** The tender she carries: its name ('Kayak', 'Skiff', 'Wave runner'), and the others this yacht could carry instead. */
   tenderName: string;
   tenderOthers: string[];
@@ -113,7 +115,7 @@ export function emptySnap(): Snap {
     windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
     hand: false, mistrim: false, aground: false, stuck: 0, knockdowns: 0,
     manoeuvre: false, knocked: false, hitAgo: Infinity, panel: false,
-    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,
+    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, walking: null, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,
     marks: 0, mark: null,
   };
 }
