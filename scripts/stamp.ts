@@ -165,6 +165,39 @@ for (const s of lines) {
   for (const [x, y] of s.line!) if (!parts(course.depth).some((p) => p.g.dx <= 60 && within(p.g, x, y))) console.log(`WARNING: ${s.name} runs outside the fine depth insets at ${x}, ${y}: it is ${course.depth.dx} m thick there`);
 }
 
+// ---- the towns' piers and moles (towns.json), on the 10 m harbour insets ------------------------------
+// A pier on piles or a mole of rock is solid to a boat: the cells within half its width of its line (and within 3 m)
+// are land. Only a grid of 10 m or finer can carry one without swallowing the floats moored beside it, so a pier that no
+// such grid covers is left out, and said so. Floats stay water.
+const townsPath = new URL('towns.json', dir);
+let piers = 0;
+if (existsSync(townsPath)) {
+  const towns = JSON.parse(readFileSync(townsPath, 'utf8')) as Array<{ id: string; paths: Array<{ id: string; kind: string; width: number; points?: Array<[number, number]> }> }>;
+  const fine = parts(course.depth).filter((p) => p.g.dx <= 10);
+  for (const t of towns) {
+    const floats = t.paths.filter((f) => f.kind === 'float' && f.points);
+    for (const p of t.paths) {
+      // A dinghy pier four metres wide is left to the tenders.
+      if ((p.kind !== 'pier' && p.kind !== 'quay') || !p.points || p.width < 5) continue;
+      const covered = p.points.every(([x, y]) => fine.some((f) => within(f.g, x, y)));
+      if (!covered) { console.log(`WARNING: ${t.id} ${p.id} is not on a 10 m depth inset: not made solid`); continue; }
+      for (const { g, start } of fine) {
+        // The finest grid covering a place is the first inset that covers it.
+        for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
+          const x = g.x0 + i * g.dx;
+          const y = g.y0 + j * g.dx;
+          if (toLine(p.points, x, y) > Math.max(p.width / 2, 3)) continue;
+          // The water under a float stays water, so a tender can lie alongside it.
+          if (floats.some((f) => toLine(f.points!, x, y) <= f.width / 2 + 1)) continue;
+          const k = start + j * g.nx + i;
+          if (depth[k] !== 0) { depth[k] = 0; piers++; }
+        }
+      }
+    }
+  }
+}
+if (piers) console.log(`${piers} depth cells under the towns' piers and moles made solid`);
+
 // ---- the land: the tiles' lumps along the walls and under the islands go ----------------------------
 let lowered = 0;
 for (const { g, start } of parts(course.terrain)) {

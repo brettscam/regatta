@@ -936,6 +936,7 @@ function readGround(ctx: AboardContext): HeightGrid | null {
   const mesh = ctx.stage.scene.getObjectByName('terrain') as THREE.Mesh | undefined;
   const position = mesh?.geometry?.getAttribute('position');
   const g = ctx.stage.course.terrain;
-  if (!position || position.count !== g.nx * g.ny) return null;
+  // The grid's points come first; the points where the shore cuts it follow them.
+  if (!position || position.count < g.nx * g.ny) return null;
   return { x0: g.x0, y0: g.y0, dx: g.dx, nx: g.nx, ny: g.ny, data: position.array, stride: 3, offset: 1 };
 }

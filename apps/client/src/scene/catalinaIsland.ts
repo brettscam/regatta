@@ -24,10 +24,8 @@ const TILE_RED = C(0.66, 0.24, 0.15);
 const PIER_GREEN = C(0.18, 0.49, 0.31);
 const UP = new THREE.Vector3(0, 1, 0);
 
-/** The middle of the Casino, on its point. The town file's walk round it has the same centre. */
-const CASINO: [number, number] = [-2330, -22352];
-/** Bird Rock, off Isthmus Cove. Not in the baked land. */
-const BIRD_ROCK: [number, number] = [-17349, -10947];
+/** The middle of the Casino, on its point, where its red roof is in the satellite picture. The town file's walk round it has the same centre. */
+const CASINO: [number, number] = [-2385, -22362];
 
 /** The round white Casino with its red roof: twelve storeys of it, the mark of the island. */
 function casino(m: Massing, lights: Light[], terrace: number): void {
@@ -249,8 +247,10 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
         const uy = (by - ay) / len;
         const turn = Math.atan2(uy, ux);
         // The side away from the dinghy float.
-        const sx = -uy;
-        const sy = ux;
+        const float = avalon.spec.paths.find((p) => p.id === 'dinghy-dock')?.points?.[0];
+        const away = float && (float[0] - ax) * -uy + (float[1] - ay) * ux > 0 ? -1 : 1;
+        const sx = -uy * away;
+        const sy = ux * away;
         for (const [s, w] of [[26, 16], [48, 13], [100, 13]] as const) {
           const x = ax + ux * s + sx * (pier.width / 2 + 4.2);
           const y = ay + uy * s + sy * (pier.width / 2 + 4.2);
@@ -260,8 +260,10 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
           for (const du of [-w / 2, w / 2]) m.beam([x + ux * du + sx * 3.6, y + uy * du + sy * 3.6, -3], [x + ux * du + sx * 3.6, y + uy * du + sy * 3.6, floor - 0.45], 0.38, 0.38, C(0.24, 0.21, 0.18));
           lights.push({ p: [x, y, floor + 3], a: WARM, b: WARM, shape: SHAPE.glow, size: 5, min: 3.4 });
         }
-        // A flagstaff at the very end.
-        m.beam([bx - ux * 1.5, by - uy * 1.5, floor], [bx - ux * 1.5, by - uy * 1.5, floor + 11], 0.2, 0.2, WHITE);
+        // A flagstaff at the very end, at the rail on the side away from the float, out of the way of anyone walking out.
+        const fx = bx - ux * 1.2 + sx * (pier.width / 2 - 0.35);
+        const fy = by - uy * 1.2 + sy * (pier.width / 2 - 0.35);
+        m.beam([fx, fy, floor], [fx, fy, floor + 11], 0.2, 0.2, WHITE);
       }
     }
     // The mole: a long open-sided shelter where the passengers wait, and a ticket office.
@@ -312,15 +314,15 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
     }
     // The two harbor lights are lit by the seamarks (`features.json`): here are the posts they stand on, on the Casino's
     // sea wall and at the end of the mole.
-    m.beam([-2302, -22375, terrace], [-2302, -22375, terrace + 3.5], 0.3, 0.3, C(0.2, 0.5, 0.3));
-    m.beam([-2056, -22764, floor], [-2056, -22764, floor + 5], 0.3, 0.3, C(0.7, 0.15, 0.12));
+    m.beam([-2272, -22388, terrace], [-2272, -22388, terrace + 3.5], 0.3, 0.3, C(0.2, 0.5, 0.3));
+    m.beam([-2041, -22792, floor], [-2041, -22792, floor + 5], 0.3, 0.3, C(0.7, 0.15, 0.12));
     // The dive park: a ring of white buoys with an orange band, on the water off the point.
     {
       let n = 0;
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * Math.PI * 2;
-        const x = -2230 + Math.cos(a) * 128;
-        const y = -22300 + Math.sin(a) * 128;
+        const x = -2350 + Math.cos(a) * 128;
+        const y = -22250 + Math.sin(a) * 128;
         if (ground.height(x, y) > -1 || ground.depth(x, y) < 2) continue;
         m.lathe(x, y, -0.3, [[0.45, 0], [0.75, 0.5], [0.75, 0.75]], 8, WHITE);
         m.lathe(x, y, 0.45, [[0.76, 0], [0.76, 0.3], [0.2, 0.95]], 8, C(0.95, 0.45, 0.1));
@@ -392,11 +394,11 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
     {
       const rows: Row[] = [];
       const pier = avalon.spec.paths.find((p) => p.id === 'pier')?.points;
-      const end = pier ? pier[1] : [-2210, -22890];
-      const mouth: [number, number] = [-2170, -22560];
+      const end = pier ? pier[1] : [-2240, -22840];
+      const mouth: [number, number] = [-2150, -22590];
       const inBay = (x: number, y: number): boolean => {
         // Inside the line from the Casino's point to the end of the mole.
-        const [ax, ay, bx, by] = [-2262, -22392, -2050, -22752];
+        const [ax, ay, bx, by] = [-2269, -22390, -2035, -22785];
         if ((bx - ax) * (y - ay) - (by - ay) * (x - ax) > 0) return false;
         // Clear of everything built, of the buoy the player picks up, and of the fairway.
         if (onGround(avalon, x, y, 24) || !free(x, y)) return false;
@@ -404,9 +406,9 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
         const u = Math.max(0, Math.min(1.25, ((x - end[0]) * (mouth[0] - end[0]) + (y - end[1]) * (mouth[1] - end[1])) / len2));
         return Math.hypot(x - end[0] - (mouth[0] - end[0]) * u, y - end[1] - (mouth[1] - end[1]) * u) > 17;
       };
-      mooringRows(rows, ground, -2270, -22700, (38 * Math.PI) / 180, 17, 31, 16, 10, 1, inBay);
+      mooringRows(rows, ground, -2330, -22640, (38 * Math.PI) / 180, 17, 31, 16, 10, 1, inBay);
       // Descanso Bay, round the point.
-      mooringRows(rows, ground, -2440, -22190, (70 * Math.PI) / 180, 20, 34, 3, 2, 5, (x, y) => free(x, y) && !onGround(avalon, x, y, 20) && Math.hypot(x + 2230, y + 22300) > 150);
+      mooringRows(rows, ground, -2440, -22190, (70 * Math.PI) / 180, 20, 34, 3, 2, 5, (x, y) => free(x, y) && !onGround(avalon, x, y, 20) && Math.hypot(x + 2350, y + 22250) > 150);
       // White's Landing, three miles up.
       mooringRows(rows, ground, -6330, -17420, (60 * Math.PI) / 180, 22, 36, 5, 2, 9, free);
       const fleet = mooredFleet(rows, 'avalon_moorings');
@@ -481,11 +483,7 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
       }
       counts.isthmusPalms = n;
     }
-    // Bird Rock, off the cove: low, flat and white with birds.
-    m.next();
-    // Where the dive there is (`dives.json`): a third of a mile off the cove's east point. Drawn, not solid.
-    m.lathe(BIRD_ROCK[0], BIRD_ROCK[1], -4, [[62, 0], [50, 5], [34, 8.5], [18, 10.5], [2, 11.2]], 11, C(0.5, 0.47, 0.42), WIN.none, 0.7, 0.5);
-    m.lathe(BIRD_ROCK[0], BIRD_ROCK[1], 5.2, [[30, 0], [17, 1.6], [2, 2.2]], 11, C(0.9, 0.89, 0.85), WIN.none, 0.7, 0.5);
+    // Bird Rock and Ship Rock are in the baked land now (pipeline/catalina/land.py), white with birds in the picture.
     const mesh = m.build('two_harbors_mesh');
     triangles += m.triangles;
     counts.isthmusTriangles = m.triangles;

@@ -1,6 +1,8 @@
 # Writes courses/catalina/ data from hand-kept tables. Run from the repository root:  python3 pipeline/catalina/towns.py .
 # Then: npx vite-node scripts/stamp.ts catalina; npx vite-node scripts/legs.ts catalina files; npx vite-node scripts/shore.ts catalina
-# Everything here is from general knowledge of the place, not from a chart. See the note at the top of features.json.
+# The waterfronts are fitted to the 10 m shoreline baked by pipeline/catalina/land.py from Sentinel-2; the names and
+# what stands where along them are from general knowledge of the place, not from a chart. Run land.py again after this:
+# it grades the land under the towns' level ground.
 import json, math, sys, re
 root = sys.argv[1]
 
@@ -14,81 +16,80 @@ def table(spots, n, x, y, say=None):
         spots.append({'name': f'table-{n}-seat-{k+1}', 'kind': 'seat', 'x': r1(x + dx), 'y': r1(y + dy), 'face': bearing((-dx, -dy))})
 
 # ---------------------------------------------------------------- Avalon
-A = (-2372, -22398)
-front = [A, (-2440, -22430), (-2478, -22470), (-2492, -22520), (-2495, -22600), (-2495, -22680), (-2488, -22740), (-2462, -22800)]
-crescent = [(-2462, -22800), (-2430, -22850), (-2395, -22895), (-2335, -22925), (-2305, -22965), (-2262, -23000), (-2215, -23012), (-2187, -23003)]
-moleroad = [(-2187, -23003), (-2185, -22960), (-2165, -22925), (-2110, -22895), (-2085, -22875), (-2040, -22848)]
-L, M = crescent[4], crescent[5]
-u = unit(L, M)
-out = (-u[1], u[0])               # toward the water: left of the way the front runs here
-if out[1] < 0: out = (-out[0], -out[1])
-proot = ((L[0] + M[0]) / 2, (L[1] + M[1]) / 2)
+# Fitted to the shoreline of the 10 m land (pipeline/catalina/land.py, from Sentinel-2): Casino Point with the Casino's
+# red roof on it, the bay's west shore under the bluff, the beach along Crescent Avenue, the green pier's foot jutting
+# into the bay, a small beach south of it, and the Cabrillo Mole at the bay's south-east corner.
+CAS = (-2385, -22362)
+A = (-2420, -22409)
+front = [A, (-2455, -22411), (-2486, -22431), (-2511, -22465), (-2528, -22500), (-2533, -22535), (-2533, -22590), (-2529, -22640), (-2515, -22672), (-2504, -22702), (-2494, -22732), (-2488, -22758), (-2474, -22787)]
+crescent = [(-2474, -22787), (-2446, -22822), (-2416, -22858), (-2392, -22906), (-2365, -22924), (-2318, -22940), (-2310, -22975), (-2296, -23006), (-2268, -23025), (-2220, -23026), (-2188, -23008)]
+moleroad = [(-2188, -23008), (-2170, -22985), (-2152, -22958), (-2130, -22926), (-2100, -22914), (-2074, -22900), (-2062, -22880)]
+proot = (-2333, -22934)
+out = (math.sin(math.radians(45)), math.cos(math.radians(45)))   # the pier runs north-east into the bay
 east = (out[1], -out[0])
 def P(s, off=0): return (r1(proot[0] + out[0] * s + east[0] * off), r1(proot[1] + out[1] * s + east[1] * off))
-CAS = (-2330, -22352)
 def ring(r, deg): return (r1(CAS[0] + r * math.cos(math.radians(deg))), r1(CAS[1] + r * math.sin(math.radians(deg))))
 
 paths = [
   {'id': 'casino-way', 'name': 'Casino Way', 'kind': 'promenade', 'width': 7, 'points': front},
   {'id': 'crescent', 'name': 'Crescent Avenue', 'kind': 'promenade', 'width': 9, 'points': crescent},
-  {'id': 'pier', 'name': 'the green Pleasure Pier', 'kind': 'pier', 'width': 7, 'paint': '#2f7d4f', 'points': [P(-2), P(116)]},
-  {'id': 'dinghy-dock', 'name': 'the dinghy dock', 'kind': 'float', 'width': 4, 'points': [P(62, 5.3), P(92, 5.3)]},
+  {'id': 'pier', 'name': 'the green Pleasure Pier', 'kind': 'pier', 'width': 7, 'paint': '#2f7d4f', 'points': [P(-2), P(128)]},
+  {'id': 'dinghy-dock', 'name': 'the dinghy dock', 'kind': 'float', 'width': 4, 'points': [P(96, -5.5), P(122, -5.5)]},
   {'id': 'mole-road', 'name': 'the road to the mole', 'kind': 'promenade', 'width': 7, 'points': moleroad},
-  {'id': 'mole', 'name': 'Cabrillo Mole', 'kind': 'quay', 'width': 18, 'points': [(-2040, -22850), (-2056, -22762)]},
-  {'id': 'lovers-cove-walk', 'name': "the walk to Lover's Cove", 'kind': 'promenade', 'width': 5, 'points': [(-2040, -22848), (-1975, -22866), (-1915, -22930), (-1872, -22985), (-1840, -23028)]},
-  {'id': 'sumner', 'name': 'Sumner Avenue', 'kind': 'street', 'width': 6, 'points': [(-2305, -22966), (-2325, -23020), (-2345, -23070), (-2362, -23115)]},
-  {'id': 'catalina-avenue', 'name': 'Catalina Avenue', 'kind': 'street', 'width': 6, 'points': [(-2262, -23001), (-2272, -23050), (-2283, -23090), (-2292, -23130)]},
-  {'id': 'fuel-pier', 'name': 'the fuel dock', 'kind': 'pier', 'width': 4, 'points': [(-2480, -22472), (-2434, -22465)]},
-  {'id': 'fuel-float', 'name': 'the fuel float', 'kind': 'float', 'width': 5, 'points': [(-2431.5, -22482), (-2431.5, -22450)]},
-  {'id': 'casino-steps', 'name': 'the Casino steps', 'kind': 'street', 'width': 6, 'points': [A, (-2350, -22375)]},
+  {'id': 'mole', 'name': 'Cabrillo Mole', 'kind': 'quay', 'width': 18, 'points': [(-2058, -22884), (-2040, -22790)]},
+  {'id': 'lovers-cove-walk', 'name': "the walk to Lover's Cove", 'kind': 'promenade', 'width': 5, 'points': [(-2058, -22884), (-2010, -22858), (-1992, -22878), (-1977, -22904), (-1953, -22930), (-1930, -22952), (-1908, -22976), (-1893, -23006), (-1872, -23034)]},
+  {'id': 'sumner', 'name': 'Sumner Avenue', 'kind': 'street', 'width': 6, 'points': [(-2394, -22912), (-2425, -22955), (-2452, -23000), (-2475, -23045)]},
+  {'id': 'catalina-avenue', 'name': 'Catalina Avenue', 'kind': 'street', 'width': 6, 'points': [(-2336, -22938), (-2342, -22985), (-2350, -23030), (-2358, -23075)]},
+  {'id': 'fuel-pier', 'name': 'the fuel dock', 'kind': 'pier', 'width': 4, 'points': [(-2532, -22520), (-2496, -22520)]},
+  {'id': 'fuel-float', 'name': 'the fuel float', 'kind': 'float', 'width': 5, 'points': [(-2493.5, -22536), (-2493.5, -22504)]},
+  {'id': 'casino-steps', 'name': 'the Casino steps', 'kind': 'street', 'width': 6, 'points': [A, ring(33, 235)]},
   {'id': 'casino-walk', 'name': 'the walk round the Casino', 'kind': 'round', 'width': 8, 'centre': list(CAS), 'inner': 27, 'floor': 6},
-  {'id': 'dive-stairs', 'name': 'the dive park stairs', 'kind': 'pier', 'width': 4, 'floor': 3.9, 'points': [ring(33, 75), ring(47, 75)]},
-  {'id': 'dive-float', 'name': 'the dive park landing', 'kind': 'float', 'width': 4, 'points': [ring(47, 75), ring(62, 75)]},
+  {'id': 'dive-stairs', 'name': 'the dive park stairs', 'kind': 'pier', 'width': 4, 'floor': 3.9, 'points': [ring(33, 80), ring(49, 80)]},
+  {'id': 'dive-float', 'name': 'the dive park landing', 'kind': 'float', 'width': 4, 'points': [ring(49, 80), ring(64, 80)]},
 ]
 spots = []
 S = lambda name, kind, xy, face, say=None: spots.append({'name': name, 'kind': kind, 'x': r1(xy[0]), 'y': r1(xy[1]), 'face': face, **({'say': say} if say else {})})
-S('dinghy-dock', 'dock', P(77, 5.5), bearing(east), 'Tenders three deep on the float beside the green pier')
-S('pier-end', 'sight', P(113), bearing(out), 'The end of the green pier: the whole mooring field, the Casino on its point, and the mainland a smudge beyond')
-S('pier-scale', 'sight', P(96, -1.5), bearing((-east[0], -east[1])), 'The scale where marlin and swordfish have been weighed since the tuna-club days')
-S('harbormaster', 'door', P(106, 1.5), bearing(east), "The harbormaster's office, at the end of the pier")
+S('dinghy-dock', 'dock', P(109, -5.5), bearing((-east[0], -east[1])), 'Tenders three deep on the float beside the green pier')
+S('pier-end', 'sight', P(125), bearing(out), 'The end of the green pier: the whole mooring field, the Casino on its point, and the mainland a smudge beyond')
+S('pier-scale', 'sight', P(100, 1.5), bearing(east), 'The scale where marlin and swordfish have been weighed since the tuna-club days')
+S('harbormaster', 'door', P(116, 1.5), bearing(east), "The harbormaster's office, at the end of the pier")
 S('pier-foot', 'sight', P(4), bearing(out))
-S('fountain', 'sight', (-2320, -22945), 40, 'The tiled fountain in the middle of Crescent Avenue')
-S('bench-1', 'bench', front[7], 60)
-S('bench-2', 'bench', (-2495, -22600), 90, 'A bench on Casino Way, under the bluff')
-S('bench-3', 'bench', (-2413, -22872), 50)
-S('bench-4', 'bench', (-2238, -23005), 10)
-S('bench-5', 'bench', (-2168, -22929), 290)
+S('fountain', 'sight', crescent[4], 40, 'The tiled fountain in the middle of Crescent Avenue')
+S('bench-1', 'bench', front[12], 60)
+S('bench-2', 'bench', front[7], 90, 'A bench on Casino Way, under the bluff')
+S('bench-3', 'bench', crescent[3], 50)
+S('bench-4', 'bench', crescent[9], 10)
+S('bench-5', 'bench', moleroad[3], 290)
 # The bar under the awning, on the front between the two bends.
 I, J = crescent[1], crescent[2]
-ub = unit(I, J); lw = (-ub[1], ub[0])
-if lw[1] > 0: lw = (-lw[0], -lw[1])
-lw = (-abs(lw[0]), -abs(lw[1]))
+ub = unit(I, J); lw = (ub[1], -ub[0])
+if lw[0] > 0: lw = (-lw[0], -lw[1])          # the land side here is to the south-west
 bp = lambda t, o: (I[0] + (J[0] - I[0]) * t + lw[0] * o, I[1] + (J[1] - I[1]) * t + lw[1] * o)
 table(spots, 1, *bp(0.35, 2.4), say='A table at the bar under the striped awning')
 table(spots, 2, *bp(0.7, 2.4))
 for k in range(3): S(f'bar-{k+1}', 'bar', bp(0.08 + 0.07 * k, 3.4), bearing(lw))
 # The cafe at the foot of the pier.
-M2, N = crescent[5], crescent[6]
+M2, N = crescent[4], crescent[5]
 um = unit(M2, N); ls = (um[1], -um[0])
-if ls[1] > 0: ls = (-ls[0], -ls[1])
+if ls[0] > 0: ls = (-ls[0], -ls[1])
 cp = lambda t, o: (M2[0] + (N[0] - M2[0]) * t + ls[0] * o, M2[1] + (N[1] - M2[1]) * t + ls[1] * o)
 table(spots, 3, *cp(0.3, 2.6), say='The cafe at the foot of the pier')
 table(spots, 4, *cp(0.65, 2.6))
 # The restaurant on the road to the mole.
-Pq, Q = moleroad[1], moleroad[2]
-table(spots, 5, (Pq[0] + Q[0]) / 2 + 1.6, (Pq[1] + Q[1]) / 2 - 0.6, say='The restaurant on the road to the mole, looking back across the moorings at the Casino')
-S('casino-steps', 'steps', (-2364, -22390), 40, 'The steps up to the Casino terrace')
-S('casino-door', 'door', ring(31, 250), 20, 'The Casino: no gambling, ever. A ballroom on the top floor and a picture palace under it, since 1929')
-S('casino-rail', 'sight', ring(32, 0), 90, 'The rail on the seaward side of the Casino')
-S('dive-park-stairs', 'steps', ring(32, 75), 15, 'The stairs down into the dive park: kelp, garibaldi and a wreck or two inside the buoys')
-S('dive-park-landing', 'dock', ring(56, 75), 15)
-S('fuel-dock', 'dock', (-2431.5, -22466), 90, 'The fuel float under the bluff')
-S('ferry-gate', 'sight', (-2052, -22782), 80, 'Where the boat from the mainland lands, an hour from Long Beach')
-S('mole-end', 'sight', (-2055, -22767), 350)
-S('lovers-cove-steps', 'steps', (-1843, -23024), 70, "The steps into Lover's Cove, where the snorkelers go in")
-S('sumner-top', 'sight', (-2360, -23110), 200)
-S('catalina-avenue-top', 'sight', (-2291, -23126), 190)
-avalon = {'id': 'avalon', 'name': 'Avalon', 'kind': 'bar', 'x': -2320, 'y': -22945, 'floor': 3, 'paths': paths, 'spots': spots,
+Pq, Q = moleroad[2], moleroad[3]
+table(spots, 5, (Pq[0] + Q[0]) / 2 - 1.2, (Pq[1] + Q[1]) / 2 - 1.2, say='The restaurant on the road to the mole, looking back across the moorings at the Casino')
+S('casino-steps', 'steps', ring(36, 235), 40, 'The steps up to the Casino terrace')
+S('casino-door', 'door', ring(31, 200), 20, 'The Casino: no gambling, ever. A ballroom on the top floor and a picture palace under it, since 1929')
+S('casino-rail', 'sight', ring(32, 20), 90, 'The rail on the seaward side of the Casino')
+S('dive-park-stairs', 'steps', ring(32, 80), 15, 'The stairs down into the dive park: kelp, garibaldi and a wreck or two inside the buoys')
+S('dive-park-landing', 'dock', ring(58, 80), 15)
+S('fuel-dock', 'dock', (-2493.5, -22520), 90, 'The fuel float under the bluff')
+S('ferry-gate', 'sight', (-2044, -22808), 20, 'Where the boat from the mainland lands, an hour from Long Beach')
+S('mole-end', 'sight', (-2042, -22796), 350)
+S('lovers-cove-steps', 'steps', (-1875, -23030), 70, "The steps into Lover's Cove, where the snorkelers go in")
+S('sumner-top', 'sight', (-2473, -23042), 200)
+S('catalina-avenue-top', 'sight', (-2357, -23072), 190)
+avalon = {'id': 'avalon', 'name': 'Avalon', 'kind': 'bar', 'x': crescent[4][0], 'y': crescent[4][1], 'floor': 3, 'paths': paths, 'spots': spots,
           'landings': [{'place': 'avalon', 'spot': 'dinghy-dock'}, {'place': 'avalon-fuel', 'spot': 'fuel-dock'}, {'place': 'casino-point', 'spot': 'dive-park-landing'}]}
 
 # ---------------------------------------------------------------- Two Harbors
@@ -105,8 +106,8 @@ road = [PB(-1, -22), (-18420, -12140), (-18470, -12220), (-18510, -12300), (-185
 paths = [
   {'id': 'beach', 'name': 'the beach at Isthmus Cove', 'kind': 'promenade', 'width': 6, 'points': beach},
   {'id': 'pier', 'name': 'the pier', 'kind': 'pier', 'width': 6, 'points': [PB(-2), PB(96)]},
-  {'id': 'dinghy-dock', 'name': 'the dinghy dock', 'kind': 'float', 'width': 4, 'points': [PB(42, 4.8), PB(68, 4.8)]},
-  {'id': 'fuel-float', 'name': 'the fuel float', 'kind': 'float', 'width': 5, 'points': [PB(80, -5.3), PB(100, -5.3)]},
+  {'id': 'dinghy-dock', 'name': 'the dinghy dock', 'kind': 'float', 'width': 4, 'points': [PB(42, 5), PB(68, 5)]},
+  {'id': 'fuel-float', 'name': 'the fuel float', 'kind': 'float', 'width': 5, 'points': [PB(80, -5.5), PB(100, -5.5)]},
   {'id': 'bar-deck', 'name': "the bar's deck", 'kind': 'street', 'width': 14, 'points': deck},
   {'id': 'isthmus-road', 'name': 'the road across the Isthmus', 'kind': 'path', 'width': 5, 'points': road},
   {'id': 'cat-harbor-pier', 'name': 'the Cat Harbor dinghy pier', 'kind': 'pier', 'width': 4, 'points': [(-18690, -12674), (-18724, -12810)]},
@@ -135,4 +136,4 @@ s = json.dumps([avalon, isthmus], indent=1, ensure_ascii=False)
 s = re.sub(r'\[\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\s*\]', r'[\1, \2]', s)
 s = re.sub(r'\{\s*"name": ("[^"]*"),\s*"kind": ("[^"]*"),\s*"x": (-?[\d.]+),\s*"y": (-?[\d.]+),\s*"face": (-?[\d.]+)\s*\}', r'{ "name": \1, "kind": \2, "x": \3, "y": \4, "face": \5 }', s)
 open(root + '/courses/catalina/towns.json', 'w').write(s + '\n')
-print('pier', P(0), P(116), 'out', out, 'two harbors pier', PB(0), PB(96), 'deck', deck, 'fuel', PB(90, -5.5), 'spots', len(avalon['spots']), len(isthmus['spots']))
+print('pier', P(0), P(128), 'out', out, 'two harbors pier', PB(0), PB(96), 'deck', deck, 'fuel', PB(90, -5.5), 'spots', len(avalon['spots']), len(isthmus['spots']))

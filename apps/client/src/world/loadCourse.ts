@@ -65,6 +65,8 @@ export interface LoadedCourse extends ReplayData {
   traffic: TrafficSpec;
   /** Hazards, traffic lanes, refuges and lights, where the water has a `features.json`. */
   features?: CourseFeatures;
+  /** Where to load the picture of the land from, on a water that has one. */
+  landImage?: string;
   /** Towns to walk about in, where the water has a `towns.json`. See `scene/town.ts`. */
   towns?: TownSpec[];
 }
@@ -80,6 +82,10 @@ const ready = <T>(all: Record<string, T>): Record<string, () => Promise<T>> => O
 const json = __SINGLE__
   ? ready(import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features,towns}.json', { import: 'default', eager: true }))
   : import.meta.glob<unknown>('../../../../courses/*/{course,starts,times,places,races,traffic,features,towns}.json', { import: 'default' });
+/** A water's picture of its land from above, where it has one (`course.terrain.image`). Inlined in the single-file build like the binaries. */
+const pictures = __SINGLE__
+  ? ready(import.meta.glob<string>('../../../../courses/*/land.jpg', { query: '?url', import: 'default', eager: true }))
+  : import.meta.glob<string>('../../../../courses/*/land.jpg', { query: '?url', import: 'default' });
 const binaries = __SINGLE__
   ? ready(import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default', eager: true }))
   : import.meta.glob<string>('../../../../courses/*/*.bin', { query: '?url', import: 'default' });
@@ -128,7 +134,8 @@ async function read(id: string): Promise<LoadedCourse> {
     // A water with no traffic file simply has none.
     file<TrafficSpec>('traffic', { referenceHours: 0, routes: [] }),
   ]);
-  return { about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic, features, towns };
+  const landImage = course.terrain.image ? await pictures[`${ROOT}${id}/${course.terrain.image.file}`]?.() : undefined;
+  return { landImage, about, course, current: new Int8Array(current), depth: new Uint8Array(depth), terrain: new Uint8Array(terrain), starts, times, places, races, traffic, features, towns };
 }
 
 /** A course and everything that goes with it. Asking twice for the same one fetches it once. */

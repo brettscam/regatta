@@ -53,9 +53,9 @@ ship('cape-dume', 'Cape Dume', 'the tanker Cape Dume', 'tanker', 250, 44, 12, '#
 ship('camellia-highway', 'Camellia Highway', 'the car carrier Camellia Highway', 'carcarrier', 200, 32, 14, '#1f5fa8', 'south', AG, 2.4, 'west', AG, 9.6, 'Los Angeles')
 
 # The Catalina boats: fast catamarans, about an hour each way.
-avalon = [[10400, 22850], [10560, 22300], [10770, 20600], QG, [10690, 18000], [6500, 5000], [300, -17000], [-1650, -22250], [-2012, -22792]]
+avalon = [[10400, 22850], [10560, 22300], [10770, 20600], QG, [10690, 18000], [6500, 5000], [300, -17000], [-1650, -22250], [-2008, -22778]]
 routes.append({'id': 'ferry-avalon', 'name': 'Avalon Jet', 'sign': 'the Catalina boat Avalon Jet', 'kind': 'ferry', 'model': 'catamaran', 'length': 44, 'beam': 12, 'speedKt': 29, 'mode': 'shuttle', 'dwell': 2700, 'phase': phase(1.0, 1), 'color': '#1c4f9c', 'ends': ['Long Beach', 'Avalon'], 'gate': {'at': 3, 'name': 'Queens Gate'}, 'points': avalon})
-isthmus = [[4950, 19250], [5300, 18700], [5120, 18250], AG, [4350, 16500], [-8000, 0], [-16800, -10300], [-18235, -11905]]
+isthmus = [[4950, 19250], [5300, 18700], [5120, 18250], AG, [4350, 16500], [-8000, 0], [-16800, -10300], [-17050, -11150], [-18235, -11905]]
 routes.append({'id': 'ferry-isthmus', 'name': 'Isthmus Express', 'sign': 'the Catalina boat Isthmus Express', 'kind': 'ferry', 'model': 'catamaran', 'length': 38, 'beam': 11, 'speedKt': 27, 'mode': 'shuttle', 'dwell': 7200, 'phase': 0, 'color': '#b5332a', 'ends': ['San Pedro', 'Two Harbors'], 'gate': {'at': 3, 'name': 'Angels Gate'}, 'points': isthmus})
 
 # A tug and her barge, working between the two ports inside the breakwater.
