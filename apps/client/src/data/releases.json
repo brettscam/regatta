@@ -1,6 +1,17 @@
 {
   "notes": [
     {
+      "id": "v40",
+      "date": "2026-11-26",
+      "title": "Go ashore on foot",
+      "items": [
+        "You can now go ashore on foot: step off at a dock, land the tender at a bar, or press O with the boat lying off a guest dock, and you are standing on the float. W A S D walk, Shift jogs, Q, E or a drag look round.",
+        "Press F to sit at a table, take a bar stool, lean on the rail or dance. G at the bar opens the menu (a Painkiller in the BVI, on the house for now), and 1 to 5 wave, say cheers, point, shrug or laugh.",
+        "Friends ashore at the same place appear as themselves, with their name, their drink and what they type in a bubble over their head. Anyone can stand the whole deck a round, and T tells every boat on the water where you are.",
+        "O back at the dock takes you aboard."
+      ]
+    },
+    {
       "id": "v39",
       "date": "2026-11-26",
       "title": "Over the side: freediving, a speargun and lobster",
