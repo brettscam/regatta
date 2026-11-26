@@ -9,7 +9,7 @@ import { divesOf } from './diveData';
 import { diveLog, logCatch, logDive, logEntry } from './diveLog';
 import {
   BREATH, DIVE_POINTS, ENTRY, FLAG, GRAB, GUN, KICK, SHIFT,
-  canDive, canFire, cleanDive, diverNear, effortOf, fightSeconds, gauge, glide, grab, holdBreath, lungsFor, urge, judge, lightAt, lobsterSeason, lobstersAt, makeGround, newBreath, packDive, populate,
+  canDive, canFire, cleanDive, lobsterAwards, diverNear, effortOf, fightSeconds, gauge, glide, grab, holdBreath, lungsFor, urge, judge, lightAt, lobsterSeason, lobstersAt, makeGround, newBreath, packDive, populate,
   recover, runOver, shoot, siteAt, spook, stepFish, surfaced, surge, underwaterVisibility, zoneAt,
   type Breath, type Lungs, type DiveFile, type DiveSite, type DiveZone, type Fish, type Ground, type Lobster, type Verdict,
 } from './diveRules';
@@ -57,6 +57,9 @@ export class Dive implements Feature {
   private crackle = 0;
   private gained = 0;
   private readonly veil = document.createElement('div');
+  private peak = 0;
+  private readonly mask = document.createElement('div');
+  private wasWet = false;
   /** Her own setting: treat the lobster season as open and the water below as an October night. Nobody else's day changes. */
   practice = false;
   breath: Breath = newBreath();
@@ -106,6 +109,10 @@ export class Dive implements Feature {
   private last = { depth: 0, seconds: 0 };
   private clock = 0;
   private kicks = 0;
+  private surgeX = 0;
+  private surgeY = 0;
+  private recoil = 0;
+  private puff = 1;
   private readonly current = { x: 0, y: 0 };
   private readonly tip = new THREE.Vector3();
   private readonly muzzle = new THREE.Vector3();
@@ -138,18 +145,24 @@ export class Dive implements Feature {
     this.panel.className = 'hud dive';
     this.panel.setAttribute('aria-label', 'Dive');
     this.panel.hidden = true;
-    for (const name of ['where', 'depth', 'breath', 'gun', 'aim', 'catch', 'brief']) {
+    for (const name of ['where', 'gauges', 'breath', 'gun', 'aim', 'catch', 'brief']) {
       const el = document.createElement('div');
       el.className = name;
       this.panel.appendChild(el);
       this.lines.push(el);
+    }
+    for (const label of ['depth', 'dive time', 'max', 'bottom', 'water']) {
+      const cell = document.createElement('div');
+      cell.append(document.createElement('b'), Object.assign(document.createElement('small'), { textContent: label }));
+      this.lines[1].appendChild(cell);
     }
     const bar = document.createElement('i');
     this.lines[2].append(document.createElement('span'), bar);
     bar.appendChild(document.createElement('b'));
     document.body.appendChild(this.panel);
     this.veil.className = 'dive-veil';
-    document.body.appendChild(this.veil);
+    this.mask.className = 'dive-mask';
+    document.body.append(this.veil, this.mask);
     window.addEventListener('pointerdown', this.onDown, true);
     window.addEventListener('pointermove', this.onMove, true);
     window.addEventListener('pointerup', this.onUp, true);
@@ -280,6 +293,9 @@ export class Dive implements Feature {
     this.settle(d.x, d.y);
     logEntry();
     this.float.visible = true;
+    // The boat's instruments mean nothing in the water: the dive computer stands alone until she climbs out.
+    document.body.classList.add('diving');
+    this.peak = 0;
     const where = this.site ? `${this.site.name}. ${this.site.say}` : `No named site here: ${Math.round(depth)} m of water`;
     // An alarm, so that time drops back to real speed: a breath is counted in real seconds.
     ctx.alarm(`Over the side. ${where}${can.say ? `. ${can.say}` : ''}`);
@@ -317,7 +333,8 @@ export class Dive implements Feature {
     this.fish = populate(file, this.ground, this.centre.x, this.centre.y, this.shift, { night: this.night, dawn: hour >= 5 && hour < 8 }).filter((f) => !this.taken.has(`${key}:f${f.index}`));
     this.lobsters = lobstersAt(file, this.ground, this.centre.x, this.centre.y, this.shift, this.night).filter((l) => !this.taken.has(`${key}:l${l.index}`));
     this.stockKey = key;
-    this.view.build(this.ground, this.centre.x, this.centre.y, this.lobsters, file.water.cover === 'coral');
+    // The canopy lies the way the water is going, which is away from where the sea comes from.
+    this.view.build(this.ground, this.centre.x, this.centre.y, this.lobsters, file.water.cover === 'coral', ctx.seaway.sea.dir + Math.PI);
   }
 
   private stockKey = '';
@@ -365,6 +382,8 @@ export class Dive implements Feature {
     this.view.group.visible = false;
     this.float.visible = false;
     this.panel.hidden = true;
+    document.body.classList.remove('diving', 'under');
+    this.wasWet = false;
     this.veil.style.opacity = '0';
     this.ctx.sound.duck(1);
     this.dragging = false;
@@ -407,6 +426,8 @@ export class Dive implements Feature {
       from: new THREE.Vector3(d.x, -d.d, -d.y), dir: new THREE.Vector3(dir.x, -dir.d, -dir.y), range: result.range, gone: 0, hit: result.hit, near: result.near, landed: false,
     };
     ctx.sound.thud(0.25);
+    this.recoil = 1;
+    this.view.bubble(this.muzzle.x, this.muzzle.y, this.muzzle.z, 4);
   }
 
   /** The shaft has got where it was going. */
@@ -506,11 +527,12 @@ export class Dive implements Feature {
       best.mode = 'caught';
       this.taken.add(`${this.stockKey}:l${best.index}`);
       this.stringer.push({ id: 'lobster', name: 'lobster', size: best.mm, unit: 'mm' });
-      const first = logCatch('lobster', rule.name, best.mm, 'mm');
-      ctx.logbook.count('lobsters');
-      ctx.logbook.earn({ kind: 'dive', points: DIVE_POINTS.lobster, label: season?.practice ? 'A legal lobster, in practice' : 'A legal lobster, by hand' });
-      if (first) ctx.logbook.earn({ kind: 'dive', points: DIVE_POINTS.first, label: 'First lobster' });
-      ctx.say(`Got it. ${g.say}`, 8);
+      // One taken in practice is practice: a couple of points, and not a lobster in the logbook or the dive log.
+      const practice = !!season?.practice;
+      const worth = lobsterAwards(practice, practice ? false : logCatch('lobster', rule.name, best.mm, 'mm'));
+      if (worth.counts) ctx.logbook.count('lobsters');
+      for (const a of worth.awards) ctx.logbook.earn(a);
+      ctx.say(`Got it. ${g.say}${practice ? '. Practice: it is not counted in your logbook' : ''}`, 8);
     }
   }
 
@@ -621,8 +643,8 @@ export class Dive implements Feature {
     world.current(d.x, d.y, sim.state.t, this.current);
     const sea = ctx.seaway.sea;
     const push = surge(sea.height, sea.swellPeriod > 0 ? sea.swellPeriod : sea.period, d.d, this.clock);
-    const sx = -Math.sin(sea.dir) * push;
-    const sy = -Math.cos(sea.dir) * push;
+    const sx = this.surgeX = -Math.sin(sea.dir) * push;
+    const sy = this.surgeY = -Math.cos(sea.dir) * push;
     if (this.still <= 0) {
       const nx = d.x + (d.vx + this.current.x + sx) * dt;
       const ny = d.y + (d.vy + this.current.y + sy) * dt;
@@ -794,7 +816,8 @@ export class Dive implements Feature {
     this.throb = Math.max(0, this.throb - dt * 2.5);
     const dark = this.dazed > 9 ? 1 : this.mode === 'under' ? Math.min(0.85, urge(this.breath.air) * 0.35 + this.throb * 0.4) : 0;
     this.veil.style.opacity = dark.toFixed(2);
-    ctx.sound.duck(wet ? 0.15 : 1);
+    // Head under: the world above goes dull and far off, and the mask's edge closes in.
+    if (wet !== this.wasWet) { this.wasWet = wet; document.body.classList.toggle('under', wet); ctx.sound.duck(wet ? 0.15 : 1); }
     this.seen = underwaterVisibility(this.file.water.visibility, sea.height, this.night);
     const far = wet ? Math.max(60, this.seen * 3.2) : 40000;
     if (cam.far !== far) { cam.far = far; cam.near = wet ? 0.08 : 0.12; cam.updateProjectionMatrix(); }
@@ -804,7 +827,7 @@ export class Dive implements Feature {
     const light = this.night ? Math.min(day, 0.07) : day;
     const [r, gr, b] = lightAt(this.eyeDepth);
     const tint = this.file.water.tint;
-    this.water.setRGB(tint[0], tint[1], tint[2]).multiplyScalar(2.1 * light * Math.exp(-Math.max(0, this.eyeDepth) * 0.035));
+    this.water.setRGB(tint[0], tint[1], tint[2]).multiplyScalar(1.75 * light * Math.exp(-Math.max(0, this.eyeDepth) * 0.035));
     this.sky.setRGB(0.62, 0.9, 1).multiplyScalar(2.4);
     this.eye.wet = wet;
     this.eye.see = this.seen;
@@ -821,19 +844,22 @@ export class Dive implements Feature {
     this.view.update(cam, {
       time: this.clock, sun: sky.sunDir, light, water: this.water, sky: this.sky, see: this.seen, lamp: this.night && this.mode === 'under',
       surgeX: -Math.sin(sea.dir) * strength, surgeZ: Math.cos(sea.dir) * strength, surgePeriod: sea.swellPeriod > 0 ? sea.swellPeriod : Math.max(4, sea.period),
-      driftX: this.current.x * dt, driftZ: -this.current.y * dt, hulls,
+      // The specks go with the stream, and to and fro with the surge.
+      driftX: (this.current.x + this.surgeX) * dt, driftZ: -(this.current.y + this.surgeY) * dt, hulls, dt,
+      loaded: !this.shot && this.reload <= 0, loading: 1 - Math.min(1, this.reload / GUN.reload), recoil: this.recoil,
     }, stage.renderer.domElement.height);
+    this.recoil = Math.max(0, this.recoil - dt * 3.5);
 
     // The shaft: flying, in a fish, or coming back.
     cam.updateMatrixWorld();
-    this.muzzle.set(0.14, -0.17, -1.5).applyMatrix4(cam.matrixWorld);
+    this.muzzle.set(0.1, -0.15, -1.3).applyMatrix4(cam.matrixWorld);
     const shot = this.shot;
     if (shot) {
       const f = shot.hit;
       if (shot.landed && f) {
         // Brought in to the hand once the fish is hers; out on the line while it runs.
         if (this.fight > 0) this.tip.set(f.x, -f.d, -f.y);
-        else this.tip.lerp(this.a.set(0.08, -0.16, -2.1).applyMatrix4(cam.matrixWorld), Math.min(1, dt * 3));
+        else this.tip.lerp(this.a.set(0.02, -0.12, -1.9).applyMatrix4(cam.matrixWorld), Math.min(1, dt * 3));
         this.heldAt.copy(this.tip);
         this.b.copy(this.tip).sub(this.muzzle).normalize();
         this.view.drawShaft(this.tip, this.b, this.muzzle);
@@ -843,7 +869,12 @@ export class Dive implements Feature {
       }
     } else this.view.drawShaft(null, this.b, this.muzzle);
     this.view.gun.visible = this.dazed <= 0;
-    this.view.drawFish(this.fish, this.clock, shot?.landed ? shot.hit : null, shot?.landed && shot.hit ? this.heldAt : null);
+    this.view.drawFish(this.fish, this.clock, shot?.landed ? shot.hit : null, shot?.landed && shot.hit ? this.heldAt : null, cam.position);
+    // Her breath going up: a burst as she turns for the top, a trickle on the way, and a little with each contraction.
+    if (this.mode === 'under' && (this.puff -= dt) <= 0) {
+      this.puff = this.ascending || d.vd < -0.35 ? 0.35 : 2.5 + 3 * hash01(Math.floor(this.clock), 79);
+      this.view.bubble(cam.position.x + Math.sin(d.yaw) * 0.12, cam.position.y - 0.1, cam.position.z - Math.cos(d.yaw) * 0.12, this.ascending || d.vd < -0.35 ? 3 : 2);
+    }
     this.view.drawLobsters(this.lobsters, this.clock);
 
     // The float rides over her, on its line.
@@ -865,7 +896,14 @@ export class Dive implements Feature {
     const [where, depth, breath, gun, aim, caught, brief] = this.lines;
     const b = this.breath;
     where.textContent = `${this.site ? this.site.name : 'Open bottom'}${this.zone ? ' · no-take reserve' : ''}${this.practice ? ' · practice' : ''}`;
-    depth.textContent = this.mode === 'under' ? `Depth ${d.d.toFixed(1)} m · bottom ${Math.round(floor)} m · vis ${Math.round(this.seen)} m` : `At the surface · bottom ${Math.round(floor)} m · vis ${Math.round(this.seen)} m`;
+    this.peak = Math.max(this.peak, d.d);
+    const cells = depth.children;
+    const set = (i: number, text: string) => { const el = cells[i].firstElementChild as HTMLElement; if (el.textContent !== text) el.textContent = text; };
+    set(0, this.mode === 'under' ? `${d.d.toFixed(1)} m` : '0.0 m');
+    set(1, clock(this.mode === 'under' ? b.under : 0));
+    set(2, `${this.peak.toFixed(1)} m`);
+    set(3, `${Math.round(floor)} m`);
+    set(4, `${this.file.water.tempC}° · vis ${Math.round(this.seen)} m`);
     const label = breath.firstElementChild as HTMLElement;
     const fill = (breath.lastElementChild as HTMLElement).firstElementChild as HTMLElement;
     label.textContent = this.dazed > 0 ? 'Dazed' : this.mode === 'under' ? `Lungs · ${clock(b.under)}${b.air < BREATH.urge ? ' · urge to breathe' : ''}` : b.rest > 0 ? `Recovering · ${Math.ceil(b.rest)} s` : b.air >= 1 && b.prep < 1 ? `Breathing up · ${Math.round(b.prep * 100)}%` : b.prep >= 1 ? 'Lungs · breathed up' : 'Lungs · filling';
@@ -961,5 +999,6 @@ export class Dive implements Feature {
     for (const f of this.flags) f.removeFromParent();
     this.panel.remove();
     this.veil.remove();
+    this.mask.remove();
   }
 }

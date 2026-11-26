@@ -20,7 +20,7 @@ const weightWords = (kg: number) => (kg >= 1 ? `${kg.toFixed(1)} kg` : `${Math.m
 // ---- the data, as each water's dives.json gives it ---------------------------------------------------
 
 export type Habitat = 'kelp' | 'reef' | 'sand' | 'open';
-export type FishShape = 'bass' | 'jack' | 'disc' | 'flat' | 'big';
+export type FishShape = 'bass' | 'jack' | 'disc' | 'flat' | 'big' | 'lion' | 'ray' | 'shark' | 'eel' | 'seal' | 'turtle';
 
 export interface DiveSpecies {
   id: string;
@@ -473,14 +473,14 @@ export function populate(file: DiveFile, ground: Ground, cx: number, cy: number,
       const phase = hash01(key, shift, index, 46) * Math.PI * 2;
       out.push({
         index, species: sp, cm, kg: sp.kgPerCm3 * cm * cm * cm, count: sp.school ?? 1,
-        x: place.x + Math.sin(phase) * off, y: place.y + Math.cos(phase) * off, d: place.d,
+        x: place.x + Math.sin(phase) * off, y: place.y + Math.cos(phase) * off, d: Math.max(0.6, Math.min(place.d, ground.floor(place.x + Math.sin(phase) * off, place.y + Math.cos(phase) * off) - 0.06)),
         hx: place.x, hy: place.y, hd: place.d, vx: 0, vy: 0, vd: 0, heading: phase, mode: 'cruise', fear: 0, left: 0, phase,
       });
     }
   }
   // The hunters work the bait: a pack of them is never far from the school.
   const bait = out.find((f) => f.species.bait);
-  if (bait) for (const f of out) if (f.species.strong && f.species.habitat === 'open') { f.hx = bait.hx + 5 * Math.sin(f.phase); f.hy = bait.hy + 5 * Math.cos(f.phase); f.hd = bait.hd; f.x = f.hx; f.y = f.hy; f.d = f.hd; }
+  if (bait) for (const f of out) if (f.species.strong && f.species.habitat === 'open') { f.hx = bait.hx + 5 * Math.sin(f.phase); f.hy = bait.hy + 5 * Math.cos(f.phase); f.hd = Math.max(0.6, Math.min(bait.hd, ground.floor(f.hx, f.hy) - 0.5)); f.x = f.hx; f.y = f.hy; f.d = f.hd; }
   return out;
 }
 
@@ -626,7 +626,7 @@ export function stepFish(f: Fish, diver: Diver, dt: number, t: number, floorAt: 
   } else if (sp.curious && still && f.fear < 0.3 && dist < 14) {
     // Come and have a look: the bold ones right up to the mask, the wary ones round her at a few metres.
     const ring = sp.wary > 0.5 ? 3.2 : 1.7;
-    const a = f.phase + t * (sp.wary > 0.5 ? 0.35 : 0.12);
+    const a = f.phase + t * (sp.wary > 0.5 ? 0.35 : 0.12 + 0.3 * Math.max(0, sp.speed - 0.6));
     tx = diver.x + Math.sin(a) * ring; ty = diver.y + Math.cos(a) * ring; td = diver.d + 0.3 * Math.sin(t * 0.4 + f.phase);
   } else {
     const roam = sp.habitat === 'open' ? 9 : sp.habitat === 'sand' || sp.rests ? 0.4 : 2.5;
@@ -671,7 +671,7 @@ export const GUN = {
 
 /** How wide a mark a fish makes for the shaft, metres from the middle of it. */
 export function markRadius(cm: number, shape: FishShape): number {
-  const deep = shape === 'disc' ? 0.2 : shape === 'flat' ? 0.3 : shape === 'big' ? 0.2 : 0.13;
+  const deep = shape === 'disc' || shape === 'lion' ? 0.2 : shape === 'flat' || shape === 'ray' || shape === 'turtle' ? 0.3 : shape === 'big' || shape === 'seal' ? 0.2 : shape === 'eel' ? 0.06 : 0.13;
   return Math.max(0.05, (cm / 100) * deep) + 0.04;
 }
 
@@ -724,6 +724,8 @@ export const DIVE_POINTS = {
   /** A fish it is a good deed to take. */
   encouraged: 8,
   lobster: 8,
+  /** A lobster taken under the practice setting: it is practice, and is not counted. */
+  practice: 2,
   /** A protected fish, or one from a reserve. */
   citation: -40,
   /** An undersize fish, or one over the day's limit: a speared fish cannot be put back alive. */
@@ -815,6 +817,17 @@ export function grab(l: Pick<Lobster, 'x' | 'y' | 'd' | 'heading' | 'deep' | 'mo
   const fromFront = flat < 0.35 || ahead >= Math.cos(GRAB.front);
   if (!fromFront || Math.hypot(diver.vx, diver.vy, diver.vd) > GRAB.lunge) return 'fled';
   return 'caught';
+}
+
+/**
+ * What a kept lobster is worth, and whether it goes in the logbook. One taken under the practice setting, when the
+ * water's own season is shut, is practice: a couple of points, and no place in the book's count of lobster.
+ */
+export function lobsterAwards(practice: boolean, first: boolean): { counts: boolean; awards: Award[] } {
+  if (practice) return { counts: false, awards: [{ kind: 'dive', points: DIVE_POINTS.practice, label: 'A legal lobster, in practice' }] };
+  const awards: Award[] = [{ kind: 'dive', points: DIVE_POINTS.lobster, label: 'A legal lobster, by hand' }];
+  if (first) awards.push({ kind: 'dive', points: DIVE_POINTS.first, label: 'First lobster' });
+  return { counts: true, awards };
 }
 
 export interface Gauged { keep: boolean; why: 'kept' | 'closed' | 'short' | 'limit' | 'reserve'; say: string }
