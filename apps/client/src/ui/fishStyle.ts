@@ -3,7 +3,7 @@
 const CSS = `
 .fishline[hidden], .fishcatch[hidden] { display: none; }
 /* Above the chart in the corner: clear of the hails on the left and the crew's words along the bottom. */
-.fishline { z-index: 4; right: var(--edge-right); bottom: calc(var(--edge-bottom) + 208px); width: min(380px, calc(100% - 32px)); padding: 10px 13px 11px; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.4; pointer-events: none; }
+.fishline { z-index: 6; right: var(--edge-right); bottom: calc(var(--edge-bottom) + 208px); width: min(380px, calc(100% - 32px)); padding: 10px 13px 11px; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.4; pointer-events: none; }
 .fishline h4 { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 10px; }
 .fishline h4 i { font-style: normal; color: var(--amber); letter-spacing: 0.06em; }
 .fishline p { margin: 0; color: rgba(238, 243, 244, 0.88); }

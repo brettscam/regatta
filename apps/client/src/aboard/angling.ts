@@ -441,7 +441,8 @@ export class Angling implements Feature {
 
   private drawHud(hidden: boolean): void {
     const f = this.fight;
-    const show = !hidden && (f !== null || this.out || this.desk.call !== null);
+    // The fishing card says all of this and opens over this corner: one or the other. A fish on always shows.
+    const show = !hidden && (f !== null || ((this.out || this.desk.call !== null) && !this.card.isOpen));
     this.lineEl.hidden = !show;
     if (!show) return;
     let html: string;
@@ -457,7 +458,7 @@ export class Angling implements Feature {
         <div class="bar"><span>Strain</span><div class="track strain"><i style="width:${(strain * 100).toFixed(1)}%"></i></div><b>${f.tension > PART ? 'parting' : f.tension > 0.66 ? 'drag' : f.tension < 0.14 ? 'slack' : 'good'}</b></div>
         <div class="where"><span>Fish</span><div class="arc"><i style="left:${(where * 100).toFixed(1)}%"></i></div></div>
         <p class="call">${esc(call)}</p>
-        <p class="dim">Hold L to wind. Port and starboard of the mark is where the fish is off the stern: the red ends are under the boat.</p>`;
+        <p class="dim">Hold L to wind. The lower bar is the fish off the stern: in the red it is under the boat.</p>`;
     } else {
       const total = `Today ${this.trip.landed.length} fish · ${this.trip.points} points`;
       const derby = this.desk.line();
