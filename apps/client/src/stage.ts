@@ -198,7 +198,14 @@ export class Stage {
     const t = this.course.terrain;
     const heightAt = terrain instanceof THREE.Mesh
       ? ((drawn: HeightGrid) => (x: number, y: number) => groundHeight(drawn, x, y))({ x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: terrain.geometry.getAttribute('position').array, stride: 3, offset: 1 })
-      : landHeight(this.course, data.terrain);
+      : ((land: (x: number, y: number) => number) => (x: number, y: number) => {
+        // Land with insets reads the sea as 0, and a venue's plot is found by where the ground goes below the water:
+        // sink charted water to its depth, or no venue finds a shore (the ocean waters had none).
+        const h = land(x, y);
+        if (h > 0.05) return h;
+        const d = world.chartDepth(x, y);
+        return d > 0 ? -d : h;
+      })(landHeight(this.course, data.terrain));
     const shore = buildShoreside(this.course.depth, data.depth, heightAt, (x, y) => world.chartDepth(x, y), data.places, scenery.landCover);
     land.add(shore.group);
     this.shore = shore.spots;

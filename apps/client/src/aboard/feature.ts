@@ -62,6 +62,8 @@ export interface AboardContext {
   sound: Sound;
   /** Another feature, by id, for the few cases where one depends on another. */
   feature<T extends Feature>(id: string): T | undefined;
+  /** ashore: the other players' figures and their bubbles are drawn against this frame's camera. */
+  view(): { camera: import('three').PerspectiveCamera; width: number; height: number };
 }
 
 /**
@@ -76,6 +78,17 @@ export interface Feature {
    * Taken already: Space P T H C M B R F G X Z K L O U N J V Y I Comma Period Slash Enter Escape Backquote, digits 1 to 6, W S A D Q E, the arrows, and each boat's own control keys.
    */
   key?(code: string, shift: boolean): boolean;
+  /**
+   * ashore: a key before the game's own keys see it, for a feature that has taken the player off the boat altogether
+   * and needs keys the boat uses (walking with W A S D, the numbers). Return true to keep it from everything else.
+   * Only take a key while the feature's `focus` is in force.
+   */
+  firstKey?(code: string, shift: boolean): boolean;
+  /**
+   * ashore: the camera, after the drone has placed it for this frame and before the picture is drawn, for a feature
+   * whose `focus` is in force and that has to keep the lens out of something the drone knows nothing of.
+   */
+  afterCamera?(camera: import('three').PerspectiveCamera, dt: number): void;
   /** One fixed sim step, 1/60 s of game time. Runs many times a frame when time is speeded up. Keep it cheap. */
   step?(): void;
   /** Once a rendered frame, after the sim has stepped. `dt` is real seconds. `seaTime` is the time to pass to `stage.seaLevel`. */
@@ -85,8 +98,9 @@ export interface Feature {
   /**
    * When this returns a point, the camera follows it instead of the boat and the sailing controls are switched off.
    * For when the player has left the boat, in the kayak for instance. Sim coordinates: x east, y north, heading compass radians.
+   * `real` (ashore) holds the clock at real speed while it is in force.
    */
-  focus?(): { x: number; y: number; heading: number; height: number } | null;
+  focus?(): { x: number; y: number; heading: number; height: number; real?: boolean } | null;
   /**
    * The player has hailed (Enter, then words). Return true if somebody this feature looks after heard it and will answer.
    * `withinHail` says who that would be, for the prompt in the hail box, or null when nobody is in range.

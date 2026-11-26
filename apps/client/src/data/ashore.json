@@ -1,0 +1,35 @@
+{
+  "items": [
+    { "id": "beer", "name": "a cold beer", "held": "bottle", "tint": "#7a4a14", "price": 6 },
+    { "id": "rum-punch", "name": "a rum punch", "held": "glass", "tint": "#d8552a", "price": 9 },
+    { "id": "painkiller", "name": "a Painkiller, nutmeg on top", "held": "glass", "tint": "#f1d9a6", "price": 10 },
+    { "id": "buffalo-milk", "name": "a buffalo milk", "held": "glass", "tint": "#e9dcc6", "price": 12 },
+    { "id": "wine", "name": "a glass of white wine", "held": "glass", "tint": "#e8dc9a", "price": 9 },
+    { "id": "irish-coffee", "name": "an Irish coffee", "held": "mug", "tint": "#f4efe6", "price": 9 },
+    { "id": "coffee", "name": "a coffee", "held": "mug", "tint": "#f4efe6", "price": 3 },
+    { "id": "lemonade", "name": "a lemonade", "held": "glass", "tint": "#f2e37a", "price": 3 },
+    { "id": "fish-tacos", "name": "fish tacos", "held": "plate", "tint": "#d8a24e", "price": 12 },
+    { "id": "conch-fritters", "name": "conch fritters", "held": "plate", "tint": "#c98c3a", "price": 11 },
+    { "id": "chowder", "name": "clam chowder in a bread bowl", "held": "plate", "tint": "#e6d7b0", "price": 11 },
+    { "id": "sandwich", "name": "a sandwich", "held": "plate", "tint": "#d9c08a", "price": 8 },
+    { "id": "ice-cream", "name": "an ice cream", "held": "glass", "tint": "#f6e9d0", "price": 4 }
+  ],
+  "kinds": {
+    "bar": ["beer", "rum-punch", "fish-tacos", "coffee"],
+    "club": ["beer", "wine", "sandwich", "coffee"],
+    "hotel": ["wine", "beer", "sandwich", "coffee"],
+    "marina": ["coffee", "sandwich", "beer", "ice-cream"],
+    "store": ["coffee", "sandwich", "lemonade", "ice-cream"],
+    "park": []
+  },
+  "waters": {
+    "bvi": { "first": ["painkiller", "conch-fritters"], "not": ["coffee", "sandwich"] },
+    "sf-bay": { "first": ["irish-coffee", "chowder"], "not": ["rum-punch", "sandwich"] },
+    "catalina": { "first": [], "not": ["rum-punch"] },
+    "san-juans": { "first": ["chowder"], "not": ["rum-punch"] }
+  },
+  "places": {
+    "isthmus": { "first": ["buffalo-milk"] },
+    "avalon": { "first": ["buffalo-milk"] }
+  }
+}
