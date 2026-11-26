@@ -13,6 +13,11 @@ export class Dockside implements Feature {
 
   constructor(private readonly ctx: AboardContext) {}
 
+  /** ashore: the place the crew has stepped off at, for `ashore/walk.ts` to put her on her feet there. */
+  get ashoreAt(): Place | null {
+    return this.at;
+  }
+
   /** The dock she is lying alongside, if she is. */
   private dock(): Place | null {
     const s = this.ctx.sim.state;

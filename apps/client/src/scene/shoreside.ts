@@ -212,15 +212,16 @@ export function buildShoreside(depth: DepthGrid, depths: ArrayLike<number>, heig
         const u0 = -house.w / 2 + (house.w * i) / n;
         const u1 = -house.w / 2 + (house.w * (i + 1)) / n;
         const colour = i % 2 ? WHITE : awning;
-        const a = P(u0, v0, 3.5);
-        const b = P(u1, v0, 3.5);
-        const c = P(u1, v0 + 4.4, 2.6);
-        const e = P(u0, v0 + 4.4, 2.6);
+        // ashore: people walk under it now, so its outer edge is 2.6 m above the deck and its valance 2.25 m (they were 1.9 and 1.55).
+        const a = P(u0, v0, 3.9);
+        const b = P(u1, v0, 3.9);
+        const c = P(u1, v0 + 4.4, 3.3);
+        const e = P(u0, v0 + 4.4, 3.3);
         m.quad(a, b, c, e, colour, P((u0 + u1) / 2, v0 + 2, 0));
         m.quad(a, b, c, e, colour.clone().multiplyScalar(0.7), P((u0 + u1) / 2, v0 + 2, 9));
-        m.quad(e, c, P(u1, v0 + 4.4, 2.25), P(u0, v0 + 4.4, 2.25), colour, P((u0 + u1) / 2, v0, 2.4));
+        m.quad(e, c, P(u1, v0 + 4.4, 2.95), P(u0, v0 + 4.4, 2.95), colour, P((u0 + u1) / 2, v0, 3.1));
       }
-      for (let i = 0; i <= 3; i++) post(-house.w / 2 + 0.2 + ((house.w - 0.4) * i) / 3, v0 + 4.3, level, 2.6, 0.12, WHITE);
+      for (let i = 0; i <= 3; i++) post(-house.w / 2 + 0.2 + ((house.w - 0.4) * i) / 3, v0 + 4.3, level, 3.3, 0.12, WHITE);
       const neon = pick(NEON, 5);
       // The sign stands on the roof, where it shows over the awning.
       for (const u of [-house.w * 0.24, house.w * 0.24]) post(u, v0 - 0.8, house.wall, house.wall + 0.9, 0.2, PILE);

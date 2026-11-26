@@ -20,6 +20,7 @@ import { Residents } from './residents';
 import { Tips } from './tips';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
+import { Ashore } from '../ashore/walk'; // ashore
 
 /**
  * Every feature in the game, in the order their hooks run. Add a line here for a new one.
@@ -34,6 +35,8 @@ export function createFeatures(ctx: AboardContext): Feature[] {
     new Pilotage(ctx),
     // Over the side with a mask and a speargun. Ahead of the tender and the anchor: while she is in the water every key is hers.
     new Dive(ctx),
+    // ashore: on foot at a place. Before the dock and the tender: while she is walking, the keys, the status and the camera are hers.
+    new Ashore(ctx),
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),

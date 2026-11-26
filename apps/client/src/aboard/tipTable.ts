@@ -180,8 +180,33 @@ export const TIPS: Tip[] = [
         ? `Press O to step ashore to ${a.where}. Every place you land is stamped on the bar hop, on the board's Logbook tab.`
         : `${a.where} is close. Press O to launch the ${dinghy(s)} and ${s.tenderName === 'Kayak' ? 'paddle' : 'run'} in with W A S D, then O at the beach to land. Every place you land is stamped on the bar hop, on the board's Logbook tab.`;
     },
-    when: (s) => s.hold !== 'none' && !s.tender && s.ashore !== null && s.ashore.d < 700,
+    when: (s) => s.hold !== 'none' && !s.tender && !s.walking && s.ashore !== null && s.ashore.d < 700,
     done: ['KeyO'], doneWhen: (s) => s.tender,
+  },
+  // ---- ashore: on foot -------------------------------------------------------------------------------
+  {
+    id: 'walk', icon: 'shore', title: 'On your own two feet', keys: ['W', 'A', 'S', 'D', 'Q', 'E'], priority: 62, hold: 3, max: 2,
+    text: (s) => `You are ashore at ${s.walking?.where ?? 'the dock'}. W A S D walks and Shift jogs. Q and E, or a drag, look round. O back at the dock takes you aboard again.`,
+    when: (s) => s.walking !== null,
+    done: ['KeyW', 'KeyA', 'KeyS', 'KeyD'],
+  },
+  {
+    id: 'walk-do', icon: 'shore', title: 'Pull up a chair', keys: ['F', 'G'], priority: 55, hold: 25, max: 2,
+    text: (s) => `Walk up to a table, a bar stool, the rail or the dance floor and press F.${s.walking?.menu ? ' At the bar, G is the menu: it is on the house for now.' : ''}`,
+    when: (s) => s.walking !== null && !s.walking.posed,
+    done: ['KeyF', 'KeyG'],
+  },
+  {
+    id: 'walk-company', icon: 'boats', title: 'You have company ashore', keys: ['1', '2', '3', '4', '5', 'Enter'], priority: 64, hold: 4, max: 3, secs: 24,
+    text: (s) => `${other(s)} is ashore here too. 1 waves, 2 is cheers, 3 points, 4 shrugs, 5 laughs. Enter types words that show over your head${s.voice ? ', and V is the radio as ever: hold it and talk' : ''}. From the bar's menu you can stand everyone a round.`,
+    when: (s) => s.walking !== null && s.walking.friends > 0,
+    done: ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Enter'],
+  },
+  {
+    id: 'walk-tell', icon: 'radio', title: 'Tell them where you are', keys: ['T'], priority: 42, hold: 40, max: 2,
+    text: (s) => `Other boats are out on this water. T tells them you are at ${s.walking?.where ?? 'the bar'}: each gets how far and which way, and a mark on the chart.`,
+    when: (s) => s.walking !== null && s.walking.friends === 0 && s.company > 0,
+    done: ['KeyT'],
   },
   {
     id: 'tender', icon: 'kayak', title: 'In the kayak', keys: ['W', 'A', 'S', 'D', 'O'], priority: 60, hold: 3,
@@ -198,7 +223,7 @@ export const TIPS: Tip[] = [
   {
     id: 'tender-launch', icon: 'kayak', title: 'Take the tender', keys: ['O', 'Shift', '+', 'O'], priority: 14, hold: 25,
     text: (s) => `She is ${s.hold === 'anchor' ? 'anchored' : 'made fast'}, so the tender can go. O to launch the ${dinghy(s)}${s.tenderOthers.length ? ` (Shift+O: ${s.tenderOthers.map((t) => t.toLowerCase()).join(' / ')})` : ''}. The boat stays where she is while you are away.`,
-    when: (s) => s.hold !== 'none' && !s.tender && !s.racing && (s.berth === null || s.berth.kind !== 'dock' || s.berth.d > 40) && (s.ashore === null || s.ashore.d >= 700),
+    when: (s) => s.hold !== 'none' && !s.tender && !s.walking && !s.racing && (s.berth === null || s.berth.kind !== 'dock' || s.berth.d > 40) && (s.ashore === null || s.ashore.d >= 700),
     done: ['KeyO', 'Shift+KeyO'], doneWhen: (s) => s.tender,
   },
   {

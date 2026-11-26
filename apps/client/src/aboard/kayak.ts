@@ -355,10 +355,17 @@ export class Kayak implements Feature {
     else ctx.say('Skiff away. W opens the throttle, Shift with W is flat out, S goes astern, A and D steer. O lands her or brings you back aboard', 9);
   }
 
+  /** ashore: the place she has landed at, and whether at its guest float, for `ashore/walk.ts` to put her on her feet there. */
+  get landedAt(): { place: Place; float: boolean } | null {
+    return this.mode === 'ashore' && this.at ? { place: this.at, float: this.atFloat } : null;
+  }
+  private atFloat = false;
+
   private goAshore(place: Place | null, float = false): void {
     const { ctx } = this;
     this.mode = 'ashore';
     this.at = place;
+    this.atFloat = float; // ashore
     this.kayak.speed = 0;
     this.kayak.turn = 0;
     const m = this.kayak;

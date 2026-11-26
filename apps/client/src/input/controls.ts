@@ -36,6 +36,8 @@ export interface ControlHost {
   toggleFleet(): void;
   /** A key the game itself does not use. True if something aboard took it. */
   featureKey(code: string, shift: boolean): boolean;
+  /** ashore: any key, before the game's own. True if the player is off the boat and whatever she is doing took it. */
+  firstKey(code: string, shift: boolean): boolean;
 }
 
 /**
@@ -308,6 +310,8 @@ export class Controls {
     this.sound.start();
     this.held.add(e.code);
     if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); return; }
+    // ashore: off the boat on foot, the keys are hers before they are the boat's.
+    if (this.host.firstKey(e.code, e.shiftKey)) { e.preventDefault(); return; }
     switch (e.code) {
       case 'Space': this.host.togglePause(); e.preventDefault(); break;
       case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
