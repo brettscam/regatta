@@ -3,6 +3,9 @@ import { KT, SIM_DT } from '@slack-tide/sim';
 import type { AboardContext, Feature } from './feature';
 import { BITE_SPELL, STRIKE_SECONDS, biteIn, describeFish, fishingAdvice, fishingMode, fishingReason, withinLimit, type Bite, type FishingMode, type Water } from './catch';
 import { baitAt, type Sea } from './fauna';
+// Points for each catch and the fishing book: see `fishing/points.ts`.
+import { addToCreel, firstTableWorth, landedPoints } from '../fishing/points';
+import { loadCreel, saveCreel } from '../ui/catchCard';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -39,6 +42,8 @@ export class Fishing implements Feature {
   /** Real seconds since a fish got away, during which L is taken as a late strike and not as reeling in. */
   private late = 0;
   private landed = 0;
+  /** Points for this sail's fish. */
+  private points = 0;
   /** Fish of each kind kept this sail, against the day's limit. */
   private readonly aboard = new Map<string, number>();
   /** The last thing said about why the fishing is slow, and how long conditions have been saying something else. */
@@ -134,7 +139,7 @@ export class Fishing implements Feature {
     if (this.out) {
       this.out = false;
       this.rig.visible = false;
-      this.ctx.say(this.landed ? `Line in. ${this.landed} fish aboard this sail` : 'Line in', 4);
+      this.ctx.say(this.landed || this.points ? `Line in. ${this.landed} fish aboard this sail, ${this.points} points` : 'Line in', 4);
       return true;
     }
     const w = this.water();
@@ -162,7 +167,12 @@ export class Fishing implements Feature {
       this.aboard.set(b.species.id, (this.aboard.get(b.species.id) ?? 0) + 1);
       this.ctx.logbook.count('fish');
     }
-    this.ctx.say(`${describeFish(b)}. The line is back out`, 8);
+    // Every fish scores by its size for its kind, kept or not, and goes in the book on the Logbook tab.
+    const fate = b.keeper ? 'kept' : b.back === 'small' ? 'short' : 'released';
+    const points = landedPoints({ size: b.species.size, worth: firstTableWorth(b.species.id) }, b.cm, fate);
+    this.points += points;
+    saveCreel(addToCreel(loadCreel(), { id: b.species.id, name: b.species.name, cm: b.cm, kg: b.kg, points, fate, water: this.ctx.stage.course.id }));
+    this.ctx.say(`${describeFish(b)}. ${points} points, ${this.points} today. The line is back out`, 8);
   }
 
   step(): void {

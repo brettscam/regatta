@@ -50,7 +50,8 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['O'], name: 'Go ashore', since: 'v10', what: 'Tied up at a dock, O steps straight ashore. Anchored or on a mooring, it launches the tender: the kayak, the dinghy or the wave runner. Drive her with W A S D (Shift with W is a sprint, or flat out), press O at a beach or a bar to land, and O beside your boat to climb back aboard.' },
     { keys: ['Shift', '+', 'O'], name: 'Change tender', what: 'Aboard, with the tender stowed: the next one your boat carries. Every boat has the kayak; 30 ft and up the dinghy, an outboard skiff; 42 ft and up (the catamaran, the 45 and the 50) a wave runner as well. Also chosen on the way in, beside the boat\'s name.' },
     { keys: ['K'], name: 'Crab pot', since: 'v9', what: 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.' },
-    { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it.' },
+    { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it. Off Long Beach and Catalina the line tows a lure while she is making way and fishes a bait or a jig when she is stopped, and a fish has to be fought: hold L to wind while it rests, let go while it runs, and slow the boat.' },
+    { keys: ['Shift', '+', 'L'], name: 'Fishing card', what: 'Off Long Beach and Catalina: what is biting here and why, the lure or the bait, the day\'s catch and points, and fishing tournaments to call or join. With a fish at the rail, L keeps it and Shift+L lets it go.' },
   ] },
   { id: 'views', title: 'Views', rows: [
     { keys: ['1', '2', '3', '4'], name: 'Camera', what: 'Jump to a view: the wheel, the mast, the bow, or above the boat.' },

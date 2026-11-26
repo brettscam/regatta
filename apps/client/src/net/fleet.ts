@@ -91,6 +91,9 @@ export interface RemoteBoat {
   // `aboard/tenderFleet.ts` draws it in her colour with her skipper in it.
   tender: TenderReport | null;
   tenderAt: number;
+  // ---- fishing: a tournament she has called (`fc`), the one she is in (`fj`) and her fish (`fe`), exactly as she sent
+  // them. Nothing here is checked: `readDerby` and `readEntry` in `fishing/derby.ts` do that.
+  fishWire: { fc: unknown; fj: unknown; fe: unknown } | null;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -129,6 +132,7 @@ class Remote implements RemoteBoat {
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
   damage = 0;
+  fishWire: { fc: unknown; fj: unknown; fe: unknown } | null = null;
   status = ''; raceCall: unknown = null; raceEvent: unknown = null; windBoost = 1; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -185,6 +189,7 @@ class Remote implements RemoteBoat {
     this.tenderAt = now;
     this.raceCall = v.rc ?? null;
     this.raceEvent = v.ev ?? null;
+    this.fishWire = v.fc || v.fj || v.fe ? { fc: v.fc, fj: v.fj, fe: v.fe } : null; // fishing tournaments: read by `fishing/derby.ts`
     this.windBoost = Math.min(2, Math.max(1, num(v.wb, 1)));
     this.raceId = typeof v.rj === 'string' ? v.rj.slice(0, 32) : '';
     this.raceLeg = num(v.rp);

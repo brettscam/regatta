@@ -1,0 +1,7 @@
+{
+  "note": "Fishing tournaments on the real clock, every week. `dow` is the day (0 Sunday to 6 Saturday) and `utc` the time of lines-in, both UTC. Every page works the same tournament out from this, so it needs no host. Read by fishing/derby.ts (`nextWeekly`).",
+  "weekly": [
+    { "id": "saturday-derby", "name": "The Saturday derby", "water": "catalina", "fmt": "points", "len": 40, "dow": 6, "utc": "17:00", "rivals": 5 },
+    { "id": "twilight-jackpot", "name": "The twilight yellowtail jackpot", "water": "catalina", "fmt": "jackpot", "len": 40, "dow": 4, "utc": "02:00", "rivals": 5 }
+  ]
+}

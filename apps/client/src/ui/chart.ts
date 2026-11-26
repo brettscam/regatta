@@ -6,6 +6,7 @@ import type { TrafficVessel } from '../scene/traffic';
 import { shoreKind } from '../scene/shoreSite';
 import { visited } from '../aboard/visited';
 import type { ChartArea, CourseFeatures } from '../world/features';
+import { chartLayers, setChartLayer } from './chartLayers'; // extra layers (fishing)
 
 const D2R = Math.PI / 180;
 const NM = 1852;
@@ -257,6 +258,15 @@ export class Chart {
       this.view.cy += before.y - after.y;
       this.mapClock = 0;
     }, { passive: false });
+
+    // The switches for the extra layers, in the side panel.
+    this.side.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-layer]');
+      if (!b) return;
+      setChartLayer(b.dataset.layer!, b.getAttribute('aria-pressed') !== 'true');
+      this.mapClock = 0;
+      this.sideClock = 0;
+    });
 
     const s = this.strip;
     let scrubbing = false;
@@ -848,6 +858,13 @@ export class Chart {
     ctx.globalAlpha = 1;
 
     this.drawFeatures(ctx, w, h, v, true);
+    // Extra layers (fishing grounds and the like): see `chartLayers.ts`.
+    for (const layer of chartLayers()) {
+      if (!layer.on) continue;
+      ctx.save();
+      layer.draw(ctx, { scale: v.scale, w, h, to: (x, y) => this.screen(w, h, v, x, y) });
+      ctx.restore();
+    }
 
     // Named places and marks.
     for (const m of this.course.marks) {
@@ -1192,6 +1209,7 @@ export class Chart {
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
       ${traffic}
+      ${chartLayers().length ? `<section class="layers"><h3>Layers</h3>${chartLayers().map((l) => `<button type="button" data-layer="${l.id}" aria-pressed="${l.on}">${l.name}: ${l.on ? 'on' : 'off'}</button>${l.on && l.legend ? `<p class="quiet">${l.legend}</p>` : ''}`).join('')}</section>` : ''}
       <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
       <p class="source">Wind and gusts: ${windSource(this.course)}. Stream and tide: NOAA ${/NOAA ([\w-]+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
