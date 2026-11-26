@@ -8,6 +8,7 @@ import { myAvatarCode, readAvatar } from '../boat/avatar';
 import { mySailStyleCode, readSailStyle } from '../boat/sailStyle';
 import { readDamage } from '../aboard/contactRules';
 import { readTender, type TenderReport } from '../aboard/tenders'; // tender
+import { readDive } from '../aboard/diveRules'; // dive
 import { room as askRoom, user as askUser, type Room, type RoomPeer, type UserApi } from './platform';
 
 /**
@@ -91,6 +92,17 @@ export interface RemoteBoat {
   // `aboard/tenderFleet.ts` draws it in her colour with her skipper in it.
   tender: TenderReport | null;
   tenderAt: number;
+  // ---- fishing: a tournament she has called (`fc`), the one she is in (`fj`) and her fish (`fe`), exactly as she sent
+  // them. Nothing here is checked: `readDerby` and `readEntry` in `fishing/derby.ts` do that.
+  fishWire: { fc: unknown; fj: unknown; fe: unknown } | null;
+  // ---- dive: where her dive flag is while her skipper is in the water (`dv`, checked by `readDive`). `aboard/dive.ts` draws it.
+  diver: { x: number; y: number } | null;
+  // ---- ashore: what she says of herself on foot (`as`), exactly as she sent it, to be read with `readAshore`
+  // (`ashore/wire.ts`), and when it was heard (ms). Her last hail and when that was heard, for the bubble over her head.
+  ashore: unknown;
+  ashoreAt: number;
+  hail: string;
+  hailAt: number;
 }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
@@ -119,6 +131,12 @@ class Remote implements RemoteBoat {
   // ---- tender
   tender: TenderReport | null = null;
   tenderAt = 0;
+  diver: { x: number; y: number } | null = null; // dive
+  // ---- ashore
+  ashore: unknown = null;
+  ashoreAt = 0;
+  hail = '';
+  hailAt = 0;
   /** Her sails as she sent them, a code to be read with `readSailStyle`. */
   private sl = '';
   readonly colour: string;
@@ -129,6 +147,7 @@ class Remote implements RemoteBoat {
   /** True while she has only just arrived and has not yet taken up the fleet's clock. */
   fresh = false;
   damage = 0;
+  fishWire: { fc: unknown; fj: unknown; fe: unknown } | null = null;
   status = ''; raceCall: unknown = null; raceEvent: unknown = null; windBoost = 1; raceId = ''; raceLeg = 0; raceToGo = 0; raceFinish = 0;
   private wire: Wire | null = null;
   private heardAt = 0;
@@ -182,9 +201,13 @@ class Remote implements RemoteBoat {
     this.hold = { kind: v.hd === 1 ? 'anchor' : v.hd === 2 ? 'mooring' : 'none', x: num(v.hx, this.x), y: num(v.hy, this.y) };
     this.damage = readDamage(v.dm);
     this.tender = readTender(v.oc); // tender
+    this.diver = readDive(v.dv); // dive
     this.tenderAt = now;
+    this.ashore = v.as ?? null; // ashore
+    this.ashoreAt = now;
     this.raceCall = v.rc ?? null;
     this.raceEvent = v.ev ?? null;
+    this.fishWire = v.fc || v.fj || v.fe ? { fc: v.fc, fj: v.fj, fe: v.fe } : null; // fishing tournaments: read by `fishing/derby.ts`
     this.windBoost = Math.min(2, Math.max(1, num(v.wb, 1)));
     this.raceId = typeof v.rj === 'string' ? v.rj.slice(0, 32) : '';
     this.raceLeg = num(v.rp);
@@ -195,7 +218,12 @@ class Remote implements RemoteBoat {
     if (mt !== this.hailStamp) {
       const first = this.hailStamp === -1;
       this.hailStamp = mt;
-      if (!first && mt && typeof v.msg === 'string' && v.msg.trim()) this.onHail(v.msg.slice(0, 160));
+      if (!first && mt && typeof v.msg === 'string' && v.msg.trim()) {
+        this.onHail(v.msg.slice(0, 160));
+        // ashore
+        this.hail = v.msg.slice(0, 160);
+        this.hailAt = now;
+      }
     }
   }
 

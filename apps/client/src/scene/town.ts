@@ -79,6 +79,11 @@ export interface TownPlan {
 }
 
 /** A town's layout: a venue's, with what a town adds. Everything a venue's layout has means the same here. */
+/** True for the layout of a town. */
+export function isTown(layout: VenueLayout): layout is TownLayout {
+  return (layout as Partial<TownLayout>).town === true;
+}
+
 export interface TownLayout extends VenueLayout {
   /** True for a town. A venue's layout has no such field. */
   town: true;
@@ -211,7 +216,9 @@ export function townLayouts(plan: TownPlan, g: VenueGround): Array<{ place: stri
         }
       }
     }
-    return { place, layout: { id: place, kind: spec.kind, name: spec.name, x: spec.x, y: spec.y, heading: Math.round(heading * 1000) / 1000, floor: spec.floor, walk, heights, paths, dock, berth, spots, says, town: true as const } };
+    // Every landing's layout carries the town's own id (its first landing's place): it is one ground, whichever float
+    // she came in by. `levels` is what a venue's layout calls `heights`: each ring is level.
+    return { place, layout: { id: spec.landings[0].place, levels: heights.map((z): [number, number] => [z, z]), kind: spec.kind, name: spec.name, x: spec.x, y: spec.y, heading: Math.round(heading * 1000) / 1000, floor: spec.floor, walk, heights, paths, dock, berth, spots, says, town: true as const } };
   });
 }
 

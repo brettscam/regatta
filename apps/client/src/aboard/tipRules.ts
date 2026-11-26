@@ -48,6 +48,8 @@ export interface Snap {
   raceDone: number;
 
   // ---- wind and boat ----
+  /** True aboard a boat with no sails: a powerboat. The tips about sails, tacking and racing are not for her. */
+  power: boolean;
   windKt: number;
   /** True wind angle off the bow, degrees, 0 to 180. */
   twaDeg: number;
@@ -90,6 +92,8 @@ export interface Snap {
   ashore: { name: string; where: string; d: number; dock: boolean } | null;
   /** The tender is out. */
   tender: boolean;
+  /** ashore: on foot at a place (`ashore/walk.ts`): its name, how many other players are there, whether it sells anything, and whether she is sitting, leaning or dancing. */
+  walking: { where: string; friends: number; menu: boolean; posed: boolean } | null;
   /** The tender she carries: its name ('Kayak', 'Skiff', 'Wave runner'), and the others this yacht could carry instead. */
   tenderName: string;
   tenderOthers: string[];
@@ -102,6 +106,23 @@ export interface Snap {
   marks: number;
   /** The next one: how far, and whether it lies too close to the wind to sail straight at. */
   mark: { d: number; upwind: boolean } | null;
+
+  // ---- fishing, on a water with its own fishing table (`aboard/angling.ts`). Left out everywhere else. ----
+  fishing?: {
+    /** The lines are out. */
+    out: boolean;
+    /** She is over water a towed lure can fish: open water, a reef, a breakwater. */
+    trollWater: boolean;
+    /** The bait barge is within a mile, and the live baits in the tank. */
+    bargeNear: boolean;
+    bait: number;
+    /** A fish is on. */
+    fighting: boolean;
+    /** Somebody has called a fishing tournament she has not joined. */
+    offered: boolean;
+    /** Fish landed on this sail. */
+    landed: number;
+  };
 }
 
 /** A snapshot of nothing happening: a boat sailing along alone on her first minute. Tests and the feature start from this. */
@@ -110,10 +131,10 @@ export function emptySnap(): Snap {
     t: 0, voice: false, shared: false, sails: 1, hours: 0, races: 0, rank: 0, xpGained: 0, lesson: false, news: 0,
     company: 0, nearBoat: Infinity, boatName: '', trafficCalls: 0,
     racing: false, raceOffered: false, countdown: null, raceDone: 0,
-    windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
+    power: false, windKt: 10, twaDeg: 50, heelDeg: 12, speedKt: 5, reef: 0, reefs: 2, hasSpin: true, spin: false, hasEngine: true, engine: false,
     hand: false, mistrim: false, aground: false, stuck: 0, knockdowns: 0,
     manoeuvre: false, knocked: false, hitAgo: Infinity, panel: false,
-    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,
+    hold: 'none', heldFor: 0, berth: null, ashore: null, tender: false, walking: null, tenderName: 'Kayak', tenderOthers: [], night: false, depth: 30,
     marks: 0, mark: null,
   };
 }

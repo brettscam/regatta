@@ -1,4 +1,4 @@
-import { planRoute, plannedPosition, trackFix, type LegPlan, type PlanWeather, type Point, type RoutePlan, type TrackFix, type Waypoint } from '@slack-tide/nav';
+import { planRoute, plannedPosition, trackFix, type LegPlan, type PlanOptions, type PlanWeather, type Point, type RoutePlan, type TrackFix, type Waypoint } from '@slack-tide/nav';
 import type { PolarTable } from '@slack-tide/sim';
 
 export interface RouteMark extends Waypoint {
@@ -34,6 +34,8 @@ export class Passage {
   version = 0;
   private lastFix = { x: NaN, y: NaN, t: -1e9 };
   private legStart: Point = { x: 0, y: 0 };
+  /** How the plan is worked out, where it differs from a sailing crew's: see `PlanOptions`. Set before the route. */
+  planOptions: PlanOptions | undefined;
 
   constructor(private polar: PolarTable, private readonly weather: PlanWeather) {}
 
@@ -88,7 +90,7 @@ export class Passage {
   replan(boat: Point, t: number): void {
     const ahead = this.ahead();
     this.legStart = { x: boat.x, y: boat.y };
-    this.plan = ahead.length ? planRoute(this.polar, boat, ahead, t, this.weather) : null;
+    this.plan = ahead.length ? planRoute(this.polar, boat, ahead, t, this.weather, this.planOptions) : null;
     ahead.forEach((m, i) => {
       m.leg = this.plan!.legs[i];
       m.plannedEta = this.plan!.legs[i].eta;

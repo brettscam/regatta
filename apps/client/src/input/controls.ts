@@ -36,6 +36,8 @@ export interface ControlHost {
   toggleFleet(): void;
   /** A key the game itself does not use. True if something aboard took it. */
   featureKey(code: string, shift: boolean): boolean;
+  /** ashore: any key, before the game's own. True if the player is off the boat and whatever she is doing took it. */
+  firstKey(code: string, shift: boolean): boolean;
 }
 
 /**
@@ -308,11 +310,14 @@ export class Controls {
     this.sound.start();
     this.held.add(e.code);
     if (e.repeat) { if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); return; }
+    // ashore: off the boat on foot, the keys are hers before they are the boat's.
+    if (this.host.firstKey(e.code, e.shiftKey)) { e.preventDefault(); return; }
     switch (e.code) {
       case 'Space': this.host.togglePause(); e.preventDefault(); break;
       case 'KeyP': if (e.shiftKey) this.host.cyclePilotMode(); else this.host.togglePilot(); break;
       case 'KeyT':
-        if (this.sim.state.hold !== 'none') this.host.announce(`She is ${this.sim.state.hold === 'anchor' ? 'at anchor' : 'made fast'}, so there is nothing to tack. X gets her under way`);
+        if (this.sim.boat.power) this.host.announce('She has no sails to tack. A and D turn the wheel, and she goes where she is pointed');
+        else if (this.sim.state.hold !== 'none') this.host.announce(`She is ${this.sim.state.hold === 'anchor' ? 'at anchor' : 'made fast'}, so there is nothing to tack. X gets her under way`);
         else {
           const turn = this.sim.tack();
           this.host.announce(turn === 'spinnaker' ? 'No tacking with the spinnaker up. N takes it down, then tack' : turn === 'tack' ? 'Ready about. Helm’s a-lee' : this.sim.spinnakerUp ? 'Stand by to gybe. Gybe-oh. The crew takes the spinnaker round' : 'Stand by to gybe. Gybe-oh');
@@ -340,6 +345,7 @@ export class Controls {
   /** N: hoist the spinnaker, or take it down. */
   private spinnaker(): void {
     const sim = this.sim;
+    if (sim.boat.power) return this.host.announce('No spinnaker aboard: she has no sails at all. Full stop opens the throttle');
     const kite = sim.boat.sails.spinnaker;
     const twaDeg = Math.round(Math.abs(sim.out.twa) * R2D);
     switch (sim.setSpinnaker()) {
@@ -356,6 +362,7 @@ export class Controls {
   /** J puts in the next reef, Shift+J shakes one out. (V is the radio.) */
   private reef(step: number): void {
     const sim = this.sim;
+    if (sim.boat.power) return this.host.announce('Nothing to reef: she has no sails. In a sea, it is the throttle that comes back (comma)');
     const reefs = sim.boat.sails.main.reefs;
     const now = sim.state.reef;
     const next = Math.max(0, Math.min(reefs.length - 1, now + step));

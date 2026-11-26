@@ -230,6 +230,44 @@ export class Sound {
     m.gain.gain.setTargetAtTime(on ? (cranking ? 0.2 : 0.16 + 0.2 * load) : 0, now, on ? 0.15 : 0.35);
   }
 
+  /**
+   * The noises of a dive, all made here: `breath` her own breathing out through the snorkel, `crackle` the snapping
+   * of the reef, `pulse` a contraction when the urge to breathe comes, `kick` the wash of a fin stroke. `level` 0 to 1.
+   */
+  diving(kind: 'breath' | 'crackle' | 'pulse' | 'kick', level = 0.5): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const k = Math.min(1, Math.max(0, level));
+    if (kind === 'pulse') {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(58, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15 + 0.5 * k, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(g).connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.35);
+      return;
+    }
+    const long = kind === 'breath' ? 1.3 : kind === 'kick' ? 0.5 : 0.03;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer(ctx, long);
+    const f = ctx.createBiquadFilter();
+    f.type = kind === 'crackle' ? 'highpass' : 'bandpass';
+    f.frequency.value = kind === 'breath' ? 900 : kind === 'kick' ? 240 : 3200;
+    f.Q.value = kind === 'breath' ? 1.2 : 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime((kind === 'breath' ? 0.1 : kind === 'kick' ? 0.12 : 0.05) * (0.4 + k), t + long * 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + long);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t);
+  }
+
   /** One hull hitting another: a low thump and the crunch after it. `hard` is 0 for a touch, 1 for a ramming. */
   thud(hard: number): void {
     const ctx = this.ctx;

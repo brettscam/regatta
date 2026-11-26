@@ -23,6 +23,11 @@ export interface CourseAbout {
   /** Place in the list: lowest first. */
   order?: number;
   /**
+   * The boat this water is best met in: a boat id from `boats/`, such as `console22` for a channel crossing. Offered to
+   * anyone who has not chosen a boat of their own yet, and when they change to this water without having picked one.
+   */
+  boat?: string;
+  /**
    * What the water says about its sea: `{ "swell": { "height": 2, "period": 12, "fromDeg": 290 }, "openFetchKm": 20 }`.
    * A swell is an ocean swell coming in from outside; left out there is none. `openFetchKm` is the open water beyond the
    * chart's edge for a wind blowing in off it. See `packages/world/src/sea.ts`.

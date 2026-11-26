@@ -13,6 +13,8 @@ const SITE = 'bajaregatta.com';
 /** New to the game: the first couple of sails. */
 const novice = (s: Snap): boolean => s.sails <= 2 && s.hours < 1.5;
 const sailing = (s: Snap): boolean => s.hold === 'none' && !s.tender && !s.aground;
+/** Under way in a boat that has sails: the tips about sails, tacking and racing are for her only. */
+const underSail = (s: Snap): boolean => sailing(s) && !s.power;
 const other = (s: Snap): string => s.boatName || 'Another boat';
 /** The tender she carries, as the skipper would call it: the skiff is the dinghy. */
 const dinghy = (s: Snap): string => (s.tenderName === 'Skiff' ? 'dinghy' : s.tenderName.toLowerCase());
@@ -22,14 +24,20 @@ export const TIPS: Tip[] = [
   {
     id: 'welcome-steer', icon: 'helm', title: 'Welcome aboard', keys: ['A', 'D'], series: true, priority: 99, max: 1,
     text: 'The crew is steering for now. Press A or D and the wheel is yours: A turns her left, D turns her right.',
-    when: (s) => novice(s) && !s.lesson && s.t >= 6 && sailing(s),
+    when: (s) => novice(s) && !s.lesson && s.t >= 6 && underSail(s),
     done: ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'], doneWhen: (s) => s.hand,
   },
   {
     id: 'welcome-trim', icon: 'sail', title: 'Set the sails', keys: ['W', 'S', 'Q', 'E'], series: true, priority: 98, max: 1,
     text: 'W pulls the mainsail in and S lets it out. Q and E do the same for the jib, the front sail. If a sail flutters, pull it in until it just stops.',
-    when: (s) => novice(s) && !s.lesson && s.t >= 45 && sailing(s),
+    when: (s) => novice(s) && !s.lesson && s.t >= 45 && underSail(s),
     done: ['KeyW', 'KeyS', 'KeyQ', 'KeyE'],
+  },
+  {
+    id: 'welcome-power', icon: 'engine', title: 'Welcome aboard', keys: ['.', ',', 'A', 'D'], series: true, priority: 99, max: 2,
+    text: 'No sails on this one. The full stop key opens the throttle a step and the comma key closes it: hold either. A and D turn the wheel. In a sea, the comma key is the one that looks after her.',
+    when: (s) => s.power && s.sails <= 3 && s.t >= 14 && sailing(s),
+    done: ['Period'],
   },
   {
     id: 'welcome-keys', icon: 'keys', title: 'Every key, when you want it', keys: ['/', 'B'], series: true, priority: 97, max: 1,
@@ -74,13 +82,13 @@ export const TIPS: Tip[] = [
   {
     id: 'race-offer', icon: 'flag', title: 'A race has been called', keys: ['R'], priority: 80, cooldown: 600, max: 3,
     text: 'Press R to see it and join. If you are far away, joining tows you to the start.',
-    when: (s) => s.raceOffered && !s.racing && sailing(s),
+    when: (s) => s.raceOffered && !s.racing && underSail(s),
     done: ['KeyR'],
   },
   {
     id: 'race-call', icon: 'flag', title: 'Race them', keys: ['R'], priority: 55, hold: 90,
     text: 'Press R to call a race now, or fix one for later and send your friends the link.',
-    when: (s) => s.company > 0 && !s.racing && !s.raceOffered && sailing(s),
+    when: (s) => s.company > 0 && !s.racing && !s.raceOffered && underSail(s),
     done: ['KeyR'],
   },
   {
@@ -111,7 +119,7 @@ export const TIPS: Tip[] = [
   {
     id: 'engine', icon: 'engine', title: 'Going nowhere', keys: ['I', '.', ','], priority: 75, cooldown: 1800,
     text: 'Press I to start the engine, then the full stop key to put her ahead. The comma key throttles back. It is not allowed in a race.',
-    when: (s) => s.hasEngine && !s.engine && !s.racing && sailing(s) && s.stuck > 50,
+    when: (s) => s.hasEngine && !s.engine && !s.racing && underSail(s) && s.stuck > 50,
     done: ['KeyI'], doneWhen: (s) => s.engine,
   },
   {
@@ -129,14 +137,16 @@ export const TIPS: Tip[] = [
   },
   {
     id: 'pilot', icon: 'helm', title: 'A long way to go', keys: ['P'], priority: 30, hold: 30,
-    text: 'P switches the autopilot on: she steers herself and the crew trims the sails. Shift and P chooses what it follows: a heading, the wind, or your route.',
+    text: (s) => (s.power
+      ? 'P switches the autopilot on: it steers for your next mark and the throttle stays yours. Shift and P has it hold a heading instead.'
+      : 'P switches the autopilot on: she steers herself and the crew trims the sails. Shift and P chooses what it follows: a heading, the wind, or your route.'),
     when: (s) => s.hand && !s.racing && sailing(s) && s.t > 420 && s.mark !== null && s.mark.d > 2500,
     done: ['KeyP'],
   },
   {
     id: 'chart', icon: 'chart', title: 'The mark is upwind', keys: ['M'], priority: 40, hold: 20,
     text: 'She cannot sail straight at it, so it will take some tacks. Press M for the chart: your route, the tide and the forecast are all there.',
-    when: (s) => sailing(s) && s.t > 120 && s.mark !== null && s.mark.upwind && s.mark.d > 1500,
+    when: (s) => underSail(s) && s.t > 120 && s.mark !== null && s.mark.upwind && s.mark.d > 1500,
     done: ['KeyM'],
   },
   {
@@ -148,7 +158,7 @@ export const TIPS: Tip[] = [
   {
     id: 'flow', icon: 'wind', title: 'See the wind', keys: ['F'], priority: 35, hold: 20,
     text: 'Press F for the wind tunnel view: lines of smoke show the air over your sails, and whether they are set right.',
-    when: (s) => sailing(s) && !s.engine && ((s.mistrim && s.t > 60) || (novice(s) && s.t > 300)),
+    when: (s) => underSail(s) && !s.engine && ((s.mistrim && s.t > 60) || (novice(s) && s.t > 300)),
     done: ['KeyF'],
   },
 
@@ -180,8 +190,33 @@ export const TIPS: Tip[] = [
         ? `Press O to step ashore to ${a.where}. Every place you land is stamped on the bar hop, on the board's Logbook tab.`
         : `${a.where} is close. Press O to launch the ${dinghy(s)} and ${s.tenderName === 'Kayak' ? 'paddle' : 'run'} in with W A S D, then O at the beach to land. Every place you land is stamped on the bar hop, on the board's Logbook tab.`;
     },
-    when: (s) => s.hold !== 'none' && !s.tender && s.ashore !== null && s.ashore.d < 700,
+    when: (s) => s.hold !== 'none' && !s.tender && !s.walking && s.ashore !== null && s.ashore.d < 700,
     done: ['KeyO'], doneWhen: (s) => s.tender,
+  },
+  // ---- ashore: on foot -------------------------------------------------------------------------------
+  {
+    id: 'walk', icon: 'shore', title: 'On your own two feet', keys: ['W', 'A', 'S', 'D', 'Q', 'E'], priority: 62, hold: 3, max: 2,
+    text: (s) => `You are ashore at ${s.walking?.where ?? 'the dock'}. W A S D walks and Shift jogs. Q and E, or a drag, look round. O back at the dock takes you aboard again.`,
+    when: (s) => s.walking !== null,
+    done: ['KeyW', 'KeyA', 'KeyS', 'KeyD'],
+  },
+  {
+    id: 'walk-do', icon: 'shore', title: 'Pull up a chair', keys: ['F', 'G'], priority: 55, hold: 25, max: 2,
+    text: (s) => `Walk up to a table, a bar stool, the rail or the dance floor and press F.${s.walking?.menu ? ' At the bar, G is the menu: it is on the house for now.' : ''}`,
+    when: (s) => s.walking !== null && !s.walking.posed,
+    done: ['KeyF', 'KeyG'],
+  },
+  {
+    id: 'walk-company', icon: 'boats', title: 'You have company ashore', keys: ['1', '2', '3', '4', '5', 'Enter'], priority: 64, hold: 4, max: 3, secs: 24,
+    text: (s) => `${other(s)} is ashore here too. 1 waves, 2 is cheers, 3 points, 4 shrugs, 5 laughs. Enter types words that show over your head${s.voice ? ', and V is the radio as ever: hold it and talk' : ''}. From the bar's menu you can stand everyone a round.`,
+    when: (s) => s.walking !== null && s.walking.friends > 0,
+    done: ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Enter'],
+  },
+  {
+    id: 'walk-tell', icon: 'radio', title: 'Tell them where you are', keys: ['T'], priority: 42, hold: 40, max: 2,
+    text: (s) => `Other boats are out on this water. T tells them you are at ${s.walking?.where ?? 'the bar'}: each gets how far and which way, and a mark on the chart.`,
+    when: (s) => s.walking !== null && s.walking.friends === 0 && s.company > 0,
+    done: ['KeyT'],
   },
   {
     id: 'tender', icon: 'kayak', title: 'In the kayak', keys: ['W', 'A', 'S', 'D', 'O'], priority: 60, hold: 3,
@@ -198,7 +233,7 @@ export const TIPS: Tip[] = [
   {
     id: 'tender-launch', icon: 'kayak', title: 'Take the tender', keys: ['O', 'Shift', '+', 'O'], priority: 14, hold: 25,
     text: (s) => `She is ${s.hold === 'anchor' ? 'anchored' : 'made fast'}, so the tender can go. O to launch the ${dinghy(s)}${s.tenderOthers.length ? ` (Shift+O: ${s.tenderOthers.map((t) => t.toLowerCase()).join(' / ')})` : ''}. The boat stays where she is while you are away.`,
-    when: (s) => s.hold !== 'none' && !s.tender && !s.racing && (s.berth === null || s.berth.kind !== 'dock' || s.berth.d > 40) && (s.ashore === null || s.ashore.d >= 700),
+    when: (s) => s.hold !== 'none' && !s.tender && !s.walking && !s.racing && (s.berth === null || s.berth.kind !== 'dock' || s.berth.d > 40) && (s.ashore === null || s.ashore.d >= 700),
     done: ['KeyO', 'Shift+KeyO'], doneWhen: (s) => s.tender,
   },
   {
@@ -210,8 +245,46 @@ export const TIPS: Tip[] = [
   {
     id: 'catch', icon: 'fish', title: 'Catch supper', keys: ['L', 'K'], priority: 15, hold: 20, cooldown: 3 * DAY, max: 2,
     text: 'L puts a fishing line over: when the crew shout "Fish on", press L again quickly. K drops a crab pot with a buoy: come back in about an hour and press K beside it.',
-    when: (s) => !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
+    when: (s) => !s.fishing && !s.tender && !s.racing && ((s.hold !== 'none' && s.heldFor > 60) || (s.hold === 'none' && s.t > 900 && s.depth > 4 && s.depth < 35 && s.speedKt > 0.4 && s.speedKt < 3)),
     done: ['KeyL', 'KeyK'],
+  },
+  {
+    id: 'dive', icon: 'fish', title: 'Go over the side', keys: ['5'], priority: 13, hold: 40, cooldown: 3 * DAY, max: 2,
+    text: '5 puts you in the water with a mask, fins and a speargun, from the boat at anchor or from the tender. The arrow keys are your fins: up kicks, down puts your head down to dive. You have one breath, so kick, glide, and rest on the float between dives.',
+    when: (s) => !s.tender && !s.racing && !s.night && s.hold !== 'none' && s.heldFor > 150 && s.depth > 2 && s.depth < 30,
+    done: ['Digit5'],
+  },
+
+  // ---- fishing, on a water with its own fishing (`s.fishing` is there) ---------------------------------------
+  {
+    id: 'fish-troll', icon: 'fish', title: 'Tow a lure', keys: ['L'], priority: 16, hold: 25, cooldown: 2 * DAY, max: 3,
+    text: (s) => `She is making ${s.speedKt.toFixed(0)} knots over fishing water. L puts a lure out astern: feathers fish at 5 to 7 knots, plugs at 6 to 9. When the reel goes off, slow down.`,
+    when: (s) => !!s.fishing && !s.fishing.out && s.fishing.trollWater && !s.tender && !s.racing && s.hold === 'none' && s.t > 240 && s.speedKt > 4.5 && s.speedKt < 9.5 && !s.night,
+    done: ['KeyL'],
+  },
+  {
+    id: 'fish-fight', icon: 'fish', title: 'Fish on', keys: ['L'], priority: 88, urgent: true, max: 3, cooldown: 600, secs: 14,
+    text: 'Hold L to wind while the fish rests, and let go while it runs: the drag tires it for you. Slow the boat, or the line parts. Winding against a run breaks it too.',
+    when: (s) => !!s.fishing?.fighting,
+    doneWhen: (s) => (s.fishing?.landed ?? 0) >= 3,
+  },
+  {
+    id: 'fish-card', icon: 'fish', title: 'The fishing card', keys: ['Shift', '+', 'L'], priority: 14, hold: 40, cooldown: 2 * DAY, max: 2,
+    text: 'Shift+L opens the fishing card: what is biting here and why, the lure or the bait, the day\'s catch, and tournaments against the club or your friends. The chart (M) has a fishing layer.',
+    when: (s) => !!s.fishing?.out && !s.fishing.fighting && !s.racing,
+    done: ['Shift+KeyL'],
+  },
+  {
+    id: 'fish-bait', icon: 'fish', title: 'The bait barge', keys: [], priority: 15, hold: 10, cooldown: 2 * DAY, max: 2,
+    text: 'The bait barge is close by. Stop beside it, under a knot and a half, and the crew take a scoop of live sardines: nearly everything eats one, and it is the only way for halibut.',
+    when: (s) => !!s.fishing?.bargeNear && s.fishing.bait === 0 && !s.racing && !s.tender,
+    doneWhen: (s) => (s.fishing?.bait ?? 0) > 0,
+  },
+  {
+    id: 'fish-derby', icon: 'flag', title: 'A fishing tournament', keys: ['Shift', '+', 'L'], priority: 45, hold: 4, cooldown: 1800, max: 4,
+    text: 'A fishing tournament has been called on this water. Shift+L, then Join: fish anywhere you like until the lines come out, and the leaderboard is on the card.',
+    when: (s) => !!s.fishing?.offered && !s.racing,
+    ack: ['Shift+KeyL'],
   },
 
   // ---- the board -------------------------------------------------------------------------------------

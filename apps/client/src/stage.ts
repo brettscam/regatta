@@ -28,6 +28,22 @@ import { planTown, townLayouts } from './scene/town';
 import { buildLongBeach, type Detail } from './scene/longBeach';
 import { buildCatalina } from './scene/catalinaIsland';
 
+/**
+ * A view from somewhere other than the drone: the mask of a diver (`aboard/dive.ts`). Whoever owns it sets
+ * `stage.eye` each frame it applies and clears it when done. With `wet` set the frame is drawn from under the water:
+ * the sea's top, the spray, the rain and the navigation lights are left out, the haze is the water's own, and the
+ * light is what is left of the sun at that depth. All of it is put back before the frame ends, so nothing has to be
+ * restored on surfacing.
+ */
+export interface EyeView {
+  camera: THREE.PerspectiveCamera;
+  wet: boolean;
+  /** The colour of the water at the eye, how far it can see through it in metres, and what is left of the sun's red, green and blue. */
+  water: THREE.Color;
+  see: number;
+  light: THREE.Color;
+}
+
 export interface StageBoat {
   /** Scene coordinates: X east, Z south. */
   x: number;
@@ -41,6 +57,16 @@ export interface StageBoat {
   /** Under engine and in gear, or lying to an anchor or a mooring: for the lights she shows at night. */
   power?: boolean;
   held?: boolean;
+  /**
+   * A small open powerboat's lights: the height of the one white light she shows all round, and of her sidelights,
+   * metres above the water. Given, she is lit as a launch whenever she is not held. See `NavLights.vessel`.
+   */
+  launch?: { allRound: number; side: number };
+  /**
+   * 0 to 1, how far a planing hull is up on the plane. Her stem is clear of the water then, so the spray that a
+   * displacement bow throws at that speed is not thrown: what she does throw comes off her chines (`aboard/powerboat.ts`).
+   */
+  plane?: number;
   /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
   hulls?: number;
 }
@@ -82,7 +108,8 @@ export class Stage {
   /** Small craft afloat this frame (the tenders, `aboard/kayak.ts`), drawn in the same wakes and spray as every vessel. Filled and emptied by their owners. */
   readonly craft: WakeVessel[] = [];
   private readonly afloat: WakeVessel[] = [];
-  private readonly white = new THREE.Color();
+  /** What white water looks like in this light: bright by day, warm at sunset, a grey ghost at night. Set each frame. */
+  readonly white = new THREE.Color(1, 1, 1);
   private readonly tint = new THREE.Color();
   private readonly seaAt = (x: number, z: number, count: number) => waveHeight(this.waves, x, z, this.seaTime, count);
   private seaTime = 0;
@@ -124,6 +151,11 @@ export class Stage {
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
   private camera: THREE.PerspectiveCamera | null = null;
+  /** Set while the frame is to be drawn from somewhere other than the drone. See `EyeView`. */
+  eye: EyeView | null = null;
+  private readonly keptColor = new THREE.Color();
+  private readonly keptSun = new THREE.Color();
+  private readonly keptFill = new THREE.Color();
 
   constructor(readonly canvas: HTMLCanvasElement, data: LoadedCourse, world: ReplayWorld) {
     canvas.tabIndex = 0;
@@ -323,7 +355,8 @@ export class Stage {
     lights.begin(1 - THREE.MathUtils.smoothstep(this.sky.elevation, -0.1, 0.02), camera, this.renderer.domElement.height, this.weather.see);
     if (lights.lit) {
       const len = boat.length ?? 11.6;
-      lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
+      if (boat.launch) lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, boat.launch.allRound, boat.held ? 'anchor' : 'launch', boat.launch.side);
+      else lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
       for (const s of ships) {
         const y = this.seaAt(s.x, -s.y, 4);
         if (s.kind === 'sail') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 1.4, s.sog < 0.25 ? 'anchor' : 'sail');
@@ -381,7 +414,8 @@ export class Stage {
       const dx = v.x - camera.position.x;
       const dz = v.z - camera.position.z;
       if (dx * dx + dz * dz > 220 * 220 + v.length * v.length * 9) continue;
-      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
+      const drives = v.id === 'own' ? 1 - 0.65 * (boat.plane ?? 0) : 1;
+      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed * drives, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
     }
     // White water takes the colour of the light: bright by day, warm at sunset, a grey ghost at night.
     this.white.copy(this.haze.color).multiplyScalar(0.3).add(this.tint.copy(this.sky.sunColor).multiplyScalar(0.62 * day + 0.05));
@@ -442,6 +476,7 @@ export class Stage {
    * @param covered true when something covers most of the 3D view, so it only needs drawing now and then
    */
   frame(dtReal: number, rate: number, t: number, seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windKt: number, covered = false): void {
+    if (this.eye) camera = this.eye.camera;
     if (camera !== this.camera) {
       this.camera = camera;
       this.resize(camera);
@@ -523,6 +558,35 @@ export class Stage {
       d.object.visible = dx * dx + dz * dz < d.far * d.far;
     }
     this.frameCount++;
-    if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);
+    if (covered && this.frameCount % 6 !== 0) return;
+    if (this.eye?.wet) this.drawUnder(camera, this.eye);
+    else this.renderer.render(this.scene, camera);
+  }
+
+  /** One frame seen from under the water. What is changed for it is put back straight after. */
+  private drawUnder(camera: THREE.PerspectiveCamera, eye: EyeView): void {
+    const { haze, scene, sky } = this;
+    const near = haze.near;
+    const far = haze.far;
+    const background = scene.background;
+    const hidden = [this.ocean.mesh, this.spray.points, this.navLights.points, this.rain.group, ...sky.backdrop].filter((o) => o.visible);
+    this.keptColor.copy(haze.color);
+    this.keptSun.copy(sky.sunLight.color);
+    this.keptFill.copy(sky.fill.color);
+    for (const o of hidden) o.visible = false;
+    haze.color.copy(eye.water);
+    haze.near = 0.2;
+    haze.far = eye.see * 1.5;
+    scene.background = eye.water;
+    sky.sunLight.color.multiply(eye.light);
+    sky.fill.color.copy(eye.water).multiplyScalar(4);
+    this.renderer.render(scene, camera);
+    for (const o of hidden) o.visible = true;
+    haze.color.copy(this.keptColor);
+    haze.near = near;
+    haze.far = far;
+    scene.background = background;
+    sky.sunLight.color.copy(this.keptSun);
+    sky.fill.color.copy(this.keptFill);
   }
 }

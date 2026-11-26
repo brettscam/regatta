@@ -26,6 +26,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 /** The middle of the Casino, on its point. The town file's walk round it has the same centre. */
 const CASINO: [number, number] = [-2330, -22352];
+/** Bird Rock, off Isthmus Cove. Not in the baked land. */
+const BIRD_ROCK: [number, number] = [-17349, -10947];
 
 /** The round white Casino with its red roof: twelve storeys of it, the mark of the island. */
 function casino(m: Massing, lights: Light[], terrace: number): void {
@@ -165,10 +167,10 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
               const col = awnings[Math.floor(hash(k, 7) * awnings.length)];
               const fx = x - nx * (d / 2);
               const fy = y - ny * (d / 2);
-              const a: P3 = [fx - ux * w * 0.46, fy - uy * w * 0.46, low + 3.4];
-              const b: P3 = [fx + ux * w * 0.46, fy + uy * w * 0.46, low + 3.4];
-              const c: P3 = [b[0] - nx * 2.2, b[1] - ny * 2.2, low + 2.6];
-              const e: P3 = [a[0] - nx * 2.2, a[1] - ny * 2.2, low + 2.6];
+              const a: P3 = [fx - ux * w * 0.46, fy - uy * w * 0.46, Math.max(low, floor) + 3.9];
+              const b: P3 = [fx + ux * w * 0.46, fy + uy * w * 0.46, Math.max(low, floor) + 3.9];
+              const c: P3 = [b[0] - nx * 2.2, b[1] - ny * 2.2, Math.max(low, floor) + 3.1];
+              const e: P3 = [a[0] - nx * 2.2, a[1] - ny * 2.2, Math.max(low, floor) + 3.1];
               m.quad(e, c, b, a, col, [fx, fy, low]);
               lights.push({ p: [fx - nx * 1.2, fy - ny * 1.2, low + 2.4], a: WARM, b: WARM, shape: SHAPE.glow, size: 3.2, min: 3 });
             }
@@ -481,8 +483,9 @@ export function buildCatalina(ground: SceneGround, plans: readonly TownPlan[], p
     }
     // Bird Rock, off the cove: low, flat and white with birds.
     m.next();
-    m.lathe(-18675, -10750, -4, [[62, 0], [50, 5], [34, 8.5], [18, 10.5], [2, 11.2]], 11, C(0.5, 0.47, 0.42), WIN.none, 0.7, 0.5);
-    m.lathe(-18675, -10750, 5.2, [[30, 0], [17, 1.6], [2, 2.2]], 11, C(0.9, 0.89, 0.85), WIN.none, 0.7, 0.5);
+    // Where the dive there is (`dives.json`): a third of a mile off the cove's east point. Drawn, not solid.
+    m.lathe(BIRD_ROCK[0], BIRD_ROCK[1], -4, [[62, 0], [50, 5], [34, 8.5], [18, 10.5], [2, 11.2]], 11, C(0.5, 0.47, 0.42), WIN.none, 0.7, 0.5);
+    m.lathe(BIRD_ROCK[0], BIRD_ROCK[1], 5.2, [[30, 0], [17, 1.6], [2, 2.2]], 11, C(0.9, 0.89, 0.85), WIN.none, 0.7, 0.5);
     const mesh = m.build('two_harbors_mesh');
     triangles += m.triangles;
     counts.isthmusTriangles = m.triangles;

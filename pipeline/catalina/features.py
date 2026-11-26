@@ -56,21 +56,21 @@ platforms = [
   ('eureka', 'Platform Eureka', 17000, 1500, 213, 50, None),
 ]
 for pid, name, x, y, depth, turn, bridge in platforms:
-    areas.append({'id': f'{pid}-ring', 'name': name, 'kind': 'keepclear', 'circle': {'x': x, 'y': y, 'r': 250},
-      'say': 'Oil platform. Lit, with a horn in thick weather',
-      'warn': f'{name}. An oil platform on steel legs in {depth} m of water: solid, lit all night, and it sounds a horn in thick weather. Pass outside the legs and mind the boat landing'})
+    areas.append({'id': f'{pid}-ring', 'name': name, 'kind': 'keepclear', 'circle': {'x': x, 'y': y, 'r': 100},
+      'say': 'Oil platform. Nobody fishes or anchors inside the ring',
+      'warn': f'{name}. An oil platform on steel legs in {depth} m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing'})
 
-areas.append({'id': 'casino-point-dive-park', 'name': 'Casino Point Dive Park', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -2230, 'y': -22300, 'r': 130},
+areas.append({'id': 'casino-point', 'name': 'Casino Point Dive Park', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -2250, 'y': -22300, 'r': 160},
   'say': 'Underwater park. Divers down. Nothing may be taken',
   'warn': 'The dive park off Casino Point: a roped-off underwater park with divers down all day. No boats inside the buoys, and nothing may be taken'})
-areas.append({'id': 'lovers-cove', 'name': "Lover's Cove", 'kind': 'refuge', 'noTake': True, 'circle': {'x': -1790, 'y': -22960, 'r': 150},
+areas.append({'id': 'lovers-cove', 'name': "Lover's Cove", 'kind': 'refuge', 'noTake': True, 'circle': {'x': -1760, 'y': -22980, 'r': 200},
   'say': 'Marine reserve. Snorkelers. Nothing may be taken',
   'warn': "Lover's Cove: a marine reserve just past the mole, full of snorkelers and bright orange garibaldi. No anchoring, and nothing may be taken"})
 lp = at(33.4060, -118.3660)
-areas.append({'id': 'long-point-reserve', 'name': 'Long Point Reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': lp[0] + 300, 'y': lp[1] + 300, 'r': 900},
+areas.append({'id': 'long-point', 'name': 'Long Point reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -6900, 'y': -15450, 'r': 1150},
   'say': 'State marine reserve. Nothing may be taken',
   'warn': 'The marine reserve round Long Point. Sail through as you like, but nothing may be taken here: no lines, no pots, no lobster'})
-areas.append({'id': 'blue-cavern', 'name': 'Blue Cavern', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -16750, 'y': -11000, 'r': 700},
+areas.append({'id': 'blue-cavern', 'name': 'Blue Cavern reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -16400, 'y': -11450, 'r': 600},
   'say': 'Marine conservation area off Blue Cavern Point. Nothing may be taken',
   'warn': 'Blue Cavern Point, east of the Isthmus: a conservation area off the marine science station. No anchoring and nothing may be taken'})
 

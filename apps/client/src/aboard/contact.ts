@@ -39,6 +39,8 @@ export class Contact implements Feature {
   private readonly others: Other[] = [];
   /** Sim seconds until a holed boat is afloat again. Below 0 she is not holed. */
   private sinking = -1;
+  /** True for the frame after she is found holed with nothing hit: said once, then cleared. */
+  private broken = false;
   private lastCost = -1e9;
   /** True from when a hull (or the rescue boat) leaves her stopped until she is sailing again. */
   private stopped = false;
@@ -130,6 +132,12 @@ export class Contact implements Feature {
       if (this.sinking < 0) this.refloat();
       return;
     }
+    // Holed, and not by anything she hit here: a powerboat pounded to pieces, or put on the rocks at speed.
+    if (s.damage >= 1) {
+      this.sinking = CONTACT.refloat;
+      this.broken = true;
+      return;
+    }
     // A collision stops her dead, and the sim will not start a boat from a dead stop in an ordinary breeze (see
     // `needsWayOn`), so she is given the first of her way once her sails are driving.
     if (this.stopped && s.hold === 'none') {
@@ -196,13 +204,20 @@ export class Contact implements Feature {
     s.damage = 0;
     this.stopped = true;
     this.ctx.alarm(spot
-      ? `Afloat again ${metres} m off, with the hull patched up. She is head to wind: put the wheel over and sail her away`
+      ? `Afloat again ${metres} m off, with the hull patched up. ${sim.boat.power ? 'Start her with I, and treat her more gently' : 'She is head to wind: put the wheel over and sail her away'}`
       : 'Afloat again, with the hull patched up');
   }
 
   update(dt: number): void {
     const { ctx } = this;
     const s = ctx.sim.state;
+    if (this.broken) {
+      this.broken = false;
+      const was = this.racing;
+      if (was) ctx.race?.leave(true);
+      ctx.sound.thud(1);
+      ctx.alarm(`She has taken more than her hull will stand: holed and going down. The rescue boat will have her afloat again in ${CONTACT.refloat} seconds`);
+    }
 
     // What happened since the last frame, said and heard once.
     if (this.news.length) {

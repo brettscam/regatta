@@ -48,9 +48,19 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['X'], name: 'Stop here', since: 'v9', what: 'Slow right down first. Drops the anchor, or ties up if you are at a mooring or a dock. Press X again to set off.' },
     { keys: ['Z'], name: 'Sleep', since: 'v9', what: 'Skip to the morning. Only while stopped, and only when you are alone on the water.' },
     { keys: ['O'], name: 'Go ashore', since: 'v10', what: 'Tied up at a dock, O steps straight ashore. Anchored or on a mooring, it launches the tender: the kayak, the dinghy or the wave runner. Drive her with W A S D (Shift with W is a sprint, or flat out), press O at a beach or a bar to land, and O beside your boat to climb back aboard.' },
+    { keys: ['W', 'A', 'S', 'D'], name: 'Walk, ashore', what: 'Once you have stepped off at a dock, landed the tender at a bar, or pressed O with the boat lying beside a guest dock, you are on foot. W A S D walks, Shift jogs, Q and E or a drag look round. O back where you came ashore takes you aboard.' },
+    { keys: ['F'], name: 'Sit, lean, dance', what: 'Ashore: does whatever there is to do where you stand. Sit at a table or on a bar stool, lean on the rail and look out, warm your hands at a fire, dance. F again gets up, or changes the dance.' },
+    { keys: ['G'], name: 'Order', what: 'Ashore, at the bar: the menu. Pick with the number keys. The last line stands everyone there a round. Nothing costs anything yet.' },
+    { keys: ['1', '–', '5'], name: 'Wave and so on', what: 'Ashore: wave, cheers, point, shrug, laugh. The others ashore with you see it.' },
+    { keys: ['T'], name: 'Tell the fleet', what: 'Ashore: tells every boat on the water where you are. Each is told how far and which way, and gets a mark on the chart.' },
     { keys: ['Shift', '+', 'O'], name: 'Change tender', what: 'Aboard, with the tender stowed: the next one your boat carries. Every boat has the kayak; 30 ft and up the dinghy, an outboard skiff; 42 ft and up (the catamaran, the 45 and the 50) a wave runner as well. Also chosen on the way in, beside the boat\'s name.' },
     { keys: ['K'], name: 'Crab pot', since: 'v9', what: 'Drops a pot with a buoy. Come back in about an hour and press K beside the buoy to pull it up.' },
-    { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it.' },
+    { keys: ['L'], name: 'Fishing line', since: 'v9', what: 'Line out or in. When "Fish on" appears, press L quickly to catch it. Off Long Beach and Catalina the line tows a lure while she is making way and fishes a bait or a jig when she is stopped, and a fish has to be fought: hold L to wind while it rests, let go while it runs, and slow the boat.' },
+    { keys: ['Shift', '+', 'L'], name: 'Fishing card', what: 'Off Long Beach and Catalina: what is biting here and why, the lure or the bait, the day\'s catch and points, and fishing tournaments to call or join. With a fish at the rail, L keeps it and Shift+L lets it go.' },
+    { keys: ['5'], name: 'Go diving', what: 'Anchored or on a mooring, or stopped in the tender: over the side with mask, fins, a speargun and a float with a dive flag. You swim on your fins with the arrow keys: each press of the up arrow is a kick, and you glide between kicks; left and right turn you; down puts your head down for a duck dive; E turns it up again; drag to look about. W A S D work the same. Kicking hard burns breath: kick, glide, and come up with air in hand. Rest on the float between dives, and wait for "breathed up" before the next. 5 under water heads for the surface, and 5 beside the boat climbs out. Clean dives grow your lungs: the logbook keeps your freediving level.' },
+    { keys: ['F'], name: 'Speargun', what: 'Under water: fires the shaft where you are looking. It is good for three or four metres, so stalk close and slowly. The panel names the fish you are looking at and its rule: a protected fish, a short one or one over the limit costs a citation, and the gun stays on safe in a reserve.' },
+    { keys: ['G'], name: 'Grab a lobster', what: 'Under water, within arm\'s reach of a lobster: takes it by hand, which is the only way allowed. Come at it from the front and slowly or it shoots off backwards. Each one is measured: short ones go back, and so do all of them out of season.' },
+    { keys: ['6'], name: 'Lobster season practice', what: 'Where the water\'s own day is outside the lobster season: treats the season as open on your dives, and the water below as night, when lobster walk the reef. Only for you: nobody else\'s day changes. Press again to turn it off.' },
   ] },
   { id: 'views', title: 'Views', rows: [
     { keys: ['1', '2', '3', '4'], name: 'Camera', what: 'Jump to a view: the wheel, the mast, the bow, or above the boat.' },
@@ -65,6 +75,7 @@ export const KEY_GROUPS: KeyGroup[] = [
     { keys: ['I'], name: 'Engine', since: 'v21', what: 'Start it or stop it. It takes a second or two to fire, and starts out of gear.' },
     { keys: ['.'], name: 'Throttle up', since: 'v21', what: 'One step at a time: ahead slow, half, cruise, full. From astern it comes back through neutral.' },
     { keys: [','], name: 'Throttle down', since: 'v21', what: 'One step back: down to neutral, then astern slow and astern full. Astern is weak, and she steers badly backwards.' },
+    { keys: ['.', ','], name: 'A powerboat\'s throttle', what: 'The centre console has no sails: the same two keys work a lever with sixteen positions ahead, from idling in gear to wide open, and hold to run it up or down. It stops in neutral on the way through. A and D turn the wheel, and with it the outboard: out of gear she hardly steers. In a sea the comma key is the one that looks after her.' },
   ] },
   { id: 'help', title: 'Time, and getting unstuck', rows: [
     { keys: ['U'], name: 'Tow', since: 'v10', what: 'Run aground? This tows you back to deep water.' },
@@ -91,7 +102,7 @@ export function isNewSince(since: string | undefined, seen: string, ids: readonl
 }
 
 /** What the player is doing, as far as the strip of main keys is concerned. */
-export type StripContext = 'sailing' | 'racing' | 'held' | 'tender';
+export type StripContext = 'sailing' | 'racing' | 'held' | 'tender' | 'diving' | 'driving';
 
 /** The handful of keys that matter most in each situation: the caps, then a word or two. */
 export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
@@ -116,10 +127,19 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
   held: [
     [['X'], 'set off'],
     [['O'], 'go ashore'],
-    [['L'], 'fishing line'],
-    [['K'], 'crab pot'],
+    [['5'], 'dive'],
+    [['L', 'K'], 'fishing line, crab pot'],
     [['Z'], 'sleep till morning'],
     [['I'], 'engine'],
+    [['B'], 'all keys'],
+  ],
+  driving: [
+    [['.', ','], 'throttle up, down'],
+    [['A', 'D'], 'steer'],
+    [['I'], 'engine'],
+    [['P'], 'autopilot'],
+    [['M'], 'chart'],
+    [['X'], 'stop here'],
     [['B'], 'all keys'],
   ],
   tender: [
@@ -129,9 +149,17 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['O'], 'land, or climb back aboard'],
     [['B'], 'all keys'],
   ],
+  diving: [
+    [['↑'], 'kick, then glide'],
+    [['←', '→'], 'turn'],
+    [['↓', 'E'], 'head down, up'],
+    [['F'], 'fire'],
+    [['G'], 'grab a lobster'],
+    [['5'], 'surface; climb out'],
+  ],
 };
 
 /** Which strip to show. The kayak comes first: while she is out, the yacht's keys are not hers. */
-export function stripContext(c: { away: boolean; racing: boolean; held: boolean }): StripContext {
-  return c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : 'sailing';
+export function stripContext(c: { away: boolean; racing: boolean; held: boolean; diving?: boolean; power?: boolean }): StripContext {
+  return c.diving ? 'diving' : c.away ? 'tender' : c.racing ? 'racing' : c.held ? 'held' : c.power ? 'driving' : 'sailing';
 }

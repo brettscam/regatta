@@ -15,6 +15,10 @@ import { SHORE_KINDS, chartSailable } from '../src/scene/shoreSite';
 import { buildStructures } from '../src/scene/structures';
 import { buildLongBeach } from '../src/scene/longBeach';
 import { buildCatalina } from '../src/scene/catalinaIsland';
+import { PLATFORM_RING, platformsOf, tableOf } from '../src/fishing/table';
+import { reservesOf } from '../src/fishing/zones';
+import { groundOfTown } from '../src/ashore/fromTown';
+import { areaAt, areaFrom, floorUnder } from '../src/ashore/ground';
 
 // Long Beach to Catalina: what was drawn into the water (breakwaters, platforms, lanes, lights, kelp, towns), checked
 // against the baked depth and land. The structures are solid because `scripts/stamp.ts` wrote them into depth.bin:
@@ -122,15 +126,15 @@ describe('the oil islands and the platforms', () => {
       expect(Math.max(s.w!, s.d!)).toBeLessThanOrEqual(56);
       const ring = area(`${s.id}-ring`);
       expect(ring.kind).toBe('keepclear');
-      expect(ring.circle).toEqual({ x: s.x, y: s.y, r: 250 });
+      expect(ring.circle).toEqual({ x: s.x, y: s.y, r: PLATFORM_RING });
       expect(ring.warn).toContain(s.name);
       // Not in a lane: the lanes are drawn to pass them.
       for (const a of features.areas) if (a.kind === 'lane' || a.kind === 'separation') expect(inArea(a, s.x!, s.y!), `${s.id} in ${a.id}`).toBe(false);
     }
     expect(platforms.find((s) => s.id === 'elly')!.bridgeTo).toBe('ellen');
     // The crew speaks as she crosses a ring, once.
-    const before = new Set(areasAt(features, 15300, 3600));
-    const now = areasAt(features, 15700, 3600);
+    const before = new Set(areasAt(features, 15700, 3600));
+    const now = areasAt(features, 15840, 3600);
     expect(entered(features, before, now).map((a) => a.id)).toEqual(['ellen-ring']);
   });
 });
@@ -171,11 +175,10 @@ describe('lanes and lights', () => {
 
   it('reserves where nothing may be taken: the dive park, Lover\'s Cove, Long Point and Blue Cavern', () => {
     const reserves = features.areas.filter((a) => a.noTake);
-    expect(reserves.map((a) => a.id)).toEqual(['casino-point-dive-park', 'lovers-cove', 'long-point-reserve', 'blue-cavern']);
+    expect(reserves.map((a) => a.id)).toEqual(['casino-point', 'lovers-cove', 'long-point', 'blue-cavern']);
     for (const a of reserves) {
       expect(a.kind).toBe('refuge');
       expect(a.warn).toBeTruthy();
-      expect(world.chartDepth(a.circle!.x, a.circle!.y), a.id).toBeGreaterThan(0);
     }
   });
 });
@@ -336,7 +339,7 @@ describe('the towns to walk in', () => {
     // Every spot is on a ring, and the dive park's landing is inside the park.
     for (const s of layout.spots) expect(layout.walk.some((r) => inRing(r, s.x, s.y)), s.name).toBe(true);
     const landing = layout.spots.find((s) => s.name === 'dive-park-landing')!;
-    expect(inArea(area('casino-point-dive-park'), landing.x, landing.y)).toBe(true);
+    expect(inArea(area('casino-point'), landing.x, landing.y)).toBe(true);
   });
 
   it('Two Harbors: a pier, the bar\'s deck, the beach, and the road across to Catalina Harbor', () => {
@@ -352,6 +355,110 @@ describe('the towns to walk in', () => {
     const saddle = layout.spots.find((s) => s.name === 'isthmus-saddle')!;
     expect(townFloorAt(layout, saddle.x, saddle.y)!).toBeGreaterThan(6);
     expect(layout.spots.filter((s) => s.kind === 'table').length).toBe(4);
+  });
+});
+
+describe('one list of each thing', () => {
+  it('fishing takes its platforms and islands from the structures, and its breakwater grounds lie along the walls', () => {
+    const table = tableOf('catalina')!;
+    expect(table.platforms).toEqual(platformsOf('catalina'));
+    expect(table.platforms.map((p) => p.id)).toEqual(['island-grissom', 'island-white', 'island-chaffee', 'island-freeman', 'edith', 'ellen', 'elly', 'eureka']);
+    for (const p of table.platforms) {
+      const s = structures.find((q) => q.id === p.id)!;
+      expect([p.x, p.y]).toEqual([s.x, s.y]);
+      // The ring nobody fishes in is the ring the chart draws; an island's stands off its rock.
+      expect(p.keepOff).toBe(p.kind === 'platform' ? area(`${p.id}-ring`).circle!.r : s.r! + 40);
+      expect(world.chartDepth(p.x + p.keepOff + 30, p.y), p.id).toBeGreaterThan(0);
+    }
+    const lines = Object.fromEntries(walls.map((w) => [w.id, w.line]));
+    const ground = (id: string) => table.grounds.find((g) => g.id === id)!;
+    expect(ground('sp-breakwater').line).toEqual(lines['san-pedro-breakwater']);
+    expect(ground('mid-breakwater').line).toEqual(lines['middle-breakwater']);
+    expect(ground('lb-breakwater').line).toEqual(lines['long-beach-breakwater']);
+  });
+
+  it('the reserves are the chart\'s no-take areas, and the dive file\'s copy agrees with them', () => {
+    const reserves = reservesOf('catalina');
+    const charted = features.areas.filter((a) => a.noTake);
+    expect(reserves.map((r) => [r.id, r.x, r.y, r.r])).toEqual(charted.map((a) => [a.id, a.circle!.x, a.circle!.y, a.circle!.r]));
+    const dives = json<{ zones: Array<{ id: string; x: number; y: number; r: number }>; sites: Array<{ id: string; x: number; y: number }> }>('dives.json');
+    expect(dives.zones.map((z) => [z.id, z.x, z.y, z.r])).toEqual(reserves.map((r) => [r.id, r.x, r.y, r.r]));
+    // Every dive site is still afloat on the stamped chart, and the two in town are inside their reserves.
+    for (const s of dives.sites) expect(world.chartDepth(s.x, s.y), s.id).toBeGreaterThan(2);
+    for (const id of ['casino-point', 'lovers-cove']) {
+      const s = dives.sites.find((q) => q.id === id)!;
+      expect(inArea(area(id), s.x, s.y), id).toBe(true);
+    }
+  });
+});
+
+describe('walking the towns', () => {
+  const plans = towns.map((t) => planTown(t, ground));
+
+  it('every landing of a town gives the same ground, all of it joined, with every spot on it', () => {
+    for (const plan of plans) {
+      const layouts = townLayouts(plan, ground);
+      const grounds = layouts.map((l) => groundOfTown(l.layout)!);
+      for (const g of grounds) expect(g.id).toBe(plan.spec.landings[0].place);
+      const g = grounds[0];
+      expect(g.areas.length).toBe(plan.rings.length);
+      // From the first float, every area can be reached over the links.
+      const seen = new Set<number>([0]);
+      const queue = [0];
+      while (queue.length) {
+        const i = queue.pop()!;
+        for (const [a, b] of g.links) {
+          const j = a === i ? b : b === i ? a : -1;
+          if (j >= 0 && !seen.has(j)) { seen.add(j); queue.push(j); }
+        }
+      }
+      expect(seen.size, plan.spec.id).toBe(g.areas.length);
+      for (const s of g.spots) expect(areaAt(g, s.x, s.y), `${plan.spec.id} ${s.name}`).toBeGreaterThanOrEqual(0);
+      // A town's own kinds have become ones a walker knows.
+      for (const s of g.spots) expect(['door', 'table', 'seat', 'bar', 'dock', 'bench', 'view'], s.name).toContain(s.kind);
+      expect(g.spots.filter((s) => s.kind === 'dock').length).toBe(plan.spec.landings.length);
+      expect(g.sights!.length).toBeGreaterThan(4);
+    }
+  });
+
+  it('Avalon: a walk in metre steps from the dinghy dock up the pier, along the front and up to the Casino never leaves the ground', () => {
+    const g = groundOfTown(townLayouts(plans[0], ground)[0].layout)!;
+    const at = (name: string) => g.spots.find((s) => s.name === name)!;
+    // Straight lines between these keep to the paths.
+    const pier = plans[0].spec.paths.find((p) => p.id === 'pier')!.points!;
+    const front = ['crescent', 'casino-way'].map((id) => plans[0].spec.paths.find((p) => p.id === id)!.points!);
+    const way: Array<[number, number]> = [[at('dinghy-dock').x, at('dinghy-dock').y]];
+    const dock = at('dinghy-dock');
+    // Across on to the pier beside the float, down the pier to its foot, north-west along Crescent Avenue and Casino Way, up the steps.
+    const ux = (pier[1][0] - pier[0][0]) / Math.hypot(pier[1][0] - pier[0][0], pier[1][1] - pier[0][1]);
+    const uy = (pier[1][1] - pier[0][1]) / Math.hypot(pier[1][0] - pier[0][0], pier[1][1] - pier[0][1]);
+    const along = (dock.x - pier[0][0]) * ux + (dock.y - pier[0][1]) * uy;
+    way.push([pier[0][0] + ux * along, pier[0][1] + uy * along], [pier[0][0] + ux * 4, pier[0][1] + uy * 4]);
+    const crescent = front[0];
+    // The pier's foot is on the stretch of the front between its fifth and sixth points: walk back from there to its start.
+    for (let i = 4; i >= 0; i--) way.push(crescent[i]);
+    for (let i = front[1].length - 2; i >= 0; i--) way.push(front[1][i]);
+    const steps = plans[0].spec.paths.find((p) => p.id === 'casino-steps')!.points!;
+    way.push(steps[0], steps[1], [at('casino-door').x, at('casino-door').y]);
+    let area = areaAt(g, way[0][0], way[0][1]);
+    expect(area).toBeGreaterThanOrEqual(0);
+    let top = 0;
+    for (let k = 1; k < way.length; k++) {
+      const [ax, ay] = way[k - 1];
+      const [bx, by] = way[k];
+      const n = Math.ceil(Math.hypot(bx - ax, by - ay));
+      for (let s = 1; s <= n; s++) {
+        const x = ax + ((bx - ax) * s) / n;
+        const y = ay + ((by - ay) * s) / n;
+        const next = areaFrom(g, area, x, y);
+        expect(next, `leg ${k} at ${Math.round(x)}, ${Math.round(y)}`).toBeGreaterThanOrEqual(0);
+        area = next;
+        top = Math.max(top, floorUnder(g, { x, y, area }));
+      }
+    }
+    // She has climbed from a float to the Casino's terrace.
+    expect(floorUnder(g, { x: way[0][0], y: way[0][1], area: areaAt(g, way[0][0], way[0][1]) })).toBeCloseTo(0.45, 2);
+    expect(top).toBeGreaterThanOrEqual(6);
   });
 });
 

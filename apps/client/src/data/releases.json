@@ -1,6 +1,50 @@
 {
   "notes": [
     {
+      "id": "v42",
+      "date": "2026-11-26",
+      "title": "Fishing off Long Beach and Catalina",
+      "items": [
+        "Off Long Beach and Catalina the fishing is now Southern California's own: calico in the kelp, halibut on the harbor sand, rockfish under the oil platforms, and yellowtail, dorado and the odd tuna out in the channel.",
+        "Tow a lure while you cruise, drift a live sardine from the bait barge at Alamitos Bay, or stop short of the birds and cast. Fight what takes it by holding L while it rests and letting go while it runs.",
+        "Every fish scores by its size for its kind, with a running total for the day and your personal bests on the Logbook tab.",
+        "Shift+L opens the fishing card: what is biting and why, and tournaments you can call against the club's skippers or your friends."
+      ]
+    },
+    {
+      "id": "v41",
+      "date": "2026-11-26",
+      "title": "A 22 ft centre console",
+      "items": [
+        "A 22 ft centre console joins the boats: no sails, one big outboard, 26 knots at cruise and 40 flat out. I starts her; full stop and comma work the throttle, and holding them runs the lever up or down.",
+        "The sea sets her speed. Drive her into a chop faster than it allows and she leaves the water, lands hard and starts to break. The readout tells you what the sea will stand.",
+        "She crosses from Long Beach to Avalon in under an hour on a sixth of her tank, draws less than half a metre, and is the suggested boat on the Catalina water.",
+        "She does not race against the sailing boats, and carries the kayak on her T-top."
+      ]
+    },
+    {
+      "id": "v40",
+      "date": "2026-11-26",
+      "title": "Go ashore on foot",
+      "items": [
+        "You can now go ashore on foot: step off at a dock, land the tender at a bar, or press O with the boat lying off a guest dock, and you are standing on the float. W A S D walk, Shift jogs, Q, E or a drag look round.",
+        "Press F to sit at a table, take a bar stool, lean on the rail or dance. G at the bar opens the menu (a Painkiller in the BVI, on the house for now), and 1 to 5 wave, say cheers, point, shrug or laugh.",
+        "Friends ashore at the same place appear as themselves, with their name, their drink and what they type in a bubble over their head. Anyone can stand the whole deck a round, and T tells every boat on the water where you are.",
+        "O back at the dock takes you aboard."
+      ]
+    },
+    {
+      "id": "v39",
+      "date": "2026-11-26",
+      "title": "Over the side: freediving, a speargun and lobster",
+      "items": [
+        "Press 5 at anchor or on a mooring to go over the side with mask, fins and a speargun. The arrow keys are your fins: kick, glide, and watch your lungs. Resting on the float before a dive gives you longer under.",
+        "Stalk slowly and shoot inside four metres (F). Read each fish's rule first: a protected fish or a short one is a citation, and reserves keep the gun on safe.",
+        "Lobster are taken by hand (G), from the front, measured and bagged only in season. Key 6 is a practice setting for an October night.",
+        "Clean dives grow your freediving level in the logbook, from 45 seconds and 8 metres toward two and a half minutes and 25. This is a first cut: dive sites are in the British Virgin Islands and at Catalina, and the underwater scenery will get richer."
+      ]
+    },
+    {
       "id": "v38",
       "date": "2026-11-26",
       "title": "A new water: Long Beach to Catalina",

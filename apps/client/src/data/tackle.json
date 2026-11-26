@@ -1,0 +1,12 @@
+{
+  "lures": [
+    { "id": "feather", "name": "Feathers", "say": "A pair of small feathers and a spoon. Bonito, barracuda, skipjack, mackerel. Tow them at 5 to 7 kt." },
+    { "id": "plug", "name": "Plugs", "say": "A cedar plug and a diving plug. Yellowtail, dorado, tuna. Tow them at 6 to 9 kt." },
+    { "id": "marlin", "name": "Marlin lure", "say": "One big skirted lure, well back. Marlin, and now and then a tuna or a dorado. 7 to 9 kt, and a long wait." }
+  ],
+  "rigs": [
+    { "id": "bait", "name": "Live bait", "say": "A live sardine from the bait barge. Nearly everything eats it, and it is the only way for halibut. One bait a bite." },
+    { "id": "iron", "name": "The iron", "say": "A heavy jig, cast or dropped and wound back. Needs no bait. Bonito, barracuda, yellowtail, and bass at a pinch." },
+    { "id": "squid", "name": "Squid on the bottom", "say": "A strip of frozen squid on a dropper loop. Needs no live bait. Sheephead, whitefish, rockfish, sculpin, croaker." }
+  ]
+}
