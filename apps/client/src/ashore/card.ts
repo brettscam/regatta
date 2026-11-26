@@ -1,5 +1,5 @@
-// What is on the screen while she is ashore: a small card with the place, the time and the way back, a prompt for
-// what can be done where she stands, and the menu at the bar. None of it is a sailing control. The styles live here
+// What is on the screen while she is ashore: a small card with the place, the time and the way back, a prompt beside
+// her for what can be done where she stands, and the menu at the bar. None of it is a sailing control. The styles live here
 // with it, so that nothing of going ashore is in the game's shared stylesheet.
 
 const CSS = `
@@ -12,7 +12,7 @@ body.ashore #readout, body.ashore #mini, body.ashore #clock, body.ashore .cheat,
 .ashore-card .who { color: var(--amber, #ffc46b); }
 .ashore-card .keys { opacity: 0.7; margin-top: 3px; }
 .ashore-card kbd, .ashore-prompt kbd, .ashore-menu kbd { display: inline-block; min-width: 1.5em; padding: 0 4px; margin-right: 3px; text-align: center; font: 600 11px ui-monospace, monospace; color: #0b151c; background: #e8eef0; border-radius: 4px; }
-.ashore-prompt { position: fixed; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(var(--edge-bottom, 16px) + 150px); display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 32px);
+.ashore-prompt { position: fixed; z-index: 3; left: calc(50% + 64px); bottom: calc(var(--edge-bottom, 16px) + 150px); display: flex; gap: 6px 14px; flex-wrap: wrap; max-width: calc(50% - 80px);
   padding: 8px 14px; background: rgba(9, 18, 24, 0.86); border: 1px solid var(--amber, #ffc46b); border-radius: 999px; color: var(--ink, #eef3f4); font-size: 13.5px; pointer-events: none; }
 .ashore-menu { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--edge-bottom, 16px) + 200px); width: min(330px, calc(100% - 32px)); padding: 12px 14px; display: grid; gap: 5px;
   background: rgba(9, 18, 24, 0.93); border: 1px solid var(--amber, #ffc46b); border-radius: 12px; color: var(--ink, #eef3f4); font-size: 13.5px; pointer-events: none; }
@@ -25,7 +25,7 @@ body.ashore #readout, body.ashore #mini, body.ashore #clock, body.ashore .cheat,
 @media (max-width: 620px) {
   .ashore-card { font-size: 11.5px; width: min(230px, calc(100% - 24px)); padding: 8px 10px; }
   .ashore-card .keys { display: none; }
-  .ashore-prompt { bottom: calc(var(--edge-bottom, 12px) + 96px); font-size: 12.5px; }
+  .ashore-prompt { left: 50%; transform: translateX(-50%); justify-content: center; max-width: calc(100% - 32px); width: max-content; bottom: calc(var(--edge-bottom, 12px) + 96px); font-size: 12.5px; }
   .ashore-menu { bottom: calc(var(--edge-bottom, 12px) + 140px); }
 }
 `;

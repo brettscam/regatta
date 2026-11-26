@@ -160,7 +160,8 @@ export class Walker {
     if (shown && this.name) this.label.style.transform = `translate(-50%, -100%) translate(${sx}px, ${sy}px)`;
     const speaking = shown && this.saidLeft > 0;
     this.bubble.style.display = speaking ? 'block' : 'none';
-    if (speaking) this.bubble.style.transform = `translate(-50%, -100%) translate(${sx}px, ${sy - (this.name ? 22 : 4)}px)`;
+    // The bubble stays on the screen when she is at the edge of it.
+    if (speaking) this.bubble.style.transform = `translate(-50%, -100%) translate(${Math.max(Math.min(130, width / 2), Math.min(width - Math.min(130, width / 2), sx))}px, ${Math.max(70, sy - (this.name ? 22 : 4))}px)`;
   }
 
   dispose(scene: THREE.Scene): void {
