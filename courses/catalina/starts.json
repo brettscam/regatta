@@ -1,0 +1,117 @@
+[
+  {
+    "id": "shoreline",
+    "name": "Shoreline Marina, Long Beach",
+    "where": "Off the marina, inside the breakwater",
+    "teaches": "The crossing. Out through Queens Gate and 22 miles south-south-west across the San Pedro Channel to Avalon. Leave at first light, before the westerly fills in.",
+    "x": 10500,
+    "y": 22700,
+    "route": [
+      {
+        "name": "Queens Gate",
+        "x": 10750,
+        "y": 19250
+      },
+      {
+        "name": "Mid channel",
+        "x": 4500,
+        "y": -1500
+      },
+      {
+        "name": "Off Avalon",
+        "x": -1300,
+        "y": -22500
+      }
+    ]
+  },
+  {
+    "id": "alamitos",
+    "name": "Alamitos Bay",
+    "where": "Off the jetties at the east end of Long Beach",
+    "teaches": "A short trip to the fishing grounds. West inside the breakwater, out through Queens Gate, and three miles on to the Horseshoe Kelp.",
+    "x": 15000,
+    "y": 20500,
+    "route": [
+      {
+        "name": "Queens Gate",
+        "x": 10750,
+        "y": 19250
+      },
+      {
+        "name": "Horseshoe Kelp",
+        "x": 6950,
+        "y": 12800
+      }
+    ]
+  },
+  {
+    "id": "avalon",
+    "name": "Avalon",
+    "where": "Off the Casino, at the mouth of Avalon Bay",
+    "teaches": "The front side of the island. North-west along the cliffs past Long Point to the Isthmus, in the lee all the way.",
+    "x": -1400,
+    "y": -22500,
+    "route": [
+      {
+        "name": "Long Point",
+        "x": -5300,
+        "y": -15400
+      },
+      {
+        "name": "Off the Isthmus",
+        "x": -17200,
+        "y": -10600
+      },
+      {
+        "name": "Isthmus Cove",
+        "x": -18100,
+        "y": -11600
+      }
+    ]
+  },
+  {
+    "id": "isthmus",
+    "name": "Two Harbors",
+    "where": "On a mooring in Isthmus Cove",
+    "teaches": "Round the West End. Out along the front side, round the point into the open Pacific, and back down the weather side to Catalina Harbor, half a mile from where you started.",
+    "x": -18100,
+    "y": -11600,
+    "route": [
+      {
+        "name": "Outside the cove",
+        "x": -17400,
+        "y": -10200
+      },
+      {
+        "name": "Off Emerald Bay",
+        "x": -22500,
+        "y": -7300
+      },
+      {
+        "name": "Off the West End",
+        "x": -29800,
+        "y": -6300
+      },
+      {
+        "name": "Outside the West End",
+        "x": -30800,
+        "y": -9500
+      },
+      {
+        "name": "Off Cat Harbor",
+        "x": -20500,
+        "y": -15400
+      },
+      {
+        "name": "Cat Harbor entrance",
+        "x": -19200,
+        "y": -14550
+      },
+      {
+        "name": "Catalina Harbor",
+        "x": -19350,
+        "y": -13850
+      }
+    ]
+  }
+]

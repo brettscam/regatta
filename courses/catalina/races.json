@@ -1,0 +1,12 @@
+[
+  {
+    "id": "to-avalon",
+    "name": "Long Beach to Avalon",
+    "blurb": "The crossing: from Queens Gate straight across the San Pedro Channel to the mouth of Avalon Bay. 22 miles, most of it out of sight of anything but the island.",
+    "marks": [
+      { "name": "Queens Gate", "x": 10750, "y": 19250 },
+      { "name": "Mid channel", "x": 4500, "y": -1500 },
+      { "name": "Avalon", "x": -1300, "y": -22500 }
+    ]
+  }
+]
