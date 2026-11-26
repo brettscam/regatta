@@ -724,7 +724,7 @@ describe('lobster', () => {
     expect(closed.keep).toBe(false);
     expect(closed.why).toBe('closed');
     expect(closed.say).toMatch(/season is closed/);
-    const reserve = gauge(110, rule, true, 0, zoneAt(catalina, -1650, -23020));
+    const reserve = gauge(110, rule, true, 0, zoneAt(catalina, -1800, -22920));
     expect(reserve.keep).toBe(false);
     expect(reserve.why).toBe('reserve');
     expect(reserve.say).toMatch(/Lover's Cove/);

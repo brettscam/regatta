@@ -60,17 +60,17 @@ for pid, name, x, y, depth, turn, bridge in platforms:
       'say': 'Oil platform. Nobody fishes or anchors inside the ring',
       'warn': f'{name}. An oil platform on steel legs in {depth} m of water: solid, lit all night, and it sounds a horn in thick weather. Nobody fishes or anchors inside a hundred metres of her: stand off and mind the boat landing'})
 
-areas.append({'id': 'casino-point', 'name': 'Casino Point Dive Park', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -2250, 'y': -22300, 'r': 160},
+areas.append({'id': 'casino-point', 'name': 'Casino Point Dive Park', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -2350, 'y': -22250, 'r': 140},
   'say': 'Underwater park. Divers down. Nothing may be taken',
   'warn': 'The dive park off Casino Point: a roped-off underwater park with divers down all day. No boats inside the buoys, and nothing may be taken'})
-areas.append({'id': 'lovers-cove', 'name': "Lover's Cove", 'kind': 'refuge', 'noTake': True, 'circle': {'x': -1760, 'y': -22980, 'r': 200},
+areas.append({'id': 'lovers-cove', 'name': "Lover's Cove", 'kind': 'refuge', 'noTake': True, 'circle': {'x': -1840, 'y': -22900, 'r': 170},
   'say': 'Marine reserve. Snorkelers. Nothing may be taken',
   'warn': "Lover's Cove: a marine reserve just past the mole, full of snorkelers and bright orange garibaldi. No anchoring, and nothing may be taken"})
 lp = at(33.4060, -118.3660)
 areas.append({'id': 'long-point', 'name': 'Long Point reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -6900, 'y': -15450, 'r': 1150},
   'say': 'State marine reserve. Nothing may be taken',
   'warn': 'The marine reserve round Long Point. Sail through as you like, but nothing may be taken here: no lines, no pots, no lobster'})
-areas.append({'id': 'blue-cavern', 'name': 'Blue Cavern reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -16400, 'y': -11450, 'r': 600},
+areas.append({'id': 'blue-cavern', 'name': 'Blue Cavern reserve', 'kind': 'refuge', 'noTake': True, 'circle': {'x': -16330, 'y': -11240, 'r': 450},
   'say': 'Marine conservation area off Blue Cavern Point. Nothing may be taken',
   'warn': 'Blue Cavern Point, east of the Isthmus: a conservation area off the marine science station. No anchoring and nothing may be taken'})
 
@@ -91,8 +91,8 @@ lights = [
   L(at(33.3020, -118.3170), id='east-end', name='Catalina East End', focal=65, tower=5, character='Fl W 10s', period=10, shows=0.8, range=14, on='land', say='Seal Rocks lie under it'),
   L(at(33.4790, -118.6040), id='west-end', name='Catalina West End', focal=23, tower=5, character='Fl W 10s', period=10, shows=0.8, range=12, on='land'),
   L(at(33.4633, -118.4917), id='ship-rock', name='Ship Rock', focal=23, tower=6, character='Fl W 4s', period=4, shows=0.5, range=6, on='rock', say='A rock like a ship under sail, a mile north of the Isthmus, white with birds. Foul ground reaches south of it'),
-  L([-2302, -22375], id='casino-point-light', name='Casino Point', focal=9.5, tower=3, character='Fl G 4s', period=4, shows=0.5, range=5, colour=G, on='buoy', say='On the sea wall under the Casino. The north side of the way in to Avalon'),
-  L([-2056, -22764], id='cabrillo-mole-light', name='Cabrillo Mole', focal=8, tower=3, character='Fl R 4s', period=4, shows=0.5, range=5, colour=R, on='buoy', say='The end of the ferry mole. The south side of the way in to Avalon'),
+  L([-2272, -22388], id='casino-point-light', name='Casino Point', focal=9.5, tower=3, character='Fl G 4s', period=4, shows=0.5, range=5, colour=G, on='buoy', say='On the sea wall under the Casino. The north side of the way in to Avalon'),
+  L([-2041, -22792], id='cabrillo-mole-light', name='Cabrillo Mole', focal=8, tower=3, character='Fl R 4s', period=4, shows=0.5, range=5, colour=R, on='buoy', say='The end of the ferry mole. The south side of the way in to Avalon'),
 ]
 
 structures = [
@@ -113,7 +113,8 @@ for pid, name, x, y, depth, turn, bridge in platforms:
     structures.append(s)
 
 # ---- kelp: the lee shore of the island, from the baked coast ----
-ring = c['coast'][0]
+# The island's ring: the longest wholly south of the origin (the mainland's is longer).
+ring = max((r for r in c['coast'] if max(r[1::2]) < 0), key=len)
 pts = [(ring[i], ring[i + 1]) for i in range(0, len(ring), 2)]
 if pts[0] == pts[-1]: pts.pop()
 n = len(pts)

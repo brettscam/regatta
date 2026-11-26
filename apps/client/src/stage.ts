@@ -190,6 +190,7 @@ export class Stage {
       this.scene.remove(this.land);
       this.land.traverse((o) => {
         const mesh = o as THREE.Mesh;
+        (o.userData.picture as THREE.Texture | undefined)?.dispose();
         mesh.geometry?.dispose();
         for (const m of Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : []) m.dispose();
       });
@@ -205,13 +206,13 @@ export class Stage {
     land.name = 'course';
     const terrain = buildLand(this.course, data.terrain, scenery.landCover);
     // A water with a picture of its land from above (Catalina: a satellite scene) wears it, lit like the rest of the
-    // land, unless the graphics are on low: then the land keeps the colours made by rule.
-    if (data.landImage && graphics.level !== 'low') {
+    // land. On low graphics it goes without the fine grain close to; until it has loaded the land wears its colours by rule.
+    if (data.landImage) {
       new THREE.TextureLoader().load(data.landImage, (picture) => {
         if (this.land !== land) { picture.dispose(); return; }
         picture.colorSpace = THREE.SRGBColorSpace;
-        picture.anisotropy = 8;
-        drapeLand(terrain, picture);
+        picture.anisotropy = graphics.level === 'low' ? 1 : 8;
+        drapeLand(terrain, picture, graphics.level !== 'low');
         terrain.userData.picture = picture;
       });
     }
@@ -454,6 +455,9 @@ export class Stage {
     this.wake.setDetail(graphics.level);
     this.spray.amount = low ? 0.4 : 1;
     this.rain.detail = low ? 0.4 : 1;
+    // The draped land's fine grain close to.
+    const picture = this.land?.getObjectByName('land')?.userData.picture ?? this.land?.getObjectByName('terrain')?.userData.picture;
+    if (this.land && picture) drapeLand(this.land, picture as THREE.Texture, !low);
   }
 
   /**

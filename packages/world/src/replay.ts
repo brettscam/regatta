@@ -39,8 +39,12 @@ export interface CourseData {
   depth: GridSpec & { scale: number; file: string; insets?: GridSpec[] };
   terrain: GridSpec & {
     max: number; file: string; source: string; insets?: GridSpec[];
-    /** A picture of the land from above (a satellite scene, sea masked out) to drape over it: the file beside the course, and the box it covers. */
-    image?: { file: string; x0: number; y0: number; x1: number; y1: number; source?: string };
+    /**
+     * A picture of the land from above (a satellite scene, the sea filled in) to drape over it: the file beside the
+     * course, and the boxes it covers, each with the part of the picture that shows it (u and v from 0 to 1, from the
+     * picture's left and bottom edges).
+     */
+    image?: { file: string; boxes: Array<{ x0: number; y0: number; x1: number; y1: number; u0: number; u1: number; v0: number; v1: number }>; source?: string };
   };
   wind: GridSpec & {
     scale: number; truth: WindStep[]; forecast: WindStep[]; note: string;

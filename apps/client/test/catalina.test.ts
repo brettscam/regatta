@@ -319,7 +319,11 @@ describe('the towns to walk in', () => {
     expect(Math.hypot(pier.points![1][0] - pier.points![0][0], pier.points![1][1] - pier.points![0][1])).toBeGreaterThan(100);
     expect(pier.paint).toBe('#2f7d4f');
     expect(townFloorAt(layout, end.x, end.y)).toBe(plan.spec.floor);
-    expect(world.chartDepth(end.x, end.y)).toBeGreaterThan(4);
+    // The pier is solid on the chart (scripts/stamp.ts): the water is ten metres off its end, and its foot is ashore.
+    const [[ax, ay], [bx, by]] = pier.points!;
+    const plen = Math.hypot(bx - ax, by - ay);
+    expect(world.chartDepth(end.x, end.y)).toBe(0);
+    expect(world.chartDepth(bx + ((bx - ax) / plen) * 10, by + ((by - ay) / plen) * 10)).toBeGreaterThan(4);
     // From the mole to the Casino along the water is the best part of a kilometre.
     const front = ['casino-way', 'crescent', 'mole-road'].flatMap((id) => plan.spec.paths.find((p) => p.id === id)!.points!);
     let length = 0;
@@ -517,5 +521,71 @@ describe('what it costs to draw', () => {
     expect(built.triangles).toBeLessThan(150000);
     // Everything but nothing is given a distance beyond which it is not drawn.
     expect(built.detail.length).toBe(built.group.children.reduce((n, c) => n + (c.type === 'Group' ? 1 : 1), 0));
+  });
+});
+
+describe('the island as it is', () => {
+  // Facts of the real Santa Catalina that the land baked from the elevation tiles and the satellite picture
+  // (pipeline/catalina/land.py) must keep. Course metres from 33.55 N, 118.30 W.
+  const at = (lat: number, lon: number): [number, number] => [(lon + 118.3) * 6371008.8 * (Math.PI / 180) * Math.cos((33.55 * Math.PI) / 180), (lat - 33.55) * 6371008.8 * (Math.PI / 180)];
+  const highest = (x: number, y: number, r: number, step = 20): number => {
+    let top = 0;
+    for (let dy = -r; dy <= r; dy += step) for (let dx = -r; dx <= r; dx += step) top = Math.max(top, drawn(x + dx, y + dy));
+    return top;
+  };
+  const coast = (course as unknown as { coast: number[][] }).coast;
+  const island = coast.filter((r) => Math.max(...r.filter((_, k) => k % 2 === 1)) < 0).sort((a, b) => b.length - a.length)[0];
+
+  it('covers 194 square kilometres, as the island does', () => {
+    let area = 0;
+    for (let k = 0; k < island.length; k += 2) {
+      const j = (k + 2) % island.length;
+      area += island[k] * island[j + 1] - island[j] * island[k + 1];
+    }
+    expect(Math.abs(area) / 2 / 1e6).toBeGreaterThan(188);
+    expect(Math.abs(area) / 2 / 1e6).toBeLessThan(200);
+  });
+
+  it('rises to Mount Orizaba, about 640 m, the top of the island', () => {
+    const orizaba = highest(...at(33.379, -118.418), 1200);
+    expect(orizaba).toBeGreaterThan(610);
+    expect(orizaba).toBeLessThan(660);
+    // Nowhere else on the island is higher.
+    expect(highest(-15000, -18000, 13000, 100)).toBeLessThan(orizaba + 5);
+  });
+
+  it('is pinched at the Isthmus: Isthmus Cove and Catalina Harbor less than 850 m apart, with low land between', () => {
+    const cove: [number, number] = [-18330, -11990];
+    const harbor: [number, number] = [-18700, -12720];
+    expect(world.chartDepth(...cove)).toBeGreaterThan(1);
+    // The head of Catalina Harbor is shoal mud, but water.
+    expect(world.chartDepth(...harbor)).toBeGreaterThan(0);
+    expect(Math.hypot(cove[0] - harbor[0], cove[1] - harbor[1])).toBeLessThan(850);
+    const mid = drawn((cove[0] + harbor[0]) / 2, (cove[1] + harbor[1]) / 2);
+    expect(mid).toBeGreaterThan(2);
+    expect(mid).toBeLessThan(40);
+  });
+
+  it('has Avalon Bay between Casino Point and the Cabrillo Mole, open water across it and land at each end', () => {
+    const avalon = towns.find((t) => t.id === 'avalon')!;
+    const casino = avalon.paths.find((p) => p.id === 'casino-walk')!.centre!;
+    const end = avalon.paths.find((p) => p.id === 'mole')!.points![1];
+    // About 550 m from the middle of the Casino to the end of the mole, as the picture has them.
+    const across = Math.hypot(end[0] - casino[0], end[1] - casino[1]);
+    expect(across).toBeGreaterThan(500);
+    expect(across).toBeLessThan(750);
+    expect(drawn(casino[0], casino[1])).toBeGreaterThan(0);
+    expect(world.chartDepth(end[0], end[1])).toBe(0);
+    // Water from the north-west shore under the bluff to the mole, deep enough to moor in at the middle.
+    let wet = 0;
+    for (let k = 1; k < 20; k++) if (world.chartDepth(-2480 + ((end[0] + 2480) * k) / 20, -22560 + ((end[1] + 22560) * k) / 20) > 2) wet++;
+    expect(wet).toBeGreaterThanOrEqual(17);
+    expect(world.chartDepth(-2300, -22620)).toBeGreaterThan(8);
+    // The town fills an amphitheatre: the hills behind it stand over 300 m within two kilometres.
+    expect(highest(-2700, -23400, 1000)).toBeGreaterThan(300);
+  });
+
+  it('keeps Bird Rock and Ship Rock above water off the Isthmus', () => {
+    for (const [lat, lon] of [[33.4514, -118.4875], [33.4633, -118.4917]]) expect(highest(...at(lat, lon), 100, 5)).toBeGreaterThan(10);
   });
 });

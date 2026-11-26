@@ -301,7 +301,7 @@ body.lobby .newsflash { left: auto; right: var(--edge-right); }
 .hint p { margin: 0; flex: 1; font-size: 13.5px; line-height: 1.45; }
 .hint button { font: inherit; font-size: 11px; color: var(--dim); background: none; border: 1px solid var(--edge); border-radius: 7px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
 body.lobby .hint, body.lobby .hails { display: none; }
-.hails { position: fixed; z-index: 2; left: var(--edge-left); bottom: calc(var(--edge-bottom) + 46px); display: grid; gap: 4px; max-width: min(360px, 60%); pointer-events: none; }
+.hails { position: fixed; z-index: 2; left: var(--edge-left); bottom: calc(var(--edge-bottom) + 78px); display: grid; gap: 4px; max-width: min(360px, 60%); pointer-events: none; }
 .hails div { padding: 5px 10px; border-radius: 9px; background: rgba(9, 18, 24, 0.72); border: 1px solid var(--edge); font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
 .hails b { color: var(--amber); font-weight: 600; }
 .hail { position: fixed; z-index: 4; left: 50%; transform: translateX(-50%); bottom: calc(var(--edge-bottom) + 120px); width: min(460px, calc(100% - 32px)); display: flex; gap: 10px; align-items: center; padding: 9px 12px; background: rgba(9, 18, 24, 0.9); border: 1px solid var(--amber); border-radius: 12px; }

@@ -34,7 +34,7 @@ const names = (list: Array<{ species: FishSpecies }>) => list.map((p) => p.speci
 
 const EDITH = table.platforms.find((p) => p.id === 'edith')!;
 /** On the kelp at Hen Rock, just outside the Long Point reserve. */
-const LONG_POINT_KELP = { x: -6116, y: -16707 };
+const LONG_POINT_KELP = { x: -6120, y: -16760 };
 const FLATS = { x: 14000, y: 21000 };
 const CHANNEL = { x: 6000, y: 3000 };
 const HORSESHOE = { x: 7400, y: 13300 };
