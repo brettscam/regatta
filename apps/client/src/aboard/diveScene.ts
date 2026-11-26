@@ -256,7 +256,7 @@ const fragment = /* glsl */ `
 const surfaceFragment = /* glsl */ `
   ${COMMON}
   uniform vec3 uSky;
-  uniform vec4 uHull[2];     // x, z, sin and cos of the heading
+  uniform vec4 uHull[2];     // x, z from the eye (agent/origin: so it holds wherever the scene's origin is), sin and cos of the heading
   uniform vec2 uHullSize[2]; // half length, half beam
   varying vec3 vWorld;
   float swell(vec2 p, float t) {
@@ -281,7 +281,7 @@ const surfaceFragment = /* glsl */ `
     vec3 mirror = uWater * (0.82 + 0.14 * slope.x) + uSky * uLight * 0.14 * streak * (1.0 - smoothstep(0.2, 0.62, c));
     vec3 col = mix(mirror, sky, window);
     for (int i = 0; i < 2; i++) {
-      vec2 d = p - uHull[i].xy;
+      vec2 d = p - cameraPosition.xz - uHull[i].xy;
       float along = d.x * uHull[i].z - d.y * uHull[i].w;
       float across = d.x * uHull[i].w + d.y * uHull[i].z;
       float e = (along * along) / max(uHullSize[i].x * uHullSize[i].x, 0.01) + (across * across) / max(uHullSize[i].y * uHullSize[i].y, 0.01);
@@ -1416,7 +1416,8 @@ export class DiveScene {
     const sizes = u.uHullSize.value as THREE.Vector2[];
     for (let i = 0; i < 2; i++) {
       const h = look.hulls[i];
-      if (h) { hulls[i].set(h.x, h.z, Math.sin(h.heading), Math.cos(h.heading)); sizes[i].set(h.length * 0.5, h.beam * 0.55); } else sizes[i].set(0, 0);
+      // agent/origin: from the eye, not the scene's zero, which the stage moves to follow the boat.
+      if (h) { hulls[i].set(h.x - camera.position.x, h.z - camera.position.z, Math.sin(h.heading), Math.cos(h.heading)); sizes[i].set(h.length * 0.5, h.beam * 0.55); } else sizes[i].set(0, 0);
     }
     const reach = look.see * 5;
     this.surface.position.set(camera.position.x, 0, camera.position.z);

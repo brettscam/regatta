@@ -32,7 +32,9 @@ const vertex = /* glsl */ `
   uniform float uSee;    // how far you can see, metres
   varying vec4 vTint;
   void main() {
-    vec3 toEye = cameraPosition - position;
+    // Positions are written in scene metres; the model matrix takes them about the scene's floating origin, where the eye is.
+    vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+    vec3 toEye = cameraPosition - wp;
     float dist = length(toEye);
     vec2 v = toEye.xz / max(length(toEye.xz), 1e-3);
     float rel = atan(dot(v, vec2(-aAim.y, aAim.x)), dot(v, aAim.xy));
@@ -41,7 +43,7 @@ const vertex = /* glsl */ `
     // A light is seen a long way: it does not shrink to nothing with distance as the hull does. Fog puts it out.
     float bright = aTint.a * shown * uNight * exp(-1.6 * dist / uSee) * clamp(1.5 - dist / 9000.0, 0.3, 1.0);
     vTint = vec4(aTint.rgb, bright);
-    vec4 mv = viewMatrix * vec4(position, 1.0);
+    vec4 mv = viewMatrix * vec4(wp, 1.0);
     gl_Position = projectionMatrix * mv;
     gl_PointSize = bright < 0.01 ? 0.0 : clamp(0.5 * uScale / max(-mv.z, 1.0), 3.0, 26.0) * (0.75 + 0.5 * aTint.a);
   }

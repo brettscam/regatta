@@ -16,6 +16,8 @@ import { buildWaves, setSea, setSeaState, waveHeight, type Wave } from './scene/
 import { SeaField } from './scene/seaField';
 import { Wake, type WakeVessel } from './scene/wake';
 import { Spray } from './scene/spray';
+import { rebase, type Origin } from './scene/origin';
+import { recentre } from './scene/recentre';
 import { graphics } from './scene/quality';
 import { NavLights } from './scene/navLights';
 import { Rain } from './scene/rain';
@@ -153,6 +155,15 @@ export class Stage {
   private camera: THREE.PerspectiveCamera | null = null;
   /** Set while the frame is to be drawn from somewhere other than the drone. See `EyeView`. */
   eye: EyeView | null = null;
+  /**
+   * The scene's floating origin, scene metres: a point near the eye, moved in whole steps of a few kilometres as she
+   * goes (`scene/origin.ts`). Every object keeps its true position; only the drawing is done about this point, so the
+   * graphics card's single precision is spent near the eye and nothing far out on a big water shakes.
+   * See `draw`. Read it, never set it.
+   */
+  readonly origin: Origin = { x: 0, z: 0 };
+  /** How many times the origin has moved, for the curious and for tests. */
+  rebases = 0;
   private readonly keptColor = new THREE.Color();
   private readonly keptSun = new THREE.Color();
   private readonly keptFill = new THREE.Color();
@@ -308,6 +319,9 @@ export class Stage {
     // The water gets its sea state here: every sim sailed on this world feels it from now on.
     if (!world.seas) world.seas = new SeaState(world, data.about.sea ?? data.course.sea);
     this.seaSet = false;
+    // Whatever was built from course positions straight into its vertices or instances is given a nearby origin of its
+    // own, so the card does not subtract one large number from another at every vertex. Nothing moves.
+    this.built.recentred = recentre(land);
     this.scene.add(land);
     this.land = land;
 
@@ -482,6 +496,7 @@ export class Stage {
       this.resize(camera);
     }
     if (!covered) this.keepPace(dtReal);
+    if (rebase(this.origin, camera.position.x, camera.position.z)) this.rebases++;
     const world = this.world;
     // The sea is the sea state where the boat is: wind, fetch, stream and depth (`SeaState`). It is eased over a few
     // seconds so that sailing into a lee lays the water down smoothly.
@@ -533,7 +548,8 @@ export class Stage {
     const driftZ = season * -1.5;
     const veil = THREE.MathUtils.smoothstep(7000 - w.see, 0, 6500) * 0.96;
     const overcast = Math.min(1, w.rain * 1.7);
-    sky.setWeather(veil, overcast, w.cover * (1 - veil), w.reach, driftX, driftZ, this.fogColor);
+    // The sky's clouds are placed from the eye, which is drawn about the origin: they are given the drift less the origin.
+    sky.setWeather(veil, overcast, w.cover * (1 - veil), w.reach, driftX - this.origin.x, driftZ - this.origin.z, this.fogColor);
     sky.drawNight(camera, this.renderer.domElement.height);
     // The eye opens up in the dark: enough to find the wheel and the winches by.
     this.renderer.toneMappingExposure = 0.46 * (1 + 0.9 * sky.night);
@@ -544,23 +560,59 @@ export class Stage {
     // The lights of the shore come on as the sun goes down: first at two degrees up, all of them by four below.
     setCityNight(1 - THREE.MathUtils.smoothstep(el, -0.07, 0.035));
     this.ocean.setSun(sky.sunDir, sky.sunColor, sky.lightPower, overcast, sky.night);
-    this.ocean.update(seaTime, camera, boat);
     this.drawWakes(seaTime, camera, boat, ships, hourly.dir, hourly.speed, windKt, up * (1 - 0.9 * sky.night));
+    // After the wakes, whose maps it reads where they have just been placed.
+    this.ocean.update(seaTime, camera, boat, this.origin);
     this.lights(seaTime, camera, boat, ships);
     const toward = hourly.dir + Math.PI;
     this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));
 
-    // Scenery that is only worth drawing from near by is hidden when the eye is far from it.
+    // Scenery that is only worth drawing from near by is hidden when the eye is far from it. It comes back inside its
+    // distance and goes a little beyond it, so an eye that hovers about the line does not make it blink.
     for (let i = 0; i < this.detail.length; i++) {
       const d = this.detail[i];
       const dx = camera.position.x - d.x;
       const dz = camera.position.z + d.y;
-      d.object.visible = dx * dx + dz * dz < d.far * d.far;
+      const r2 = dx * dx + dz * dz;
+      const reach = d.object.visible ? d.far * 1.06 : d.far;
+      d.object.visible = r2 < reach * reach;
     }
     this.frameCount++;
     if (covered && this.frameCount % 6 !== 0) return;
     if (this.eye?.wet) this.drawUnder(camera, this.eye);
-    else this.renderer.render(this.scene, camera);
+    else this.draw(camera);
+  }
+
+  /**
+   * Draw the scene about the floating origin. For the length of the draw the whole scene, and the eye with it, is moved
+   * by minus the origin, so every matrix the graphics card is handed (model, view, shadow) holds small numbers. The
+   * matrices are worked out here in double precision, so the shift itself costs nothing in precision. Straight after,
+   * everything is put back where it was, so picking, labels and anything else that reads a world matrix between frames
+   * sees true scene positions as before.
+   */
+  private draw(camera: THREE.PerspectiveCamera): void {
+    const { x, z } = this.origin;
+    if (x === 0 && z === 0) {
+      this.renderer.render(this.scene, camera);
+      return;
+    }
+    const scene = this.scene;
+    // A camera that hangs in the scene is moved with it; one on its own is moved here.
+    const loose = !camera.parent;
+    scene.position.set(-x, 0, -z);
+    if (loose) {
+      camera.position.x -= x;
+      camera.position.z -= z;
+      camera.updateMatrixWorld();
+    }
+    this.renderer.render(scene, camera);
+    scene.position.set(0, 0, 0);
+    scene.updateMatrixWorld();
+    if (loose) {
+      camera.position.x += x;
+      camera.position.z += z;
+      camera.updateMatrixWorld();
+    }
   }
 
   /** One frame seen from under the water. What is changed for it is put back straight after. */
@@ -580,7 +632,7 @@ export class Stage {
     scene.background = eye.water;
     sky.sunLight.color.multiply(eye.light);
     sky.fill.color.copy(eye.water).multiplyScalar(4);
-    this.renderer.render(scene, camera);
+    this.draw(camera);
     for (const o of hidden) o.visible = true;
     haze.color.copy(this.keptColor);
     haze.near = near;
