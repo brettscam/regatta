@@ -906,7 +906,11 @@ export class Dive implements Feature {
       if (end) this.fightOver(end);
     } else this.hauling = Math.max(0, this.hauling - dt * 2);
     // Her buoyancy: the air in her lungs and suit floats her near the top and squeezes small down deep.
-    if (this.mode === 'under') d.vd += buoyancy(d.d, this.suitL) * dt;
+    // Drifting, she lies broadside to the water and floats up or sinks slowly; finning, she cuts through it.
+    if (this.mode === 'under') {
+      d.vd += buoyancy(d.d, this.suitL) * dt;
+      if (this.sinceKick > 1 && this.duck <= 0) d.vd /= 1 + 2.5 * Math.abs(d.vd) * dt;
+    }
 
     // The water moves too: the stream all the way down, the surge near the top.
     world.current(d.x, d.y, sim.state.t, this.current);
@@ -1164,16 +1168,27 @@ export class Dive implements Feature {
     } else {
       // Behind her and a little above, looking past her at the point the shaft would reach; pulled in rather than go
       // into the rock or the kelp, and a little further back the faster she goes.
+      // The camera hangs back along half her pitch, so a duck dive is seen from behind and above, not from her fins.
       const want = chaseLength(speed) + (this.mode === 'surface' ? 0.4 : 0);
       const upBy = this.mode === 'surface' ? 1.1 : CHASE.up;
-      const bx = -lookX * want;
-      const by = -lookY * want + upBy;
-      const bz = -lookZ * want;
-      const blen = Math.hypot(bx, by, bz);
+      const half = this.camPitch * 0.3;
       const eyeSim = { x: d.x, y: d.y, d: -headY };
-      const back = { x: bx / blen, y: -bz / blen, d: -by / blen };
       const under = this.mode === 'under';
-      const reach = chaseReach(eyeSim, back, blen, (x, y, dd) => (dd > this.scene.floorAt(x, y) - 0.2) || (under && dd > 0.6 && this.scene.kelpNear(x, y, 0.35)));
+      const solid = (x: number, y: number, dd: number) => (dd > this.scene.floorAt(x, y) - 0.2) || (under && dd > 0.6 && this.scene.kelpNear(x, y, 0.15));
+      // If the line back is blocked close in, the camera climbs over her rather than come down into her fins.
+      let back = { x: 0, y: 0, d: -1 };
+      let blen = want;
+      let reach = 0;
+      for (const climb of [0, 0.5, 1]) {
+        const bx = -Math.sin(this.camYaw) * Math.cos(half) * want * (1 - climb * 0.6);
+        const by = -Math.sin(half) * want + upBy + climb * want * 0.8;
+        const bz = Math.cos(this.camYaw) * Math.cos(half) * want * (1 - climb * 0.6);
+        const len = Math.hypot(bx, by, bz);
+        const dirB = { x: bx / len, y: -bz / len, d: -by / len };
+        const r = chaseReach(eyeSim, dirB, len, solid);
+        if (r > reach) { reach = r; back = dirB; blen = len; }
+        if (r >= Math.min(len, 1.9)) break;
+      }
       this.a.set(d.x + back.x * reach, headY - back.d * reach, -d.y - back.y * reach);
       // Under water the lens stays under water.
       if (under) this.a.y = Math.min(this.a.y, -0.3);

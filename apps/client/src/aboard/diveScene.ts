@@ -1123,7 +1123,8 @@ export class DiveScene {
   private readonly materials: THREE.Material[] = [];
   private readonly built = new THREE.Group();
   private readonly shoals = {} as Record<FishShape, Shoal>;
-  private readonly forms: Record<FishShape, Form>;
+  /** Plainer bodies for the fish in a school: hundreds of them, small, and seen at a distance. */
+  private readonly schoolForms: Record<FishShape, Form>;
   private schools: School[] = [];
   private readonly lobsterMesh: THREE.InstancedMesh;
   private readonly handMesh = {} as Record<HandThing['spec']['kind'], THREE.InstancedMesh>;
@@ -1172,7 +1173,12 @@ export class DiveScene {
 
     // The fish: one mesh for each kind of body, every fish of that body an instance of it, marked by the shader.
     // Schools are their own meshes, made when the reef is built.
-    const all = this.forms = forms();
+    const all = forms();
+    RING = low ? 4 : 6;
+    SMOOTH = 0;
+    this.schoolForms = forms();
+    RING = low ? 6 : 12;
+    SMOOTH = low ? 0 : 1;
     for (const shape of Object.keys(all) as FishShape[]) {
       const f = all[shape];
       const most = (low ? Math.max(6, Math.round(f.most * 0.6)) : f.most) + MAX_STRUNG;
@@ -1709,7 +1715,7 @@ export class DiveScene {
   private makeSchools(fish: Fish[]): void {
     for (const f of fish) {
       if (f.count <= 1) continue;
-      const form = this.forms[f.species.shape] ?? this.forms.jack;
+      const form = this.schoolForms[f.species.shape] ?? this.schoolForms.jack;
       const n = this.low ? Math.ceil(f.count * 0.4) : f.count;
       const src = form.geometry;
       const geo = new THREE.InstancedBufferGeometry();

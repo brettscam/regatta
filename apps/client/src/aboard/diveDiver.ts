@@ -208,7 +208,7 @@ export class DiverModel {
     fig.apply();
 
     // Mask on the face, the belt round the waist, the gun in her right hand pointing where she looks.
-    this.mask.position.copy(fig.neck).addScaledVector(f, 0.07 * 0 + 0.07).addScaledVector(u, 0.12).addScaledVector(this.look, 0.08);
+    this.mask.position.copy(fig.neck).addScaledVector(f, 0.07).addScaledVector(u, 0.12).addScaledVector(this.look, 0.08);
     this.t.copy(this.mask.position).add(this.look);
     this.mask.up.copy(u);
     this.mask.lookAt(this.t);
@@ -236,7 +236,9 @@ export class DiverModel {
 
   dispose(): void {
     this.group.removeFromParent();
-    this.group.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.parent !== this.figure.group) (o as THREE.Mesh).geometry.dispose(); });
+    // The figure's shapes are shared with every other figure: only the dive's own gear is thrown away.
+    this.group.remove(this.figure.group);
+    this.group.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); });
     for (const m of this.mats) m.dispose();
   }
 }

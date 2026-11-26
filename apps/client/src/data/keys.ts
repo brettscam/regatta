@@ -156,7 +156,9 @@ export const STRIPS: Record<StripContext, Array<[string[], string]>> = {
     [['←', '→'], 'turn'],
     [['↓', 'E'], 'head down, up'],
     [['F'], 'fire'],
-    [['G'], 'grab a lobster'],
+    [['G'], 'take by hand'],
+    [['Q'], 'lock on'],
+    [['1', '2'], 'mask, chase view'],
     [['5'], 'surface; climb out'],
   ],
 };
