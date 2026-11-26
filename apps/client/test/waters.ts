@@ -4,7 +4,7 @@ import type { BoatSpec } from '@slack-tide/sim';
 import { ReplayWorld, type CourseData } from '@slack-tide/world';
 
 export interface RaceData { id: string; name: string; marks: Array<{ name: string; x: number; y: number }> }
-export const WATERS = ['sf-bay', 'san-juans', 'bvi'] as const;
+export const WATERS = ['sf-bay', 'san-juans', 'bvi', 'catalina'] as const;
 
 const root = new URL('../../../', import.meta.url);
 const cache = new Map<string, { course: CourseData; current: Int8Array; depth: Uint8Array; races: RaceData[] }>();

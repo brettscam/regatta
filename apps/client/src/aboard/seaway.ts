@@ -74,7 +74,8 @@ export class Seaway {
     const s = sim.state;
     if (s.slams > this.slams) {
       const lwl = sim.boat.dimensions.lwl;
-      this.pendingSlam = Math.min(1, Math.max(0.3, this.sea.height / lwl / 0.1));
+      // A sailing boat's slam is as hard as the sea is big for her. A powerboat's is as hard as she was thrown: the sim says by how many g.
+      this.pendingSlam = sim.boat.power ? Math.min(1, Math.max(0.3, (sim.out.impact - 1) / 1.2)) : Math.min(1, Math.max(0.3, this.sea.height / lwl / 0.1));
       this.slamTimes.push(s.t);
     }
     this.slams = s.slams;

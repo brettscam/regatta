@@ -24,6 +24,11 @@ export interface LogTotals {
   fish: number;
   nights: number;
   ashore: number;
+  /** Fish taken with the speargun (they count among `fish` too) and lobster taken by hand. Books saved before there was diving load as zero. */
+  speared: number;
+  lobsters: number;
+  /** Freediving practice: points from clean dives, which set her lungs (`lungsFor` in `aboard/diveRules.ts`). */
+  freedive: number;
   /** Kinds of animal seen for the first time. */
   seen: number;
   /** Experience points, and what earned them by kind. Books saved before there were points load as zero. */
@@ -43,11 +48,12 @@ export interface Profile {
 }
 
 const SAVED = 'regatta.log';
-const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0, seen: 0, xp: 0, xpBy: {} };
+const ZERO: LogTotals = { miles: 0, hours: 0, sails: 0, marks: 0, tacks: 0, knockdowns: 0, topKt: 0, races: 0, wins: 0, crabs: 0, fish: 0, nights: 0, ashore: 0, seen: 0, speared: 0, lobsters: 0, freedive: 0, xp: 0, xpBy: {} };
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
 const clean = (l: Partial<LogTotals> | undefined): LogTotals => ({
   miles: num(l?.miles), hours: num(l?.hours), sails: num(l?.sails), marks: num(l?.marks), tacks: num(l?.tacks), knockdowns: num(l?.knockdowns), topKt: num(l?.topKt),
   races: num(l?.races), wins: num(l?.wins), crabs: num(l?.crabs), fish: num(l?.fish), nights: num(l?.nights), ashore: num(l?.ashore), seen: num(l?.seen),
+  speared: num(l?.speared), lobsters: num(l?.lobsters), freedive: Math.min(num(l?.freedive), 1e5),
   ...cleanLedger(l),
 });
 
@@ -137,7 +143,7 @@ export class Logbook {
     this.logged += seconds;
   }
 
-  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore' | 'seen', n = 1): void {
+  count(what: 'marks' | 'tacks' | 'knockdowns' | 'races' | 'wins' | 'crabs' | 'fish' | 'nights' | 'ashore' | 'seen' | 'speared' | 'lobsters' | 'freedive', n = 1): void {
     this.totals[what] += n;
     this.dirty = true;
     // Some of what is counted here is seamanship, and earns points. The sizes are in `xp/score.ts`.

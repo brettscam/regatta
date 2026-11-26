@@ -77,6 +77,10 @@ export class FlowView implements Feature {
 
   key(code: string): boolean {
     if (code !== 'KeyF') return false;
+    if (this.ctx.sim.boat.power && !this.on) {
+      this.ctx.say('The wind tunnel shows the air over sails, and she has none');
+      return true;
+    }
     this.on = !this.on;
     this.group.visible = this.on;
     this.card.hidden = !this.on;

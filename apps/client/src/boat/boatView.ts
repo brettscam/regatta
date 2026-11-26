@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import type { BoatSpec, ControlBinding, SimOutputs, SimState } from '@slack-tide/sim';
+import { interp1, planing, type BoatSpec, type ControlBinding, type SimOutputs, type SimState } from '@slack-tide/sim';
 import { buildSloop, type Livery, type SloopGeometry, type SloopModel } from './buildSloop';
 import { buildCatamaran } from './buildCat';
+import { buildConsole } from './buildConsole';
 
 export type { BoatDisplay, Livery } from './buildSloop';
 import { Jib, Mainsail, Spinnaker, spinnakerColour, sunCover, type SailShape } from './sails';
@@ -128,10 +129,18 @@ export function unpackSpin(sp: number, state: SimState, out: SimOutputs): void {
 export class BoatView {
   readonly root: THREE.Group;
   readonly model: SloopModel;
-  readonly main: Mainsail;
-  readonly jib: Jib;
+  /** A boat with no sails (`spec.power`) has none of these three, nor any of the rigging below. Nothing outside this class reads them for her. */
+  readonly main!: Mainsail;
+  readonly jib!: Jib;
   /** The spinnaker, in the boat's own colour. Hidden until it is hoisted. */
-  readonly spinnaker: Spinnaker;
+  readonly spinnaker!: Spinnaker;
+  /** True for a powerboat: no rig, an outboard that turns with the wheel, and a running trim of her own. */
+  readonly power: boolean;
+  /** How far her outboard is kicked up, 0 down to 1 clear of the water, and how far round its propeller has turned. */
+  private tilt = 0;
+  private propTurn = 0;
+  /** Her running trim as drawn, radians bow up, eased from the sim's. */
+  private trim = 0;
   private readonly spinSheet = new Rope(0xe9c23a, 0.008);
   private readonly spinTackLine = new Rope(0xe9c23a, 0.008);
   /** Everything the pointer can land on. */
@@ -176,10 +185,10 @@ export class BoatView {
   private displayClock = 0;
 
   /** At anchor or on a mooring: the main under its cover on the boom, the jib rolled on the forestay, and the line she lies to. */
-  private readonly sailCover: THREE.Mesh;
+  private readonly sailCover!: THREE.Mesh;
   private readonly jibRoll = new Rope(0x1b2d4a, 0.042);
   /** The part of the mainsail that is not up the mast, tied down along the boom: a reef's bunt, or the whole sail flaked. */
-  private readonly bunt: THREE.Mesh;
+  private readonly bunt!: THREE.Mesh;
   /** True while the main is lowered because she is lying head to wind under engine. Hoisted again when she pays off. */
   private mainDown = false;
   private sails: SailStyle | undefined;
@@ -194,10 +203,38 @@ export class BoatView {
 
   constructor(readonly spec: BoatSpec, readonly livery: Livery = {}) {
     // The boat file says which builder draws her. Both give the same model: the same named nodes and rig geometry.
-    this.model = (spec as BoatSpec & { model?: string }).model === 'catamaran' ? buildCatamaran(spec, livery) : buildSloop(spec, livery);
+    this.power = !!spec.power;
+    const builder = (spec as BoatSpec & { model?: string }).model;
+    this.model = builder === 'console' ? buildConsole(spec, livery) : builder === 'catamaran' ? buildCatamaran(spec, livery) : buildSloop(spec, livery);
     this.root = this.model.root;
     this.views = { ...VIEWS, ...(spec as BoatSpec & { views?: Record<string, ViewPreset> }).views };
     this.root.rotation.order = 'YXZ';
+    this.displayCanvas.width = 512;
+    this.displayCanvas.height = 256;
+    this.displayTexture = new THREE.CanvasTexture(this.displayCanvas);
+    this.displayTexture.colorSpace = THREE.SRGBColorSpace;
+    this.pilotCanvas.width = 300;
+    this.pilotCanvas.height = 220;
+    this.pilotTexture = new THREE.CanvasTexture(this.pilotCanvas);
+    this.pilotTexture.colorSpace = THREE.SRGBColorSpace;
+    if (this.power) {
+      // No rig to build. Her skipper stands alone at the console, her instruments are on the plotter in the dash.
+      this.crew = new Crew(this.model, true);
+      if (livery.avatar) this.crew.setAvatar(livery.avatar);
+      this.bindControls();
+      const plotter = this.model.nodes.plotter_screen as THREE.Mesh | undefined;
+      if (plotter) plotter.material = new THREE.MeshBasicMaterial({ map: this.displayTexture, toneMapped: false });
+      const pilotScreen = this.model.nodes.autopilot_screen as THREE.Mesh | undefined;
+      if (pilotScreen) pilotScreen.material = new THREE.MeshBasicMaterial({ map: this.pilotTexture, toneMapped: false });
+      this.setPilot({ engaged: false, mode: 'heading', label: '' });
+      this.rode.mesh.visible = false;
+      this.rode.mesh.castShadow = false;
+      this.root.add(this.rode.mesh);
+      this.pickables.push(...this.model.hitProxies, this.model.nodes.hull, this.model.nodes.deck);
+      this.solids = [this.model.nodes.hull, this.model.nodes.deck];
+      this.thin = this.model.solids.filter((s) => s !== this.model.nodes.hull && s !== this.model.nodes.deck);
+      return;
+    }
     this.sails = livery.sails;
     const cloth = clothOf(this.sails);
     this.main = new Mainsail(this.model.geo, String((spec as BoatSpec & { lengthFt?: number }).lengthFt ?? 38), cloth, livery.sail);
@@ -210,22 +247,7 @@ export class BoatView {
     this.model.nodes.main = this.main.mesh;
     this.model.nodes.jib = this.jib.mesh;
 
-    for (const b of spec.controls) this.bindings.set(b.node, b);
-
-    // Give each control part its own materials so it can light up without lighting its neighbours.
-    for (const node of this.bindings.keys()) {
-      const obj = this.model.nodes[node];
-      if (!obj) continue;
-      const meshes: THREE.Mesh[] = [];
-      obj.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.isMesh && m.userData.glow) {
-          m.material = (m.material as THREE.MeshStandardMaterial).clone();
-          meshes.push(m);
-        }
-      });
-      this.glowMeshes.set(node, meshes);
-    }
+    this.bindControls();
 
     for (const r of [...this.mainsheet, this.vang, ...this.sheetPort, ...this.sheetStbd]) this.root.add(r.mesh);
 
@@ -282,18 +304,10 @@ export class BoatView {
       this.leechTells.push({ v, t });
     }
 
-    this.displayCanvas.width = 512;
-    this.displayCanvas.height = 256;
-    this.displayTexture = new THREE.CanvasTexture(this.displayCanvas);
-    this.displayTexture.colorSpace = THREE.SRGBColorSpace;
     const display = this.model.nodes.mast_display as THREE.Mesh;
     (display.material as THREE.Material[])[4] = new THREE.MeshBasicMaterial({ map: this.displayTexture, toneMapped: false });
 
     // The autopilot head's screen.
-    this.pilotCanvas.width = 300;
-    this.pilotCanvas.height = 220;
-    this.pilotTexture = new THREE.CanvasTexture(this.pilotCanvas);
-    this.pilotTexture.colorSpace = THREE.SRGBColorSpace;
     const pilotScreen = this.model.nodes.autopilot_screen as THREE.Mesh | undefined;
     if (pilotScreen) pilotScreen.material = new THREE.MeshBasicMaterial({ map: this.pilotTexture, toneMapped: false });
     this.setPilot({ engaged: false, mode: 'heading', label: '' });
@@ -301,6 +315,24 @@ export class BoatView {
     this.pickables.push(...this.model.hitProxies, this.main.mesh, this.jib.mesh, this.model.nodes.hull, this.model.nodes.deck);
     this.solids = [this.model.nodes.hull, this.model.nodes.deck];
     this.thin = [this.main.mesh, this.jib.mesh, this.spinnaker.mesh, ...this.model.solids.filter((s) => s !== this.model.nodes.hull && s !== this.model.nodes.deck)];
+  }
+
+  /** Bind the boat file's controls to her named parts, and give each part its own materials so it can light up without lighting its neighbours. */
+  private bindControls(): void {
+    for (const b of this.spec.controls) this.bindings.set(b.node, b);
+    for (const node of this.bindings.keys()) {
+      const obj = this.model.nodes[node];
+      if (!obj) continue;
+      const meshes: THREE.Mesh[] = [];
+      obj.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh && m.userData.glow) {
+          m.material = (m.material as THREE.MeshStandardMaterial).clone();
+          meshes.push(m);
+        }
+      });
+      this.glowMeshes.set(node, meshes);
+    }
   }
 
   /** The colour a plain spinnaker is cut in: the livery's, else the hull's made bright. */
@@ -315,6 +347,7 @@ export class BoatView {
    */
   setSailStyle(style: SailStyle | undefined): void {
     this.sails = style;
+    if (this.power) return;
     const cloth = clothOf(style);
     this.main.setCloth(cloth);
     this.jib.setCloth(cloth);
@@ -333,7 +366,8 @@ export class BoatView {
     // The working view for whatever was pointed at.
     let view = binding?.view ?? '';
     if (!view) {
-      if (node === 'main' || node === 'mast') view = 'mast';
+      if (this.power) view = 'helm';
+      else if (node === 'main' || node === 'mast') view = 'mast';
       else if (node === 'jib' || node === 'furler') view = 'foredeck';
       else {
         const z = this.root.worldToLocal(this.v1.copy(hit.point)).z;
@@ -399,6 +433,7 @@ export class BoatView {
   }
 
   update(pose: BoatPose, state: SimState, out: SimOutputs, time: number, dt: number): void {
+    if (this.power) return this.updatePower(pose, state, out, time, dt);
     const { nodes, geo } = this.model;
     this.root.position.set(pose.x, pose.heave, pose.z);
     // Pressed past her limit, a boat that does not heel puts her lee bow down instead.
@@ -580,6 +615,52 @@ export class BoatView {
   }
 
   /**
+   * A powerboat for one frame: her running trim (bow up on the hump, a few degrees planing, and the stern lifting as
+   * she comes onto the plane), the outboard turning with the wheel and kicked up when she is made fast, the propeller,
+   * the throttle lever, and her skipper at the console. Heel is the sim's, which for her is the bank of a turn.
+   */
+  private updatePower(pose: BoatPose, state: SimState, out: SimOutputs, time: number, dt: number): void {
+    const { nodes } = this.model;
+    const k = Math.min(1, dt * 4);
+    // Her own boat's trim comes from her sim. Another player's is not sent: it is read off her speed, as the sim would.
+    const p = this.spec.power;
+    const kt = Math.abs(state.speed) / KT;
+    const mine = (out.trim || 0) !== 0 || (out.plane || 0) !== 0;
+    const trim = mine || !p ? out.trim || 0 : (interp1(p.trim.kt, p.trim.deg, kt) * Math.PI) / 180;
+    const plane = mine || !p ? out.plane || 0 : planing(p, state.speed);
+    this.trim += (trim - this.trim) * (dt > 0 ? k : 1);
+    // She trims about a point well aft, and a planing hull rides higher than one sitting in her own hole.
+    const half = this.spec.dimensions.loa / 2;
+    const rise = Math.sin(this.trim) * half * 0.5 + 0.09 * plane + 0.25 * (out.air || 0) * plane;
+    this.root.position.set(pose.x, pose.heave + rise, pose.z);
+    this.root.rotation.set(pose.pitch + this.trim, -pose.heading, -pose.heel);
+
+    nodes.wheel.rotation.z = -pose.rudder * WHEEL_RATIO;
+    const made = state.hold !== 'none' && !state.engineOn;
+    this.tilt += ((made ? 1 : 0) - this.tilt) * Math.min(1, dt * 1.2);
+    if (nodes.outboard) nodes.outboard.rotation.y = pose.rudder * (1 - this.tilt);
+    if (nodes.outboard_tilt) nodes.outboard_tilt.rotation.x = -1.05 * this.tilt;
+    if (nodes.prop) {
+      this.propTurn += dt * (state.engineOn && state.throttle !== 0 ? Math.sign(state.throttle) * (8 + out.engineRpm / 60) : 0);
+      nodes.prop.rotation.z = this.propTurn;
+    }
+    // The lever: upright in neutral, forward for ahead, back for astern.
+    if (nodes.throttle) nodes.throttle.rotation.x = -(state.engineOn ? state.throttle : 0) * 0.24;
+
+    this.updateRode(state);
+    if (this.glowNode) {
+      this.glowLevel += (1 - this.glowLevel) * Math.min(1, dt * 12);
+      this.applyGlow(this.glowNode, this.glowLevel * (1.1 + 0.25 * Math.sin(time * 5)));
+    }
+    this.crew.update(state, out, pose, time, dt);
+    this.displayClock -= dt;
+    if (this.displayClock <= 0) {
+      this.displayClock = 0.25;
+      this.drawDisplay(state, out);
+    }
+  }
+
+  /**
    * The line she lies to. At anchor the rode leads from the bow roller down into the water toward the anchor.
    * On a mooring a short line leads from the bow to the buoy, once she has been brought up to it.
    */
@@ -590,9 +671,13 @@ export class BoatView {
       return;
     }
     const pos = this.root.position;
-    const bow = this.v1.copy(this.model.nodes.furler.position);
-    bow.y -= 0.12;
-    bow.z -= 0.22;
+    // From the stem: the foot of the forestay on a sailing boat, the bow roller on a boat that has no forestay.
+    const roller = this.model.nodes.bow_roller;
+    const bow = this.v1.copy((roller ?? this.model.nodes.furler).position);
+    if (!roller) {
+      bow.y -= 0.12;
+      bow.z -= 0.22;
+    }
     const bowWorld = this.v3.copy(bow).applyQuaternion(this.root.quaternion).add(pos);
     const dx = state.holdX - bowWorld.x;
     const dz = -state.holdY - bowWorld.z;
@@ -720,8 +805,15 @@ export class BoatView {
       g.fillText(value, cx + 112, cy + 44);
     };
     const awa = Math.abs(out.awa) * R2D;
-    cell(W * 0.25, H * 0.25, 'SPD', (state.speed / KT).toFixed(1));
+    cell(W * 0.25, H * 0.25, 'SPD', (Math.abs(state.speed) / KT).toFixed(1));
     cell(W * 0.75, H * 0.25, 'HDG', String(Math.round(state.heading * R2D) % 360).padStart(3, '0'));
+    if (this.power) {
+      // No wind instruments on a powerboat's dash: revs and what is in the tank.
+      cell(W * 0.25, H * 0.75, 'RPM', String(Math.round(out.engineRpm / 10) * 10));
+      cell(W * 0.75, H * 0.75, 'FUEL L', out.fuel.toFixed(0));
+      this.displayTexture.needsUpdate = true;
+      return;
+    }
     cell(W * 0.25, H * 0.75, out.awa >= 0 ? 'AWA S' : 'AWA P', awa.toFixed(0));
     cell(W * 0.75, H * 0.75, 'AWS', (out.aws / KT).toFixed(0));
     this.displayTexture.needsUpdate = true;

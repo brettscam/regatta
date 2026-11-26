@@ -6,6 +6,7 @@ import type { TrafficVessel } from '../scene/traffic';
 import { shoreKind } from '../scene/shoreSite';
 import { visited } from '../aboard/visited';
 import type { ChartArea, CourseFeatures } from '../world/features';
+import { chartLayers, setChartLayer } from './chartLayers'; // extra layers (fishing)
 
 const D2R = Math.PI / 180;
 const NM = 1852;
@@ -47,7 +48,12 @@ export interface ChartHost {
   traffic?: () => TrafficVessel[];
   /** Hazards, traffic lanes, refuges and lights, on a water that has them. */
   features?: CourseFeatures;
+  /** True for a boat with no sails: her legs are told by where the wind is, not as a beat, a reach or a run. */
+  underPower?: () => boolean;
 }
+
+/** A leg's wind in a powerboat skipper's words. */
+const WIND_ON: Record<string, string> = { beat: 'ahead', reach: 'abeam', run: 'astern' };
 
 interface View {
   cx: number;
@@ -258,6 +264,15 @@ export class Chart {
       this.mapClock = 0;
     }, { passive: false });
 
+    // The switches for the extra layers, in the side panel.
+    this.side.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-layer]');
+      if (!b) return;
+      setChartLayer(b.dataset.layer!, b.getAttribute('aria-pressed') !== 'true');
+      this.mapClock = 0;
+      this.sideClock = 0;
+    });
+
     const s = this.strip;
     let scrubbing = false;
     const scrub = (e: PointerEvent) => {
@@ -449,6 +464,13 @@ export class Chart {
         ctx.setLineDash([3, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
+      } else if (a.kind === 'keepclear') {
+        // The ring round something built in the sea: a plain red circle to stay outside of.
+        ctx.strokeStyle = 'rgba(192, 57, 43, 0.9)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
       } else if (a.kind === 'hazard') {
         ctx.fillStyle = 'rgba(192, 57, 43, 0.13)';
         ctx.fill();
@@ -468,12 +490,57 @@ export class Chart {
       if (!labels || a.kind === 'separation' || a.kind === 'lane') continue;
       const big = v.scale > 0.012;
       ctx.font = `italic 600 ${a.kind === 'hazard' ? 11.5 : 10.5}px ui-serif, Georgia, serif`;
-      ctx.fillStyle = a.kind === 'hazard' ? '#a5281c' : a.kind === 'refuge' ? '#1f6a45' : MAGENTA;
+      // A ring's name is only worth its room once the chart is drawn large enough to tell one ring from the next.
+      if (a.kind === 'keepclear' && v.scale < 0.02) continue;
+      ctx.fillStyle = a.kind === 'hazard' || a.kind === 'keepclear' ? '#a5281c' : a.kind === 'refuge' ? '#1f6a45' : MAGENTA;
       const at = a.kind === 'precaution' && a.circle ? mid.cy - a.circle.r * v.scale * 0.62 : a.circle ? mid.cy + a.circle.r * v.scale + 12 : mid.cy;
       ctx.fillText(a.name, mid.cx, at);
       if (big && a.say) {
         ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
         ctx.fillText(a.kind === 'hazard' && a.least !== undefined ? `${a.say}. Least depth ${a.least} m` : a.say, mid.cx, at + 13);
+      }
+    }
+    // What is built in the sea (added with Long Beach to Catalina): a breakwater or a pier as a heavy line, a platform
+    // as a small square with a dot in it, as a chart marks one. The oil islands are land on the chart already.
+    for (const st of f.structures ?? []) {
+      if (st.line) {
+        ctx.strokeStyle = st.kind === 'pier' ? 'rgba(60, 60, 60, 0.9)' : 'rgba(70, 62, 50, 0.95)';
+        ctx.lineWidth = Math.max(st.kind === 'pier' ? 1.2 : 2, (st.kind === 'pier' ? 9 : 16) * v.scale);
+        ctx.beginPath();
+        st.line.forEach(([x, y], i) => {
+          const [px, py] = this.screen(w, h, v, x, y);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        if (labels && v.scale > 0.02) {
+          const mid = st.line[Math.floor(st.line.length / 2)];
+          const [mx, my] = this.screen(w, h, v, mid[0], mid[1]);
+          ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
+          ctx.fillStyle = INK;
+          ctx.fillText(st.name, mx, my + 13);
+        }
+      } else if (st.kind === 'platform' && st.x !== undefined && st.y !== undefined) {
+        const [px, py] = this.screen(w, h, v, st.x, st.y);
+        if (px < -20 || py < -20 || px > w + 20 || py > h + 20) continue;
+        const r = Math.max(3, 25 * v.scale);
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(px - r, py - r, r * 2, r * 2);
+        ctx.fillStyle = INK;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+        if (labels && v.scale > 0.006 && v.scale < 0.02) {
+          ctx.font = 'italic 600 9.5px ui-serif, Georgia, serif';
+          ctx.fillStyle = '#a5281c';
+          ctx.fillText(st.name.replace('Platform ', ''), px, py - r - 7);
+        }
+      } else if (st.kind === 'island' && labels && v.scale > 0.012 && st.x !== undefined && st.y !== undefined) {
+        const [px, py] = this.screen(w, h, v, st.x, st.y);
+        ctx.font = 'italic 9.5px ui-serif, Georgia, serif';
+        ctx.fillStyle = INK;
+        ctx.fillText(st.name, px, py + (st.r ?? 100) * v.scale + 10);
       }
     }
     // Lights: a magenta flare with the light's character, as a chart shows them.
@@ -848,6 +915,13 @@ export class Chart {
     ctx.globalAlpha = 1;
 
     this.drawFeatures(ctx, w, h, v, true);
+    // Extra layers (fishing grounds and the like): see `chartLayers.ts`.
+    for (const layer of chartLayers()) {
+      if (!layer.on) continue;
+      ctx.save();
+      layer.draw(ctx, { scale: v.scale, w, h, to: (x, y) => this.screen(w, h, v, x, y) });
+      ctx.restore();
+    }
 
     // Named places and marks.
     for (const m of this.course.marks) {
@@ -1130,7 +1204,7 @@ export class Chart {
       return `<tr class="${done ? 'done' : i === st.nextIndex ? 'next' : ''}">
         <td>${i + 1}</td><td class="name">${m.name}</td>
         <td>${leg ? `${pad3(leg.bearing)}°` : ''}</td><td>${leg ? metresToNm(leg.distance).toFixed(2) : ''}</td>
-        <td>${leg ? `${leg.twsKt.toFixed(0)} kt ${leg.sail}` : ''}</td><td>${stream}</td>
+        <td>${leg ? `${leg.twsKt.toFixed(0)} kt ${this.host.underPower?.() ? WIND_ON[leg.sail] ?? '' : leg.sail}` : ''}</td><td>${stream}</td>
         <td>${leg ? leg.sogKt.toFixed(1) : ''}</td><td>${m.plannedEta !== null ? this.clock(m.plannedEta) : ''}</td><td>${actual}</td></tr>`;
     }).join('');
 
@@ -1192,7 +1266,8 @@ export class Chart {
           <span>Depth</span><b>${depth > 0 ? `${(depth + world.tide(t)).toFixed(0)} m` : '—'}</b></div>
       </section>
       ${traffic}
-      <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. Plan times use the boat's polar with the forecast wind and tidal stream.</p>
+      ${chartLayers().length ? `<section class="layers"><h3>Layers</h3>${chartLayers().map((l) => `<button type="button" data-layer="${l.id}" aria-pressed="${l.on}">${l.name}: ${l.on ? 'on' : 'off'}</button>${l.on && l.legend ? `<p class="quiet">${l.legend}</p>` : ''}`).join('')}</section>` : ''}
+      <p class="hint">Click water to add a waypoint, or a place to head for it: a flag is a yacht club, a glass a bar, and each turns green once you have been ashore there. Drag a waypoint to move it, double-click to remove it. Drag the timeline to look ahead, double-click it to come back to now. ${this.host.underPower?.() ? 'Plan times are at her cruising speed with the forecast tidal stream: the sea may not let her make it' : "Plan times use the boat's polar with the forecast wind and tidal stream"}.</p>
       <p class="source">Wind and gusts: ${windSource(this.course)}. Stream and tide: NOAA ${/NOAA ([\w-]+)/.exec(this.course.season.source)?.[1] ?? 'tide model'}. Both replayed from ${this.dayFmt.format(world.dateAt(0))} ${world.dateAt(0).getUTCFullYear()}. Wind forecast issued ${this.timeFmt.format(issued)} ${this.dayFmt.format(issued)}. Depths and coast from open elevation data. Not for navigation.</p>`;
   }
 }

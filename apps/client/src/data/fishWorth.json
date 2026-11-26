@@ -1,0 +1,4 @@
+{
+  "note": "Points for the biggest fish of each kind on waters that still use the game's first fishing table (aboard/catch.ts). Waters with their own fishing.json carry `worth` there.",
+  "worth": { "striper": 500, "king": 700, "halibut": 600, "leopard": 400, "batray": 250, "jacksmelt": 60, "perch": 80 }
+}

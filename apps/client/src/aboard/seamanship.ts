@@ -1,5 +1,5 @@
-import { SIM_DT } from '@slack-tide/sim';
-import { Seamanship, courseMiles, raceAwards, rankOf, type Award, type Rank } from '../xp/score';
+import { SIM_DT, leverFor, milesPerLitre, type PowerSpec } from '@slack-tide/sim';
+import { PowerSeamanship, Seamanship, courseMiles, raceAwards, rankOf, type Award, type Rank } from '../xp/score';
 import type { AboardContext, Feature } from './feature';
 
 const SAVED = 'regatta.awards';
@@ -19,6 +19,9 @@ export class SeamanshipPoints implements Feature {
   private readonly el = document.createElement('div');
   private readonly panel = document.getElementById('fleetpanel');
   private readonly scorer = new Seamanship();
+  /** A powerboat is scored by other rules altogether: no trim, no tacks. Made the first time she is seen to be one. */
+  private powerScorer: PowerSeamanship | null = null;
+  private powerFor: PowerSpec | null = null;
   private readonly queue: Line[] = [];
   private showing = 0;
   /** The trickle of points in the groove, saved up so that it is said every couple of minutes and not every half. */
@@ -52,7 +55,12 @@ export class SeamanshipPoints implements Feature {
 
   step(): void {
     this.steps++;
-    const awards = this.scorer.step(this.ctx.sim.state, this.ctx.sim.out, this.weight);
+    const power = this.ctx.sim.boat.power;
+    if (power && power !== this.powerFor) {
+      this.powerFor = power;
+      this.powerScorer = new PowerSeamanship(milesPerLitre(power, leverFor(power, power.cruiseKt)));
+    }
+    const awards = power && this.powerScorer ? this.powerScorer.step(this.ctx.sim.state, this.ctx.sim.out) : this.scorer.step(this.ctx.sim.state, this.ctx.sim.out, this.weight);
     for (const a of awards) this.ctx.logbook.earn(a);
   }
 

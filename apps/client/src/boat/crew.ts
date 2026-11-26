@@ -211,7 +211,8 @@ export class Figure {
 
 export class Crew {
   private readonly helm: Figure;
-  private readonly trim: Figure;
+  /** The hand on the cockpit seat. A boat sailed single-handed from a console has none. */
+  private readonly trim: Figure | null;
   private started = false;
   /** Which side the wind is on, eased: +1 starboard, -1 port. Turns the helmsman's head. */
   private windSide = 1;
@@ -224,10 +225,11 @@ export class Crew {
   private readonly v = new THREE.Vector3();
   private readonly w = new THREE.Vector3();
 
-  constructor(private readonly model: SloopModel) {
+  /** @param solo true for a boat with nobody but her skipper aboard: no trimmer is made or posed */
+  constructor(private readonly model: SloopModel, solo = false) {
     this.helm = new Figure('crew_helm', DEFAULT_AVATAR);
-    this.trim = new Figure('crew_trim', MATE_AVATAR);
-    for (const f of [this.helm, this.trim]) {
+    this.trim = solo ? null : new Figure('crew_trim', MATE_AVATAR);
+    for (const f of this.trim ? [this.helm, this.trim] : [this.helm]) {
       model.root.add(f.group);
       model.nodes[f.group.name] = f.group;
     }
@@ -236,7 +238,7 @@ export class Crew {
   /** Dress the skipper at the wheel as this avatar. The hand on the seat keeps crew kit, or joins in a costume. */
   setAvatar(avatar: Avatar): void {
     this.helm.wear(avatar);
-    this.trim.wear(mateFor(avatar));
+    this.trim?.wear(mateFor(avatar));
   }
 
   update(state: SimState, out: SimOutputs, pose: BoatPose, time: number, dt: number): void {
@@ -263,7 +265,7 @@ export class Crew {
     this.busy = Math.max(0, this.busy - dt * 1.4);
 
     this.poseHelm(pose, time);
-    this.poseTrimmer(pose, time);
+    if (this.trim) this.poseTrimmer(this.trim, pose, time);
   }
 
   /** Standing aft of the wheel, hands at ten and two, leaning uphill as the boat heels. */
@@ -303,8 +305,7 @@ export class Crew {
   }
 
   /** Sitting on the windward seat watching the jib. Crosses the cockpit when the wind changes sides. */
-  private poseTrimmer(pose: BoatPose, time: number): void {
-    const f = this.trim;
+  private poseTrimmer(f: Figure, pose: BoatPose, time: number): void {
     const geo = this.model.geo;
     const sole = geo.cockpitSoleY;
     const seat = geo.seatY;

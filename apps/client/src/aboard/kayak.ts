@@ -355,10 +355,17 @@ export class Kayak implements Feature {
     else ctx.say('Skiff away. W opens the throttle, Shift with W is flat out, S goes astern, A and D steer. O lands her or brings you back aboard', 9);
   }
 
+  /** ashore: the place she has landed at, and whether at its guest float, for `ashore/walk.ts` to put her on her feet there. */
+  get landedAt(): { place: Place; float: boolean } | null {
+    return this.mode === 'ashore' && this.at ? { place: this.at, float: this.atFloat } : null;
+  }
+  private atFloat = false;
+
   private goAshore(place: Place | null, float = false): void {
     const { ctx } = this;
     this.mode = 'ashore';
     this.at = place;
+    this.atFloat = float; // ashore
     this.kayak.speed = 0;
     this.kayak.turn = 0;
     const m = this.kayak;
@@ -764,7 +771,13 @@ export class Kayak implements Feature {
       this.unberth();
       this.berth = want;
       const d = ctx.spec.dimensions;
-      if (want === 'deck') {
+      // A boat with no side deck to lash her on says where she goes: a rack of her own (`tender_stow`, see `boat/buildConsole.ts`).
+      const rack = want === 'deck' ? ctx.boatView.model.nodes.tender_stow : undefined;
+      if (rack) {
+        rack.add(model.root);
+        model.root.position.set(0, 0, 0);
+        model.root.rotation.set(0, 0, 0);
+      } else if (want === 'deck') {
         // On her side against the stanchions, bow forward.
         ctx.boatView.root.add(model.root);
         model.root.position.set(-(d.beam * 0.5 - 0.42), d.freeboard + 0.2, -d.loa * 0.03);

@@ -2,10 +2,13 @@ import { BadAir } from './badair';
 import { ClubBanter } from './banter';
 import { CheatStrip } from './cheat';
 import { Contact } from './contact';
+import { Dive } from './dive';
 import { Dockside } from './dock';
 import { Engine } from './engine';
 import type { AboardContext, Feature } from './feature';
 import { Fishing } from './fishing';
+import { Angling } from './angling';
+import { tableOf } from '../fishing/table';
 import { FlowView } from './flow';
 import { Mooring } from './mooring';
 import { Pilotage } from './pilotage';
@@ -17,8 +20,10 @@ import { CrabPots } from './pots';
 import { Radio } from './radio';
 import { Residents } from './residents';
 import { Tips } from './tips';
+import { Powerboat } from './powerboat';
 import { Tow } from './tow';
 import { Wildlife } from './wildlife';
+import { Ashore } from '../ashore/walk'; // ashore
 
 /**
  * Every feature in the game, in the order their hooks run. Add a line here for a new one.
@@ -31,11 +36,19 @@ export function createFeatures(ctx: AboardContext): Feature[] {
   return [
     // Local knowledge comes first only so that it can keep the kayak aboard inside a wildlife refuge. It takes O nowhere else and gives no status.
     new Pilotage(ctx),
+    // Over the side with a mask and a speargun. Ahead of the tender and the anchor: while she is in the water every key is hers.
+    new Dive(ctx),
+    // ashore: on foot at a place. Before the dock and the tender: while she is walking, the keys, the status and the camera are hers.
+    new Ashore(ctx),
     new Dockside(ctx),
     new Kayak(ctx),
     new CrabPots(ctx),
-    new Fishing(ctx),
+    // A water with its own fishing table (`courses/<id>/fishing.json`) fishes by it: trolling, bait, the fight, tournaments.
+    // The others keep the game's first fishing. Both answer to L and are the feature called 'fishing'.
+    ((table) => (table ? new Angling(ctx, table) : new Fishing(ctx)))(tableOf(ctx.stage.course.id)),
     new Mooring(ctx),
+    // A powerboat's own: it says what she is doing before the engine does, and takes no keys. Nothing aboard a boat with sails.
+    new Powerboat(ctx),
     new Engine(ctx),
     new Tow(ctx),
     new FlowView(ctx),

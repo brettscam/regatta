@@ -153,7 +153,8 @@ export class Tips implements Feature {
     const step = Math.min(this.acc, 2);
     this.acc = 0;
     const s = this.snap = this.look(step);
-    const due = this.picker.next(s, step, this.showing !== null);
+    // In the water with a mask on she has her own panel, and no hand free for a card about the boat.
+    const due = this.ctx.feature('dive')?.focus?.() ? null : this.picker.next(s, step, this.showing !== null);
     const now = this.showing;
     if (now) {
       // Done, timed out, or something more pressing is going on.
@@ -382,18 +383,21 @@ export class Tips implements Feature {
       lesson: this.lessonSeen, news: this.news,
       company: boats.length, nearBoat, boatName, trafficCalls: this.trafficCalls,
       racing, raceOffered: !!race && race.call === null && race.offers.size > 0, countdown: racing ? race.countdown : null, raceDone: this.raceDone,
-      windKt, twaDeg: twa, heelDeg: Math.abs(s.heel) * R2D, speedKt,
+      power: !!sim.boat.power, windKt, twaDeg: twa, heelDeg: Math.abs(s.heel) * R2D, speedKt,
       reef: s.reef, reefs: Math.max(0, ctx.spec.sails.main.reefs.length - 1), hasSpin: !!ctx.spec.sails.spinnaker, spin: s.spin,
       hasEngine: !!sim.boat.engine, engine: s.engineOn,
       hand: s.helmMode === 'hand', mistrim, aground: o.aground, stuck: this.stuck, knockdowns: s.knockdowns - this.knockAtStart,
       manoeuvre: s.maneuver !== null, knocked: o.knockedDown || s.knock > 0.05, hitAgo: this.clock - this.hitAt, panel,
       hold: s.hold, heldFor: this.heldFor, berth, ashore,
       tender: !!ctx.feature('kayak')?.focus?.(), night: this.night,
+      walking: (ctx.feature('ashore') as { snap?: () => Snap['walking'] } | undefined)?.snap?.() ?? null, // ashore
       // The tender she carries, and what Shift+O would give instead (`aboard/kayak.ts`).
       tenderName: (ctx.feature('kayak') as { tenderName?: () => string } | undefined)?.tenderName?.() ?? 'Kayak',
       tenderOthers: (ctx.feature('kayak') as { tenderOthers?: () => string[] } | undefined)?.tenderOthers?.() ?? [],
       depth: o.underKeel === null ? 99 : o.underKeel + ctx.spec.dimensions.draft,
       marks: passage.marks.length - passage.nextIndex, mark,
+      // Fishing, where the water has its own (`aboard/angling.ts`).
+      fishing: (ctx.feature('fishing') as { tipState?: () => Snap['fishing'] } | undefined)?.tipState?.(),
     };
   }
 }

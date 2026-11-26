@@ -3,6 +3,9 @@ import { KT, SIM_DT } from '@slack-tide/sim';
 import type { AboardContext, Feature } from './feature';
 import { BITE_SPELL, STRIKE_SECONDS, biteIn, describeFish, fishingAdvice, fishingMode, fishingReason, withinLimit, type Bite, type FishingMode, type Water } from './catch';
 import { baitAt, type Sea } from './fauna';
+// Points for each catch and the fishing book: see `fishing/points.ts`.
+import { addToCreel, firstTableWorth, landedPoints } from '../fishing/points';
+import { loadCreel, saveCreel } from '../ui/catchCard';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -39,6 +42,8 @@ export class Fishing implements Feature {
   /** Real seconds since a fish got away, during which L is taken as a late strike and not as reeling in. */
   private late = 0;
   private landed = 0;
+  /** Points for this sail's fish. */
+  private points = 0;
   /** Fish of each kind kept this sail, against the day's limit. */
   private readonly aboard = new Map<string, number>();
   /** The last thing said about why the fishing is slow, and how long conditions have been saying something else. */
@@ -74,6 +79,7 @@ export class Fishing implements Feature {
     };
     // In a holder on the stern rail, to starboard of the centreline and inboard of the lifebuoy.
     this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
+    this.stand();
     const carbon = new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.45 });
     const geo = new THREE.CylinderGeometry(0.005, 0.016, ROD_LENGTH, 6);
     geo.translate(0, ROD_LENGTH / 2 - ROD_BUTT, 0);
@@ -95,6 +101,14 @@ export class Fishing implements Feature {
     this.rig.add(this.rod, this.line);
     this.rig.visible = false;
     ctx.boatView.root.add(this.rig);
+  }
+
+  /** A boat built with rod holders (`rod_stbd`, see `boat/buildConsole.ts`) has the rod in her starboard one, not on a stern rail she does not have. */
+  private stand(): void {
+    const holder = this.ctx.boatView.model.nodes.rod_stbd;
+    if (!holder) return;
+    this.foot.copy(holder.position);
+    this.foot.y += 0.1;
   }
 
   private water(): Water {
@@ -134,7 +148,7 @@ export class Fishing implements Feature {
     if (this.out) {
       this.out = false;
       this.rig.visible = false;
-      this.ctx.say(this.landed ? `Line in. ${this.landed} fish aboard this sail` : 'Line in', 4);
+      this.ctx.say(this.landed || this.points ? `Line in. ${this.landed} fish aboard this sail, ${this.points} points` : 'Line in', 4);
       return true;
     }
     const w = this.water();
@@ -162,7 +176,12 @@ export class Fishing implements Feature {
       this.aboard.set(b.species.id, (this.aboard.get(b.species.id) ?? 0) + 1);
       this.ctx.logbook.count('fish');
     }
-    this.ctx.say(`${describeFish(b)}. The line is back out`, 8);
+    // Every fish scores by its size for its kind, kept or not, and goes in the book on the Logbook tab.
+    const fate = b.keeper ? 'kept' : b.back === 'small' ? 'short' : 'released';
+    const points = landedPoints({ size: b.species.size, worth: firstTableWorth(b.species.id) }, b.cm, fate);
+    this.points += points;
+    saveCreel(addToCreel(loadCreel(), { id: b.species.id, name: b.species.name, cm: b.cm, kg: b.kg, points, fate, water: this.ctx.stage.course.id }));
+    this.ctx.say(`${describeFish(b)}. ${points} points, ${this.points} today. The line is back out`, 8);
   }
 
   step(): void {
@@ -254,6 +273,7 @@ export class Fishing implements Feature {
     // The rod goes to the same place on the new boat's stern rail.
     const d = this.ctx.spec.dimensions;
     this.foot.set(d.beam * 0.17, d.freeboard + 0.5, d.loa / 2 - 0.06);
+    this.stand();
     this.rod.position.copy(this.foot);
     this.ctx.boatView.root.add(this.rig);
   }

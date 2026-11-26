@@ -3,7 +3,7 @@ import { KT } from '@slack-tide/sim';
 import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildLand, landHeight } from './scene/terrain';
+import { Buoy, buildBridge, buildLand, drawnLandHeight, landHeight } from './scene/terrain';
 import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
@@ -21,6 +21,28 @@ import { NavLights } from './scene/navLights';
 import { Rain } from './scene/rain';
 import { SF_FOG_PATH, cloudCover, fogAt, fogReach, morningHaze, pathPoint, rainAt, solarHour, squallsAt, visibility, type FogPath, type Squall } from './scene/weatherRules';
 import type { LoadedCourse } from './world/loadCourse';
+// Long Beach to Catalina: what is built in the sea, kelp, towns to walk in, and the two shores' own scenery.
+import { buildStructures } from './scene/structures';
+import { buildKelp, kelpCanopy } from './scene/kelp';
+import { planTown, townLayouts } from './scene/town';
+import { buildLongBeach, type Detail } from './scene/longBeach';
+import { buildCatalina } from './scene/catalinaIsland';
+
+/**
+ * A view from somewhere other than the drone: the mask of a diver (`aboard/dive.ts`). Whoever owns it sets
+ * `stage.eye` each frame it applies and clears it when done. With `wet` set the frame is drawn from under the water:
+ * the sea's top, the spray, the rain and the navigation lights are left out, the haze is the water's own, and the
+ * light is what is left of the sun at that depth. All of it is put back before the frame ends, so nothing has to be
+ * restored on surfacing.
+ */
+export interface EyeView {
+  camera: THREE.PerspectiveCamera;
+  wet: boolean;
+  /** The colour of the water at the eye, how far it can see through it in metres, and what is left of the sun's red, green and blue. */
+  water: THREE.Color;
+  see: number;
+  light: THREE.Color;
+}
 
 export interface StageBoat {
   /** Scene coordinates: X east, Z south. */
@@ -35,6 +57,16 @@ export interface StageBoat {
   /** Under engine and in gear, or lying to an anchor or a mooring: for the lights she shows at night. */
   power?: boolean;
   held?: boolean;
+  /**
+   * A small open powerboat's lights: the height of the one white light she shows all round, and of her sidelights,
+   * metres above the water. Given, she is lit as a launch whenever she is not held. See `NavLights.vessel`.
+   */
+  launch?: { allRound: number; side: number };
+  /**
+   * 0 to 1, how far a planing hull is up on the plane. Her stem is clear of the water then, so the spray that a
+   * displacement bow throws at that speed is not thrown: what she does throw comes off her chines (`aboard/powerboat.ts`).
+   */
+  plane?: number;
   /** Half the distance between her two hulls, metres, for a wake from each. Left out, one hull. */
   hulls?: number;
 }
@@ -76,7 +108,8 @@ export class Stage {
   /** Small craft afloat this frame (the tenders, `aboard/kayak.ts`), drawn in the same wakes and spray as every vessel. Filled and emptied by their owners. */
   readonly craft: WakeVessel[] = [];
   private readonly afloat: WakeVessel[] = [];
-  private readonly white = new THREE.Color();
+  /** What white water looks like in this light: bright by day, warm at sunset, a grey ghost at night. Set each frame. */
+  readonly white = new THREE.Color(1, 1, 1);
   private readonly tint = new THREE.Color();
   private readonly seaAt = (x: number, z: number, count: number) => waveHeight(this.waves, x, z, this.seaTime, count);
   private seaTime = 0;
@@ -99,6 +132,10 @@ export class Stage {
   readonly sea: Sea = emptySea();
   /** The venue standing on the shore at each place there is to go ashore: where it is, and its deck, dock and named spots. */
   shore: ShoreSpot[] = [];
+  /** Scenery that is only worth drawing from near by, each with where it is and how far off it is hidden. See `frame`. */
+  private detail: Detail[] = [];
+  /** What the water's own scenery came to, for the curious and for tests: counts of things, and triangles. */
+  readonly built: Record<string, number> = {};
   /** The land and what stands on it, for the course showing. */
   private land: THREE.Group | null = null;
   private readonly haze = new THREE.Fog(0xb9cbd6, 1200, 30000);
@@ -114,6 +151,11 @@ export class Stage {
   private readonly pace = { time: 0, frames: 0, slowWindows: 0, warmup: 4 };
   private frameCount = 0;
   private camera: THREE.PerspectiveCamera | null = null;
+  /** Set while the frame is to be drawn from somewhere other than the drone. See `EyeView`. */
+  eye: EyeView | null = null;
+  private readonly keptColor = new THREE.Color();
+  private readonly keptSun = new THREE.Color();
+  private readonly keptFill = new THREE.Color();
 
   constructor(readonly canvas: HTMLCanvasElement, data: LoadedCourse, world: ReplayWorld) {
     canvas.tabIndex = 0;
@@ -177,7 +219,8 @@ export class Stage {
     const t = this.course.terrain;
     const heightAt = terrain instanceof THREE.Mesh
       ? ((drawn: HeightGrid) => (x: number, y: number) => groundHeight(drawn, x, y))({ x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: terrain.geometry.getAttribute('position').array, stride: 3, offset: 1 })
-      : landHeight(this.course, data.terrain);
+      // Land with insets: the finest grid at each place, with the sea below zero as it is drawn, so a shoreline can be found on it.
+      : drawnLandHeight(this.course, data.terrain);
     const shore = buildShoreside(this.course.depth, data.depth, heightAt, (x, y) => world.chartDepth(x, y), data.places, scenery.landCover);
     land.add(shore.group);
     this.shore = shore.spots;
@@ -194,6 +237,57 @@ export class Stage {
     if (pieces.has('palms')) land.add(buildPalms(this.course, data.terrain));
     if (pieces.has('mooring-fields')) land.add(buildMooringFields(this.course, data.terrain, data.depth, data.places, approaches));
     if (pieces.has('virgin-islands')) land.add(buildVirginIslands(this.course, data.terrain));
+    // ---- added for Long Beach to Catalina; each part is drawn on any water whose data has it -----------------
+    this.detail = [];
+    for (const k of Object.keys(this.built)) delete this.built[k];
+    const tally = (name: string, counts: Record<string, number>, triangles: number) => {
+      this.built[`${name}Triangles`] = triangles;
+      for (const [k, v] of Object.entries(counts)) this.built[k] = v;
+    };
+    const sceneGround = { height: heightAt, depth: (x: number, y: number) => world.chartDepth(x, y) };
+    // What is built in the sea: breakwaters, platforms, oil islands (`features.json` structures). Solid through the chart's depth.
+    if (data.features?.structures?.length) {
+      const built = buildStructures(data.features.structures);
+      land.add(built.group);
+      tally('structures', { structures: built.placed.length }, built.triangles);
+    }
+    // Kelp at the surface, a mesh to each bed so a bed far off is not drawn.
+    if (data.features?.kelp?.length) {
+      const patches = kelpCanopy(data.features.kelp, sceneGround.depth);
+      for (const bed of data.features.kelp) {
+        const own = patches.filter((p) => p.bed === bed.id);
+        if (!own.length) continue;
+        const mesh = buildKelp(own);
+        land.add(mesh);
+        const mid = bed.line[Math.floor(bed.line.length / 2)];
+        const span = Math.hypot(bed.line[0][0] - bed.line[bed.line.length - 1][0], bed.line[0][1] - bed.line[bed.line.length - 1][1]);
+        this.detail.push({ object: mesh, x: mid[0], y: mid[1], far: 5000 + span });
+      }
+      tally('kelp', { kelpPatches: patches.length }, patches.length * 8);
+    }
+    // Towns to walk about in (`towns.json`). Each landing of a town is an entry of `shore` under its place's id, with
+    // the whole town as its layout: see `TownLayout` in `scene/town.ts`. The ground itself is drawn with the town.
+    const townGround = { ...sceneGround, sailable: () => true };
+    const plans = (data.towns ?? []).map((t) => planTown(t, townGround));
+    for (const plan of plans) {
+      townLayouts(plan, townGround).forEach(({ place, layout }, n) => {
+        const at = n === 0 || !layout.dock ? layout : layout.dock;
+        this.shore.push({ id: place, kind: layout.kind, x: at.x, y: at.y, top: layout.floor + (n === 0 ? 16 : 9), layout });
+      });
+    }
+    if (pieces.has('long-beach')) {
+      const built = buildLongBeach(this.course, sceneGround, data.places.map((p): [number, number, number] => [p.x, p.y, 90]));
+      land.add(built.group);
+      this.detail.push(...built.detail);
+      tally('longBeach', built.counts, built.triangles);
+    }
+    if (pieces.has('catalina-island')) {
+      const built = buildCatalina(sceneGround, plans, data.places);
+      land.add(built.group);
+      this.detail.push(...built.detail);
+      tally('catalina', built.counts, built.triangles);
+    }
+    // ---- end of the Long Beach to Catalina additions ----------------------------------------------------
     // The water itself. Clear tropical water is blue where it is deep and shows its bottom where it is not.
     if (scenery.water === 'clear') {
       const shoals = shoalMap(this.course, data.depth);
@@ -261,7 +355,8 @@ export class Stage {
     lights.begin(1 - THREE.MathUtils.smoothstep(this.sky.elevation, -0.1, 0.02), camera, this.renderer.domElement.height, this.weather.see);
     if (lights.lit) {
       const len = boat.length ?? 11.6;
-      lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
+      if (boat.launch) lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, boat.launch.allRound, boat.held ? 'anchor' : 'launch', boat.launch.side);
+      else lights.vessel(boat.x, this.seaAt(boat.x, boat.z, 4), boat.z, boat.heading, len, boat.beam ?? 3.8, len * 1.4, boat.held ? 'anchor' : boat.power ? 'power' : 'sail');
       for (const s of ships) {
         const y = this.seaAt(s.x, -s.y, 4);
         if (s.kind === 'sail') lights.vessel(s.x, y, -s.y, s.heading, s.length, s.beam, s.length * 1.4, s.sog < 0.25 ? 'anchor' : 'sail');
@@ -319,7 +414,8 @@ export class Stage {
       const dx = v.x - camera.position.x;
       const dz = v.z - camera.position.z;
       if (dx * dx + dz * dz > 220 * 220 + v.length * v.length * 9) continue;
-      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
+      const drives = v.id === 'own' ? 1 - 0.65 * (boat.plane ?? 0) : 1;
+      this.spray.bow(v.id, seaTime, dt, v.x, v.z, v.heading, v.speed * drives, v.length, v.beam, Math.sign(v.lee), windKt, this.seaAt);
     }
     // White water takes the colour of the light: bright by day, warm at sunset, a grey ghost at night.
     this.white.copy(this.haze.color).multiplyScalar(0.3).add(this.tint.copy(this.sky.sunColor).multiplyScalar(0.62 * day + 0.05));
@@ -380,6 +476,7 @@ export class Stage {
    * @param covered true when something covers most of the 3D view, so it only needs drawing now and then
    */
   frame(dtReal: number, rate: number, t: number, seaTime: number, camera: THREE.PerspectiveCamera, boat: StageBoat, ships: TrafficVessel[], windKt: number, covered = false): void {
+    if (this.eye) camera = this.eye.camera;
     if (camera !== this.camera) {
       this.camera = camera;
       this.resize(camera);
@@ -453,7 +550,43 @@ export class Stage {
     const toward = hourly.dir + Math.PI;
     this.rain.update(seaTime, w.rain, w.squalls, Math.sin(toward) * hourly.speed, -Math.cos(toward) * hourly.speed, (0.15 + 0.85 * up) * (1 - 0.9 * sky.night));
 
+    // Scenery that is only worth drawing from near by is hidden when the eye is far from it.
+    for (let i = 0; i < this.detail.length; i++) {
+      const d = this.detail[i];
+      const dx = camera.position.x - d.x;
+      const dz = camera.position.z + d.y;
+      d.object.visible = dx * dx + dz * dz < d.far * d.far;
+    }
     this.frameCount++;
-    if (!covered || this.frameCount % 6 === 0) this.renderer.render(this.scene, camera);
+    if (covered && this.frameCount % 6 !== 0) return;
+    if (this.eye?.wet) this.drawUnder(camera, this.eye);
+    else this.renderer.render(this.scene, camera);
+  }
+
+  /** One frame seen from under the water. What is changed for it is put back straight after. */
+  private drawUnder(camera: THREE.PerspectiveCamera, eye: EyeView): void {
+    const { haze, scene, sky } = this;
+    const near = haze.near;
+    const far = haze.far;
+    const background = scene.background;
+    const hidden = [this.ocean.mesh, this.spray.points, this.navLights.points, this.rain.group, ...sky.backdrop].filter((o) => o.visible);
+    this.keptColor.copy(haze.color);
+    this.keptSun.copy(sky.sunLight.color);
+    this.keptFill.copy(sky.fill.color);
+    for (const o of hidden) o.visible = false;
+    haze.color.copy(eye.water);
+    haze.near = 0.2;
+    haze.far = eye.see * 1.5;
+    scene.background = eye.water;
+    sky.sunLight.color.multiply(eye.light);
+    sky.fill.color.copy(eye.water).multiplyScalar(4);
+    this.renderer.render(scene, camera);
+    for (const o of hidden) o.visible = true;
+    haze.color.copy(this.keptColor);
+    haze.near = near;
+    haze.far = far;
+    scene.background = background;
+    sky.sunLight.color.copy(this.keptSun);
+    sky.fill.color.copy(this.keptFill);
   }
 }

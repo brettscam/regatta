@@ -3,9 +3,10 @@
 //   with nothing more it checks the course's own places.json;
 //   with latitudes and longitudes it shows where each would fall, and the nearest water deep enough to bring a boat to;
 //   with `layout` it prints the venues' layouts (deck outline, dock, berth, named spots) as JSON, all or one.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { ReplayWorld, type CourseData } from '@slack-tide/world';
-import { groundHeight, type HeightGrid } from '../apps/client/src/aboard/paddle';
+import { drawnLandHeight } from '../apps/client/src/scene/terrain';
+import { planTown, townFaults, townLayouts, type TownSpec } from '../apps/client/src/scene/town';
 import { chartSailable, shoreKind } from '../apps/client/src/scene/shoreSite';
 import { layoutOf, planVenue, type VenueGround, type VenuePlace } from '../apps/client/src/scene/venue';
 
@@ -16,18 +17,18 @@ const bin = (f: string) => readFileSync(new URL(f, dir));
 const cur = bin('current.bin');
 const depths = new Uint8Array(bin('depth.bin'));
 const world = new ReplayWorld({ course, current: new Int8Array(cur.buffer, cur.byteOffset, cur.byteLength), depth: depths }, 0);
-const t = course.terrain;
-const raw = new Uint8Array(bin('terrain.bin'));
-// The land as `scene/terrain.ts` draws it: water cells sit well under the sea.
-const drawn = Float32Array.from(raw, (b) => { const h = (b / 255) ** 2 * t.max; return h > 0.4 ? h : -6; });
-const grid: HeightGrid = { x0: t.x0, y0: t.y0, dx: t.dx, nx: t.nx, ny: t.ny, data: drawn, stride: 1, offset: 0 };
-const ground: VenueGround = { height: (x, y) => groundHeight(grid, x, y), sailable: chartSailable(course.depth, depths), depth: (x, y) => world.chartDepth(x, y) };
+// The land as `scene/terrain.ts` draws it, read from the finest grid there is at each place: water cells sit well under the sea.
+const drawn = drawnLandHeight(course, new Uint8Array(bin('terrain.bin')));
+const ground: VenueGround = { height: drawn, sailable: chartSailable(course.depth, depths), depth: (x, y) => world.chartDepth(x, y) };
+// Towns to walk about in, where the water has them (`towns.json`, `scene/town.ts`).
+const towns = existsSync(new URL('towns.json', dir)) ? (JSON.parse(readFileSync(new URL('towns.json', dir), 'utf8')) as TownSpec[]) : [];
 const M = (6371008.8 * Math.PI) / 180;
 
 let places = JSON.parse(readFileSync(new URL('places.json', dir), 'utf8')) as VenuePlace[];
 if (rest[0] === 'layout') {
   const out = places.filter((p) => !rest[1] || p.id === rest[1]).map((p) => { const plan = planVenue(p, ground); return plan ? layoutOf(plan, ground) : null; });
-  console.log(JSON.stringify(out, null, 1));
+  const townOut = towns.flatMap((t) => townLayouts(planTown(t, ground), ground)).filter((l) => !rest[1] || l.place === rest[1]).map((l) => l.layout);
+  console.log(JSON.stringify([...out.filter(Boolean), ...townOut], null, 1));
   process.exit(0);
 }
 const probing = rest.length > 0;
@@ -58,6 +59,17 @@ for (const p of places) {
   const depth = world.chartDepth(p.x, p.y);
   const plan = planVenue(p, ground);
   const notes: string[] = [];
+  if (p.ashore?.town) {
+    // A place in a town: the town is its venue, and one of the town's landings should be this place's.
+    const town = towns.find((t) => t.id === p.ashore!.town);
+    const landing = town?.landings.find((l) => l.place === p.id);
+    const spot = town?.spots.find((q) => q.name === landing?.spot);
+    if (!town) notes.push(`NO TOWN CALLED ${p.ashore.town.toUpperCase()}`);
+    if (depth < 2.5) notes.push(depth <= 0 ? 'PLACE ON LAND' : 'PLACE SHOAL');
+    if (notes.some((n) => n === n.toUpperCase())) bad++;
+    console.log(`${`${p.name} (${p.kind ?? '-'}, in ${p.ashore.town})`.padEnd(40)} ${String(p.x).padStart(6)},${String(p.y).padStart(6)} ${depth.toFixed(1).padStart(5)} m  ${spot ? `lands at ${landing!.spot}, ${Math.round(Math.hypot(spot.x - p.x, spot.y - p.y))} m from the place` : 'no landing of its own: reached on foot from the town\'s others'}${notes.length ? `   <-- ${notes.join(', ')}` : ''}`);
+    continue;
+  }
   if (depth < 2.5) notes.push(depth <= 0 ? 'PLACE ON LAND' : 'PLACE SHOAL');
   let line = 'no shore in reach';
   if (!plan) notes.push('NO SHORE IN REACH');
@@ -76,5 +88,16 @@ for (const p of places) {
   }
   if (notes.some((n) => n === n.toUpperCase())) bad++;
   console.log(`${`${p.name} (${p.kind ?? '-'}, ${shoreKind(p)})`.padEnd(40)} ${String(p.x).padStart(6)},${String(p.y).padStart(6)} ${depth.toFixed(1).padStart(5)} m  ${line}${notes.length ? `   <-- ${[...new Set(notes)].join(', ')}` : ''}${probing ? deepNear(p.x, p.y) : ''}`);
+}
+for (const t of probing ? [] : towns) {
+  const plan = planTown(t, ground);
+  const faults = townFaults(plan, ground);
+  const layouts = townLayouts(plan, ground);
+  const area = plan.rings.reduce((sum, r) => sum + Math.abs(r.ring.reduce((a, [x, y], i) => { const [nx, ny] = r.ring[(i + 1) % r.ring.length]; return a + x * ny - nx * y; }, 0)) / 2, 0);
+  console.log(`Town ${t.name}: ${plan.rings.length} pieces of ground in ${t.paths.length} paths, about ${Math.round(area)} m2, ${t.spots.length} spots, floor ${t.floor} m (streets up to ${Math.max(...plan.rings.map((r) => r.z)).toFixed(1)} m)`);
+  for (const l of layouts) console.log(`  landing for ${l.place}: dock ${l.layout.dock ? `${l.layout.dock.x},${l.layout.dock.y} at ${l.layout.dock.z} m` : 'NONE'}${l.layout.berth ? `, ${l.layout.berth.depth} m of water ${Math.round(Math.hypot(l.layout.berth.x - l.layout.dock!.x, l.layout.berth.y - l.layout.dock!.y))} m off it` : ', NO BERTH OFF IT'}`);
+  for (const f of faults) console.log(`  FAULT ${f}`);
+  for (const l of t.landings) if (!places.some((p) => p.id === l.place)) { console.log(`  FAULT landing for ${l.place}: no such place`); bad++; }
+  bad += faults.length;
 }
 if (bad) console.log(`${bad} to fix`);

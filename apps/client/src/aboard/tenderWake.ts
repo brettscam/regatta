@@ -56,6 +56,11 @@ export class TenderWake {
     scene.add(this.group);
   }
 
+  /** The colour of white water in this light (`stage.white`), so spray does not glow after dark. Left alone, it is white. */
+  tint(colour: THREE.Color): void {
+    (this.spray.material as THREE.MeshBasicMaterial).color.copy(colour);
+  }
+
   /** How many drops are in the air. For the console. */
   showing(): { drops: number } {
     return { drops: this.drops.filter((d) => d.age < d.life).length };

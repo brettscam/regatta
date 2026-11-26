@@ -85,7 +85,7 @@ export class BadAir implements Feature {
     // The player's own wind. Held, her sails are stowed and it does not matter.
     let want = 1;
     this.by = null;
-    if (s.hold === 'none' && sources.length) {
+    if (s.hold === 'none' && sources.length && !sim.boat.power) {
       const here = world.sample(s.x, s.y, s.t);
       const shadow = shadowAt(s.x, s.y, here.windDir, here.windSpeed, sources);
       want = shadow.factor;
@@ -97,7 +97,7 @@ export class BadAir implements Feature {
     if (!pacers.length) return;
     const first = sources.length - pacers.length;
     const d = sim.boat.dimensions;
-    sources.push({ x: s.x, y: s.y, sog: sim.out.sog, cog: sim.out.cog, length: d.loa, mast: d.mastHeight, sails: s.hold === 'none' });
+    sources.push({ x: s.x, y: s.y, sog: sim.out.sog, cog: sim.out.cog, length: d.loa, mast: d.mastHeight, sails: s.hold === 'none' && !sim.boat.power });
     for (let i = 0; i < pacers.length; i++) {
       const p = pacers[i];
       const ps = p.sim.state;

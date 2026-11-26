@@ -26,6 +26,8 @@ interface Rule {
   say(c: HintContext): string;
   /** Said once in a sail and not again. */
   once?: boolean;
+  /** True for a hint that is a powerboat's. Left out, it is for a boat with sails, and a powerboat never hears it. */
+  power?: boolean;
 }
 
 const SAVED = 'regatta.hints';
@@ -155,6 +157,29 @@ export class Hints {
       say: () => 'This chop is stopping her: every wave takes a little speed. Crack off a few degrees and keep her moving. In a sea, speed first and pointing second.',
     },
     {
+      // ---- a powerboat's own. She gets these and none of the sailing ones above.
+      id: 'pounding', after: 2, power: true,
+      when: (c) => (c.slams?.() ?? 0) >= 5 && c.sim.out.underPower,
+      say: (c) => `She is pounding: thrown off the top of each wave and landing hard. Every landing costs speed, and the hard ones cost hull. Ease the throttle with the comma key to about ${Math.max(6, Math.floor(c.sim.out.comfort / KT))} kt, or put the seas on her shoulder.`,
+    },
+    {
+      id: 'hump', after: 14, power: true,
+      when: (c) => {
+        const p = c.sim.boat.power;
+        const kt = c.sim.state.speed / KT;
+        return !!p && c.sim.out.underPower && kt > p.humpKt + 0.5 && kt < p.planeKt - 1.5 && Math.abs(c.sim.out.targetSpeed - c.sim.state.speed) < 0.6 && c.sim.out.seaLoss < 0.04;
+      },
+      say: () => 'She is ploughing along with her bow in the air, neither one thing nor the other, and drinking fuel for it. A step more throttle (full stop) puts her on the plane. A step or two less and she is a displacement boat again.',
+    },
+    {
+      id: 'noSteerage', after: 4, power: true,
+      when: (c) => {
+        const s = c.sim.state;
+        return s.helmMode === 'hand' && !c.sim.out.underPower && Math.abs(s.rudderCmd) > 0.3 && Math.abs(s.speed) > 1.2 * KT && c.sim.out.rudderGrip < 0.35;
+      },
+      say: () => 'Out of gear she barely answers the wheel: an outboard steers by pointing its thrust. Put her in gear (full stop) and she will come round.',
+    },
+    {
       id: 'tack', after: 15,
       when: (c) => {
         const m = c.nextMark();
@@ -195,8 +220,10 @@ export class Hints {
       this.held.clear();
       return;
     }
+    const power = !!this.ctx.sim.boat.power;
     for (const r of this.rules) {
-      const held = r.when(this.ctx) ? (this.held.get(r.id) ?? 0) + dt : 0;
+      // A sailing boat is coached on her sails, a powerboat on her throttle: neither hears the other's.
+      const held = !!r.power === power && r.when(this.ctx) ? (this.held.get(r.id) ?? 0) + dt : 0;
       this.held.set(r.id, held);
       if (held < r.after || this.clock < this.quietUntil) continue;
       if (this.clock - (this.lastSaid.get(r.id) ?? -1e9) < (r.once ? Infinity : 150)) continue;

@@ -23,6 +23,11 @@ export interface VenuePlace {
     tables?: number;
     /** `white` for a deck of white sunshades. Otherwise they are coloured by the place's hash. */
     umbrellas?: string;
+    /**
+     * The place is part of a town (a water's `towns.json`, `scene/town.ts`): no venue of its own is built, and the
+     * town's layout stands for it in `stage.shore`.
+     */
+    town?: string;
   };
 }
 
@@ -66,10 +71,13 @@ export interface VenuePlan {
 /** One named spot on a venue, in course metres. `face` is the compass heading, radians, of someone using it. */
 export interface VenueSpot {
   name: string;
-  kind: 'door' | 'table' | 'seat' | 'bar' | 'rail' | 'dance' | 'fire' | 'dock';
+  /** The last four are a town's (`scene/town.ts`): a bench to sit on, something to stand and look at, the head of a flight of steps, a shop door. */
+  kind: 'door' | 'table' | 'seat' | 'bar' | 'rail' | 'dance' | 'fire' | 'dock' | 'bench' | 'sight' | 'steps' | 'shop';
   x: number;
   y: number;
   face: number;
+  /** ashore: true where one of the figures drawn as scenery (`VenuePlan.people`) is already sitting or standing, so no player is put there. */
+  taken?: boolean;
 }
 
 /** A venue in course coordinates: what the next piece of work needs to let people go ashore and walk about. */
@@ -86,6 +94,11 @@ export interface VenueLayout {
   floor: number;
   /** Outlines of what can be walked on, each a ring of [x, y]: the deck first, then the walkway, then the guest float. */
   walk: Array<Array<[number, number]>>;
+  /**
+   * ashore: the height of each outline in `walk`, metres above the still sea, as it is drawn: at its first edge and at
+   * the edge opposite. The two are the same for a level floor and differ for a walkway that slopes down to its float.
+   */
+  levels: Array<[number, number]>;
   /** The guest float: where a tender lands and the crew steps up. Null where the shore has no room for one. */
   dock: { x: number; y: number; z: number } | null;
   /** The nearest water off the dock where a yacht can lie afloat, and how much water there is on the chart. */
@@ -99,7 +112,8 @@ const BERTH_DEPTH = 3.5;
 
 /** Where a place's venue stands and everything on it. Null where there is no shore within reach of the place. */
 export function planVenue(place: VenuePlace, g: VenueGround): VenuePlan | null {
-  if (!place.ashore) return null;
+  // A place in a town has the town for its venue.
+  if (!place.ashore || place.ashore.town) return null;
   const from = place.ashore.site ?? [place.x, place.y];
   const edge = siteFor(from[0], from[1], g);
   if (!edge) return null;
@@ -264,14 +278,19 @@ export function layoutOf(p: VenuePlan, g: VenueGround): VenueLayout {
   };
   const ring = (r: Rect): Array<[number, number]> => [xy(r.u0, r.v0), xy(r.u1, r.v0), xy(r.u1, r.v1), xy(r.u0, r.v1)];
   const walk: VenueLayout['walk'] = [];
-  if (p.deck) walk.push(ring(p.deck));
-  if (p.jetty) walk.push(ring({ u0: p.jetty.u - 1.3, u1: p.jetty.u + 1.3, v0: p.jetty.v0, v1: p.jetty.v1 }));
-  if (p.float) walk.push(ring(p.float));
+  // ashore: the heights go with the outlines, one pair each.
+  const levels: VenueLayout['levels'] = [];
+  const floor = round(s.base + p.level);
+  if (p.deck) { walk.push(ring(p.deck)); levels.push([floor, floor]); }
+  if (p.jetty) { walk.push(ring({ u0: p.jetty.u - 1.3, u1: p.jetty.u + 1.3, v0: p.jetty.v0, v1: p.jetty.v1 })); levels.push([round(s.base + p.jetty.z0, 100), round(s.base + p.jetty.z1, 100)]); }
+  if (p.float) { walk.push(ring(p.float)); levels.push([0.45, 0.45]); }
 
   const spots: VenueSpot[] = [];
   const add = (name: string, kind: VenueSpot['kind'], u: number, v: number, a: number) => {
     const [x, y] = xy(u, v);
-    spots.push({ name, kind, x, y, face: face(a) });
+    // ashore: a seat, a stool or a place at the rail that one of the scenery's figures has is marked as taken.
+    const taken = (kind === 'seat' || kind === 'bar' || kind === 'rail') && p.people.some((who) => Math.hypot(who.u - u, who.v - v) < 0.5);
+    spots.push(taken ? { name, kind, x, y, face: face(a), taken } : { name, kind, x, y, face: face(a) });
   };
   if (p.deck) add('door', 'door', 0, p.deck.v0 + 0.6, Math.PI / 2);
   p.tables.forEach((t, i) => {
@@ -298,7 +317,7 @@ export function layoutOf(p: VenuePlan, g: VenueGround): VenueLayout {
       if (d >= BERTH_DEPTH) { berth = { x: bx, y: by, depth: round(d) }; break; }
     }
   }
-  return { id: p.id, kind: p.kind, name: p.sign, x: round(s.x), y: round(s.y), heading: round(heading, 1000), floor: round(s.base + p.level), walk, dock, berth, spots };
+  return { id: p.id, kind: p.kind, name: p.sign, x: round(s.x), y: round(s.y), heading: round(heading, 1000), floor, walk, levels, dock, berth, spots };
 }
 
 const round = (n: number, k = 10): number => Math.round(n * k) / k;
