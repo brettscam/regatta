@@ -37,7 +37,11 @@ export interface CourseData {
   forecast: { issued: string; hours: number; source: string; windIssued?: string };
   current: GridSpec & { scale: number; steps: number; file: string; insets?: GridSpec[] };
   depth: GridSpec & { scale: number; file: string; insets?: GridSpec[] };
-  terrain: GridSpec & { max: number; file: string; source: string; insets?: GridSpec[] };
+  terrain: GridSpec & {
+    max: number; file: string; source: string; insets?: GridSpec[];
+    /** A picture of the land from above (a satellite scene, sea masked out) to drape over it: the file beside the course, and the box it covers. */
+    image?: { file: string; x0: number; y0: number; x1: number; y1: number; source?: string };
+  };
   wind: GridSpec & {
     scale: number; truth: WindStep[]; forecast: WindStep[]; note: string;
     /** What in the wind is worked out by rule and not recorded, where anything is. Shown with the sources. */

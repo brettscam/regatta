@@ -142,6 +142,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const pos = new Float32Array(nx * ny * 3);
   const col = new Float32Array(nx * ny * 3);
   const h = new Float32Array(nx * ny);
+  const tint = new Float32Array(nx * ny);
   for (let k = 0; k < nx * ny; k++) h[k] = (heights[k] / 255) ** 2 * g.max;
   const wet = (i: number, j: number) => h[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))] <= 0.4;
 
@@ -249,6 +250,7 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
       // Faces turned away from the afternoon sun, to the north and east, read a touch darker.
       const away = THREE.MathUtils.clamp((-e - n) * 1.6, -0.5, 1);
       const grain = (0.93 + 0.14 * hash(i, j)) * (1 - 0.16 * Math.max(0, away)) * (1 + 0.05 * Math.max(0, -away));
+      tint[k] = grain;
       col[k * 3] = c.r * grain;
       col[k * 3 + 1] = c.g * grain;
       col[k * 3 + 2] = c.b * grain;
@@ -273,6 +275,21 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
   const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  // Where the water has a picture of its land from above and this grid lies inside it, each point knows its place in
+  // the picture, and keeps a second set of colours: plain grey grain and shading, to multiply the picture by.
+  const im = course.terrain.image;
+  if (im && g.x0 >= im.x0 - 1 && g.y0 >= im.y0 - 1 && g.x0 + (nx - 1) * dx <= im.x1 + 1 && g.y0 + (ny - 1) * dx <= im.y1 + 1) {
+    const uv = new Float32Array(nx * ny * 2);
+    const grey = new Float32Array(nx * ny * 3);
+    for (let k = 0; k < nx * ny; k++) {
+      uv[k * 2] = (pos[k * 3] - im.x0) / (im.x1 - im.x0);
+      uv[k * 2 + 1] = (-pos[k * 3 + 2] - im.y0) / (im.y1 - im.y0);
+      grey[k * 3] = grey[k * 3 + 1] = grey[k * 3 + 2] = (tint[k] || 1) * 1.12;
+    }
+    geom.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geom.userData.rule = geom.getAttribute('color');
+    geom.userData.grey = new THREE.BufferAttribute(grey, 3);
+  }
   geom.setIndex(new THREE.BufferAttribute(idx.subarray(0, p), 1));
   geom.computeVertexNormals();
   const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ vertexColors: true }));
@@ -282,6 +299,25 @@ export function buildTerrain(course: CourseData, heights: Uint8Array, cover = 's
 }
 
 /** Where each grid of a course's land begins in its height data: the main grid, then its insets in order. */
+/**
+ * Drape a picture of the land from above over every part of it that lies inside the picture (see `buildTerrain`), or
+ * take it off again with null. With the picture on, a part's own colours are its grey grain; off, the colours made by rule.
+ */
+export function drapeLand(land: THREE.Object3D, picture: THREE.Texture | null): number {
+  let n = 0;
+  land.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const geom = mesh.geometry as THREE.BufferGeometry | undefined;
+    if (!geom?.userData.grey) return;
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    geom.setAttribute('color', picture ? geom.userData.grey : geom.userData.rule);
+    mat.map = picture;
+    mat.needsUpdate = true;
+    n++;
+  });
+  return n;
+}
+
 export function landParts(course: CourseData): Array<{ grid: GridSpec; start: number }> {
   const out = [{ grid: course.terrain as GridSpec, start: 0 }];
   let o = course.terrain.nx * course.terrain.ny;

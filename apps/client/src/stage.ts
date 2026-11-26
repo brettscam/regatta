@@ -3,7 +3,7 @@ import { KT } from '@slack-tide/sim';
 import { SeaState, emptySea, type CourseData, type ReplayWorld, type Sea } from '@slack-tide/world';
 import { Ocean } from './scene/ocean';
 import { SkySystem } from './scene/sky';
-import { Buoy, buildBridge, buildLand, drawnLandHeight, landHeight } from './scene/terrain';
+import { Buoy, buildBridge, buildLand, drapeLand, drawnLandHeight, landHeight } from './scene/terrain';
 import { Seamarks } from './scene/seamarks';
 import { Traffic, type TrafficVessel } from './scene/traffic';
 import { buildScenery } from './scene/scenery';
@@ -204,6 +204,17 @@ export class Stage {
     const land = new THREE.Group();
     land.name = 'course';
     const terrain = buildLand(this.course, data.terrain, scenery.landCover);
+    // A water with a picture of its land from above (Catalina: a satellite scene) wears it, lit like the rest of the
+    // land, unless the graphics are on low: then the land keeps the colours made by rule.
+    if (data.landImage && graphics.level !== 'low') {
+      new THREE.TextureLoader().load(data.landImage, (picture) => {
+        if (this.land !== land) { picture.dispose(); return; }
+        picture.colorSpace = THREE.SRGBColorSpace;
+        picture.anisotropy = 8;
+        drapeLand(terrain, picture);
+        terrain.userData.picture = picture;
+      });
+    }
     land.add(terrain);
     this.seamarks = data.features?.lights.length ? new Seamarks(data.features.lights, landHeight(this.course, data.terrain)) : null;
     if (this.seamarks) land.add(this.seamarks.group);
